@@ -1,1 +1,1 @@
-# pkm-jp-full-color-patch
+# ポケモン赤、緑、青、ピカチュウフルカラーパッチ
