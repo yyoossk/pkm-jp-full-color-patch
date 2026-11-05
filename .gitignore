@@ -1,0 +1,7 @@
+base/
+out/
+obj/
+tools/
+*.gb
+*.gbc
+__pycache__/
