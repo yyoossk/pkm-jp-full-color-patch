@@ -1,0 +1,6 @@
+out/
+disasm/
+tools/rgbds/
+*.gbc
+*.o
+__pycache__/
