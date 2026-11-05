@@ -164,14 +164,6 @@ F5_LoadObjects:
 	fw_farcall FW_BANK, Fw_MapLoad
 	ret
 
-; スプライトを 並べる 前（_UpdateSprites $01:$5920 の call InitSprites $01:$5930）に Fw_Vis
-SECTION "follow updatesprites hook", ROMX[$5930], BANK[$01]
-	call F1_InitSprites
-SECTION "follow bank1 vis", ROMX[$7fe8], BANK[$01]
-F1_InitSprites:
-	fw_farcall FW_BANK, Fw_Vis
-	jp $5991                          ; InitSprites
-
 SECTION "follow handlemap hook", ROMX[$6788], BANK[$25]
 	call F25_Objects                  ; 元は call HandleMapObjects
 SECTION "follow bank25", ROMX[$7fe0], BANK[$25]
@@ -1256,27 +1248,7 @@ Fw_Update:
 	push de
 	call FW_GetObjectStruct
 	pop de
-	; 主人公と すれちがう 間（ふりかえって 連れ歩きの ほうへ 歩いた とき）は 見えなく する（主人公の 上・下に かさなって 見えた）
-	ld hl, OBJ_DIR_WALKING
-	add hl, bc
-	ld a, [hl]
-	cp $ff
-	jr z, .notcross
-	ld e, a
-	ld a, [wObjectStructs + OBJ_DIR_WALKING]
-	cp $ff
-	jr z, .notcross
-	xor 1
-	cp e
-	jr z, .hide
-.notcross
-	push de
-	call Fw_Toward
-	pop de
-	cp 1
-	jr z, .hide
-	cp 2
-	jp z, .noshow
+	; ふりかえって 主人公と 入れかわる ときは 見えた まま（主人公が 手前に かかれ、連れ歩きは 奥を とおる。ユーザーの 希望）
 .notahead
 	ld hl, OBJ_MAP_X
 	add hl, bc
@@ -1857,115 +1829,6 @@ Fw_SetInvis:
 	add hl, bc
 	set 0, [hl]
 	ret
-;---------------------------------------------------------------------
-; 連れ歩きが 主人公の まえ（主人公が 歩いて いく ほう）に いるか（bc = 連れ歩きの 構造体）
-; a = 1：見えなく する、2：いまの まま、0：何も しない（z）
-Fw_Toward:
-	; 主人公から みて 連れ歩きが いる 向き（十字キーの ビット：下 $80・上 $40・左 $20・右 $10）を e に
-	ld e, 0
-	ld hl, OBJ_SPRITE_X
-	add hl, bc
-	ld a, [wObjectStructs + OBJ_SPRITE_X]
-	sub [hl]                          ; 主人公 − 連れ歩き
-	jr z, .ny
-	ld e, $10
-	bit 7, a
-	jr nz, .ny
-	ld e, $20
-.ny
-	inc hl
-	ld a, [wObjectStructs + OBJ_SPRITE_Y]
-	sub [hl]
-	jr z, .gotmask
-	bit 7, a
-	ld a, $80
-	jr nz, .sety
-	ld a, $40
-.sety
-	or e
-	ld e, a
-.gotmask
-	ld a, e
-	and a
-	jr z, .none
-	; 主人公が 連れ歩きの ほうへ 歩いて いる（または その 向きの 十字キーを おして いて これから 歩く）間は 見えなく する
-	; （連れ歩きが 主人公の まえ・下に かさなって 見えない ように）
-	ld a, [wObjectStructs + OBJ_DIR_WALKING]
-	cp $ff
-	jr z, .pidle
-	and 3                             ; 下 0・上 1・左 2・右 3
-	ld l, a
-	ld a, $80
-	inc l
-.padsh
-	dec l
-	jr z, .padok
-	rrca
-	jr .padsh
-.padok
-	and e
-	jr nz, .hide
-	jr .none
-.pidle
-	ldh a, [hJoyDown]
-	and e
-	jr nz, .hide
-	; 主人公が 歩きと 歩きの あいだ（止まって いる 1〜2コマ）で、連れ歩きが まだ 動いて いる ときは そのまま（ちらつかない ように）
-	ld hl, OBJ_DIR_WALKING
-	add hl, bc
-	ld a, [hl]
-	cp $ff
-	jr z, .none
-	jr .keep
-.hide
-	ld a, 1
-	and a
-	ret
-.keep
-	ld a, 2
-	and a
-	ret
-.none
-	xor a
-	ret
-
-;---------------------------------------------------------------------
-; スプライトを 並べる 直前（_UpdateSprites の InitSprites の 前）：主人公が 連れ歩きの ほうへ 歩きだした コマで すぐ かくす
-; （歩きだしの コマは HandleMap の あとの Fw_Update が まわらない ことが あり、2コマ ほど 主人公に かさなって 見えて いた）
-Fw_Vis::
-	ld a, [wPartyCount]
-	and a
-	ret z
-	fw_wram2
-	ld a, [wFwBall]
-	ld e, a
-	fw_wram_back
-	ld a, e
-	and a
-	ret nz
-	call Fw_FindSlot
-	ret c
-	ld a, [bc]
-	cp $ff
-	ret z
-	call FW_GetObjectStruct
-	ld a, [bc]
-	cp FW_SPRITE
-	ret nz
-	ld a, [wObjectStructs + OBJ_DIR_WALKING]
-	cp $ff
-	ret z                             ; 主人公が 歩いて いる ときだけ（メニューの 中で キーを おしても かくさない）
-	call Fw_Toward
-	dec a
-	ret nz
-	ld hl, OBJ_FLAGS1
-	add hl, bc
-	set 0, [hl]                       ; INVISIBLE_F
-	ld hl, OBJ_FACING
-	add hl, bc
-	ld [hl], $ff                      ; STANDING
-	ret
-
 Fw_ClearInvis:
 	call Fw_FindSlot
 	ret c
