@@ -1,0 +1,5 @@
+*.gbc
+*.sym
+*.map
+obj/
+__pycache__/

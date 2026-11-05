@@ -1,0 +1,82 @@
+# ポケットモンスター金 追加機能パッチ を 組み立てる
+#   つかいかた：python3 build.py
+#   ・このフォルダに 元の ROM（ポケットモンスター金 後期版。CRC32 4EF7F2A5）を base.gbc の 名前で おく
+#   ・RGBDS 1.0.4 の rgbasm・rgblink・rgbfix を PATH に 入れる（または 環境変数 RGBDS に その フォルダ）
+#   ・できる もの：kin.gbc（通常版）・kin60.gbc（60fps版）
+import subprocess,sys,os,zlib
+T=os.environ.get('RGBDS','')
+if T and not T.endswith('/'): T+='/'
+HERE=os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
+FILES=[
+    'src/features.asm',
+    'src/bugfix.asm',
+    'src/minis.asm',
+    'src/hmfield.asm',
+    'src/fishnest.asm',
+    'src/rematch_gold.asm',
+    'src/wild_gold.asm',
+    'src/clockopt_gold.asm',
+    'src/learnmove.asm',
+    'src/pikaballs.asm',
+    'src/statsmove.asm',
+    'src/redballs.asm',
+    'src/picpal.asm',
+    'src/fieldcolors.asm',
+    'src/safari/safari.asm',
+    'src/sigmove_gold.asm',
+    'src/autobox.asm',
+    'src/masterball.asm',
+    'src/repelask.asm',
+    'src/textspeed.asm',
+    'src/phonefreq.asm',
+    'src/moverelearn.asm',
+    'src/movetutor.asm',
+    'src/nesttime.asm',
+    'src/kurtbulk.asm',
+    'src/daycarehint.asm',
+    'src/legends.asm',
+    'src/starters.asm',
+    'src/movepower.asm',
+    'src/phonemark.asm',
+    'src/itemfinder.asm',
+    'src/pokegearwhite.asm',
+    'src/quickball.asm',
+    'src/hearts.asm',
+    'src/gearday.asm',
+    'src/eggsteps.asm',
+    'src/partyshiny.asm',
+    'src/mapsign.asm',
+    'src/hpower.asm',
+    'src/dvview.asm',
+    'src/enemyhp.asm',
+    'src/partyitem.asm',
+    'src/fishbite.asm',
+    'src/moveacc.asm',
+    'src/legendrevive.asm',
+    'src/contestpc.asm',
+    'src/monmenu_fix.asm']
+EXPECT={'kin.gbc':0x282A970B,'kin60.gbc':0x25F5129D}   # Ver.1.2.1
+def run(*a):
+    r=subprocess.run(a,capture_output=True,text=True)
+    if r.returncode: print(r.stdout,r.stderr); sys.exit(1)
+def build(asms,out,base='base.gbc',basedata=0x51aa9):
+    objs=[]
+    os.makedirs('obj',exist_ok=True)
+    for a in asms:
+        o='obj/'+os.path.basename(a)+'.o'
+        run(T+'rgbasm','-I','pokegold/','-o',o,a); objs.append(o)
+    run(T+'rgblink','-O',base,'-n',out.replace('.gbc','.sym'),'-m',out.replace('.gbc','.map'),'-o',out,*objs)
+    d=bytearray(open(out,'rb').read())
+    for i in range(251):                 # すべての ポケモンが ひでんマシンを おぼえる
+        o=basedata+i*32
+        d[o+30]|=0xfc
+        d[o+31]|=0x01
+    open(out,'wb').write(d)
+    run(T+'rgbfix','-v','-p','0',out)
+    c=zlib.crc32(open(out,'rb').read())
+    print(out,'%08X'%c,'OK' if c==EXPECT.get(out) else '（リリースと ちがう）')
+if __name__=='__main__':
+    if not os.path.exists('base.gbc'): sys.exit('base.gbc（ポケットモンスター金 後期版）を おいてください')
+    if zlib.crc32(open('base.gbc','rb').read())!=0x4EF7F2A5: print('注意：base.gbc の CRC32 が 4EF7F2A5（後期版）では ありません')
+    build(FILES,'kin.gbc')
+    build(FILES+['src/fps60.asm'],'kin60.gbc')
