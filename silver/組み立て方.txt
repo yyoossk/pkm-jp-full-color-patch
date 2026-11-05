@@ -1,0 +1,21 @@
+ポケットモンスター銀 追加機能パッチ Ver.1.2.1 の ソース
+
+中身
+  src/・bf/・data/・gfxdata/ … 追加機能の ソース
+  build.py・mkips.py・tools/ … 組み立ての 道具
+  README.txt・*_説明.txt     … 説明
+  pokegold/                  … pret/pokegold の constants/・macros/（定数と マクロ。組み立てで 読む だけ）
+
+いる もの
+  ・rgbds 1.0.4（rgbasm・rgblink・rgbfix）
+  ・Python 3
+  ・元の ROM：ポケットモンスター銀（後期版）CRC32 0AEA5383 を silver/base.gbc として おく（ROM は 入って いない）
+
+組み立て（silver/ の 中で）
+  export RGBDS=<rgbds の フォルダ>/   （PATH に あれば いらない）
+  export POKEGOLD=pokegold/
+  通常版：python3 build.py feat.gbc $(cat buildlist.txt)
+  60fps版：python3 build.py feat60.gbc src/fps60.asm $(cat buildlist.txt)
+
+できた ROM の CRC32：通常版 C09BAB55、60fps版 56A97AB1（リリースの パッチを 当てた ものと 同じ）
+IPS を 作る：python3 mkips.py feat.gbc 通常版.ips base.gbc

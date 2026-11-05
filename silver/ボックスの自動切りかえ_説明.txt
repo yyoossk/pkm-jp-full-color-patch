@@ -1,0 +1,65 @@
+ボックスが いっぱいに なったら 自動で 次の ボックスに 切りかえる（ピカチュウ版フルカラーと 同じ。金銀クリスタル共通）
+==========================================================================
+使うファイル：
+  src/autobox.asm   本体（アドレスは 先頭の DEF だけ。入っている値は 金 日本版）
+
+
+■ README・説明に使う文言
+--------------------------------------------------------------------------
+（機能の一覧に入れる短い文）
+  ・ボックスが いっぱいに なったら 自動で 次の ボックスに 切りかえる（ピカチュウ版フルカラーと 同じ）
+
+（くわしい説明）
+  元のゲームでは ボックスが いっぱい（30匹）に なると、パソコンで ボックスを 切りかえるまで
+  ポケモンを つかまえられませんでした（手もちも 6匹のとき）。
+  ピカチュウ版フルカラーと 同じように、フィールドで いまの ボックスが いっぱいだと、
+  次の あいている ボックスに 自動で 切りかえて レポートを 書くようにしました。
+  ・「ポケモン ボックス１が いっぱいに なりました！ ポケモン ボックス２に じどうで きりかえました！
+     ボックスを きりかえたので レポートを かきました！」（ピカチュウ版の 文）
+  ・次の ボックスは いまの 次から じゅんに さがします（9 の 次は 1）。
+  ・ぜんぶ いっぱいなら「ポケモン ボックスが ぜんぶ いっぱいです！ パソコンで ボックスを せいり してください」（1回だけ）。
+  ・まだ 1回も レポートを 書いていないときと、ちがう 人の レポートが あるときは 切りかえません。
+
+
+■ しくみ
+--------------------------------------------------------------------------
+  ・フィールドで 毎回 動く CheckTimeEvents の .do_daily の さいごの「farcall CheckPhoneCall」（6バイトの うち 前の 5バイト）を
+    AutoBox_Check への farcall に かえる。
+  ・AutoBox_Check：CheckPhoneCall（元の 処理）で 電話が かかってこなければ、
+      wSavedAtLeastOnce が 0 → なにもしない
+      いまの ボックスの 数（SRAM の sBoxCount）が 30 より 少ない → wAutoBoxDone を 0 に して おわり
+      wAutoBoxDone が 1（もう 知らせた）→ なにもしない
+      CompareLoadedAndSavedPlayerID が ちがう → なにもしない
+      それ以外 → wAutoBoxDone = 1、CallScript で AutoBox_Script を 始めて キャリー（電話と 同じ）
+  ・AutoBox_Script：次の あいている ボックスを さがし（ほかの ボックスの 数は GetBoxCount.BoxBankAddresses と 同じ 表で SRAM から 読む。
+    farcall では a が もどらないので GetBoxCount は 使わない）、
+      あれば SFX_SAVE → パソコンの「ボックスを かえる」と 同じ（PauseGameLogic → SaveBox → wCurBox → LoadBox → _SaveGameData →
+      ResumeGameLogic。たずねない）→ 文。ボックスの 番号は wStringBuffer1 に「１@２@」の ように 入れて 文で 出す。
+      なければ「ぜんぶ いっぱい」の 文。
+  ・wAutoBoxDone・wAutoBoxNew：使われていない WRAM（金は $def0・$def1。60fps 版の $de40〜$dee7 の あと）。
+
+
+■ 銀・クリスタルに入れるとき
+--------------------------------------------------------------------------
+  先頭の DEF（IF !DEF(AUTOBOX_HOOK) の中）を その ROM の 値に する（先に DEF を 書いた .inc を 読みこんでもよい。
+  AUTOBOX_BOXES マクロも 先に 決めれば そちらが 使われる）。
+  ・AUTOBOX_HOOK / _BANK：CheckTimeEvents.do_daily の「farcall CheckPhoneCall」の 所
+    （金：ld a, $24 / ld hl, $4074 / rst $08 が $25:$6890。ほかの farcall の あと、ret c の 前）。
+    クリスタルは .do_daily の 中身が ちがう（CheckPhoneCall の 前後を 見て、さいごの farcall を かえる）。
+  ・AUTOBOX_BANK / _ADDR：処理を 置く 空き（約 370バイト）。
+  ・wAutoBoxDone・wAutoBoxNew：使われていない WRAM 2バイト。
+  ・AUTOBOX_NUM_BOXES・AUTOBOX_MONS_PER_BOX：日本版は 金銀クリスタルとも 9・30。
+  ・AUTOBOX_SBOX_BANK・AUTOBOX_SBOXCOUNT：いまの ボックス（sBoxCount）の SRAM の バンクと アドレス（GetBoxCount.activebox で わかる）。
+  ・AUTOBOX_BOXES：ボックス1〜9 の 場所（GetBoxCount.BoxBankAddresses の 表を そのまま 写す）。
+  ・src/jp_all.inc の 名前：CheckPhoneCall・CompareLoadedAndSavedPlayerID・PauseGameLogic・SaveBox・LoadBox・_SaveGameData・
+    ResumeGameLogic・CallScript・OpenSRAM・CloseSRAM、RAM の wCurBox・wSavedAtLeastOnce・wScriptVar・wStringBuffer1。
+    文は 日本版 金銀クリスタルで 同じ 文字コード（そのまま 使える）。
+
+
+■ 確かめたこと（金 日本版、SameBoy。通常版・60fps版）
+--------------------------------------------------------------------------
+  ・レポートを 書いたあと、いまの ボックス（1）を 30匹に すると、すぐに 音 →
+    「ボックス１が いっぱいに…」→「ボックス２に じどうで きりかえました」→「レポートを かきました」。
+    ボックス1 の 場所に 30匹の まま 書かれ、いまの ボックスは 2（0匹）に なった。
+  ・ぜんぶ いっぱいのとき「ぜんぶ いっぱいです！ パソコンで ボックスを せいり してください」が 1回だけ 出て、ボックスは そのまま。
+  ・レポートを 1回も 書いていないときは 何も 起きない。

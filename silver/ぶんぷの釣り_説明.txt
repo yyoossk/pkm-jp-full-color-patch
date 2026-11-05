@@ -1,0 +1,98 @@
+ずかんの「ぶんぷをみる」に、つりざおで釣れる場所も出す
+==========================================================================
+金・銀・クリスタル（日本版・海外版）共通。使うファイル：
+  src/fishnest.asm                 本体（アドレスは先頭の DEF だけ）
+  src/fishnest_maps.inc            釣りの場所の表（金・銀。この2つは同じ表）
+  src/fishnest_maps_crystal.inc    釣りの場所の表（クリスタル）
+  tools/fishnest_find.py           ROM から fishnest.asm のアドレスを調べる
+  tools/fishnest_maps.py           釣りの場所の表を作る（作り直すときだけ）
+
+
+■ README・説明に使う文言
+--------------------------------------------------------------------------
+（機能の一覧に入れる短い文）
+  ・ずかんの「ぶんぷをみる」に、つりざおで釣れる場所も出す（釣りの場所は青いマーク）
+
+（くわしい説明）
+  ずかんの「ぶんぷをみる」で、つりざおで釣れる場所にも マークが出ます。
+  ・釣りの場所のマークは 青です。
+  ・草むらや水の上（なみのり）で出る場所と同じ所は、今までのマーク（黒）が出ます。
+  ・ボロのつりざお・いいつりざお・すごいつりざお、朝・昼・夜 のどれかで釣れる所に出ます。
+  ・ゲームのデータどおり、実際に釣れる所だけに出ます。
+  ・白黒のゲームボーイでは、釣りの場所も今までと同じマークです。
+
+
+■ 銀・クリスタルに入れるときの手順
+--------------------------------------------------------------------------
+1. アドレスを調べる（元の ROM、またはほかのパッチを当てた後の ROM）
+     python3 tools/fishnest_find.py 銀.gbc
+   次の10行が出る（ずかんの「ぶんぷ」の処理の命令の並びで探している。金・銀・クリスタルで同じ処理）。
+     DEF FISHNEST_HOOK / FISHNEST_HOOK_BANK / FISHNEST_DONE_NEST
+     DEF FISHNEST_FindNest / FISHNEST_FindNest_BANK
+     DEF FISHNEST_GetLandmarkCoords / FISHNEST_GetLandmarkCoords_BANK
+     DEF FISHNEST_wTilemap / FISHNEST_wShadowOAM / FISHNEST_wNamedObjectIndex
+
+2. 色・地方・置く所の行を足す
+   ・銀（日本版）：金と同じはず（1 で出た wTilemap・wShadowOAM・wNamedObjectIndex が金と同じなら、色の RAM も同じ）
+       DEF FISHNEST_KANTO_LANDMARK    EQU $2e
+       DEF FISHNEST_wOBPals1          EQU $c240
+       DEF FISHNEST_wOBPals2          EQU $c2c0
+       DEF FISHNEST_PALS_WRAMBANK     EQU 0
+       DEF FISHNEST_hCGB              EQU $ffe8
+       DEF FISHNEST_hCGBPalUpdate     EQU $ffe7
+   ・クリスタル（日本版。クリスタル追加機能キットの minis.asm と同じ値）
+       DEF FISHNEST_KANTO_LANDMARK    EQU $2f
+       DEF FISHNEST_wOBPals1          EQU $d040   ; WRAM バンク5
+       DEF FISHNEST_wOBPals2          EQU $d0c0
+       DEF FISHNEST_PALS_WRAMBANK     EQU 5
+       DEF FISHNEST_hCGB              EQU 0       ; カラー専用
+       DEF FISHNEST_hCGBPalUpdate     EQU $ffe5
+       DEF FISHNEST_MAPS EQUS "src/fishnest_maps_crystal.inc"
+   ・どれも：新しい処理（約430バイト）を置く所
+       DEF FISHNEST_BANK              EQU $..
+       DEF FISHNEST_ADDR              EQU $....
+     ほかのパッチ（features.asm・fps60.asm・minis.asm・hmfield.asm・バグ修正など）が使っている所と
+     重ならないようにする（.map ファイルで確かめる）。
+
+3. 1・2 の行を書いた .inc を作り、fishnest.asm より前に読みこむ
+   （fishnest.asm の DEF は「まだ決まっていなければ」の値なので、先に決めたほうが使われる）。
+     例：rgbasm -P src/fishnest_silver.inc -o obj/fishnest.o src/fishnest.asm
+   または fishnest.asm の先頭の DEF をそのまま書きかえてもよい。
+   ※ FISHNEST_HOOK などの10行を書くときは、2 の行も全部書く（全部そろっていないと組み立てで止まる）。
+
+4. 組み立てて確かめる
+   ・コイキング：釣りができる所に青いマーク。いかりのみずうみ など、水の上でも出る所は黒いマーク
+   ・ポッポ など釣れないポケモン：今までと同じ
+   ・左右で ジョウト・カントー を切りかえても出る。マークが点めつする
+   ・SELECT で自分の場所を出して、もどしても止まらない
+
+
+■ 選べること
+--------------------------------------------------------------------------
+  DEF FISHNEST_ALL_SPOTS EQU 1   を先に書くと、コイキング・トサキント・ニョロモを
+                                 釣りのできる所 全部に出す（ピカチュウ版と同じ）。
+  （いつもの設定（0）は ゲームのデータどおり。金銀クリスタルのデータでは、コイキングは もともと
+    釣りのできる所 全部で釣れるが、トサキントは「みずうみ」、ニョロモは「いけ」の釣りのグループの所だけ）
+
+
+■ 釣りの場所の表（作り直すときだけ）
+--------------------------------------------------------------------------
+  釣りができる所 = マップに 釣りのグループ があり、そのマップに水のタイルがある所。
+  （ほとんどのマップ（家の中なども）に 釣りのグループ が入っているので、水があるかで決める）
+  日本版も マップ・地名・釣りのデータは 英語版と同じなので、pret の組み立てた ROM と sym から作る。
+     金・銀：python3 tools/fishnest_maps.py pokegold.gbc pokegold.sym 5.8 > src/fishnest_maps.inc
+     クリスタル：python3 tools/fishnest_maps.py pokecrystal.gbc pokecrystal.sym 3.90 > src/fishnest_maps_crystal.inc
+  後ろの 5.8・3.90 は 使われていないマップ（SAFARI_ZONE_BETA）。
+  セキチクシティの地名で「うみべ」の釣りのグループが入っているので、除かないと まちがった所に出る。
+  （日本版 金の ROM からも同じ表が出ることを確かめた：sym の代わりにアドレスを書く。tools/fishnest_maps.py の説明）
+  クリスタルでは、ハナダシティ・4ばんどうろ・ハナダジム には釣りのグループが無い（金銀にはある）。
+
+■ しくみ（変える所は1か所）
+--------------------------------------------------------------------------
+  ・「ぶんぷをみる」のマークは Pokedex_GetArea.GetAndPlaceNest が出している。
+    FindNest が 今までの場所（草むら・水の上・はいかいするポケモン）を wTilemap にため、それをスプライトにする。
+  ・その中の「farcall FindNest」（6バイト）と次の2バイトを、
+    「新しい処理を farcall / jr .done_nest」に書きかえる。
+  ・新しい処理は FindNest を呼んだあと、釣りの場所を wTilemap+$100 にため（今までの場所にあるものは入れない）、
+    今までのマーク（OBJ パレット0）→ 釣りのマーク（OBJ パレット7）の順に、40個まで スプライトにする。
+    パレット7 は 色3 = こい青・色2 = 水色（マークの絵はほとんど色3なので、今までのマークは黒に見える）。

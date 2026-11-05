@@ -1,0 +1,63 @@
+ずかんの一覧と パソコンの ポケモンの絵を、白い背景に そのポケモンの色で出す
+==========================================================================
+金・銀・クリスタル（日本版）共通。使うファイル：
+  src/picpal.asm            本体（アドレスは先頭の DEF だけ）
+  tools/picpal_find.py      ROM から picpal.asm のアドレスを調べる
+
+
+■ README・説明に使う文言
+--------------------------------------------------------------------------
+（機能の一覧に入れる短い文）
+  ・ずかんの一覧と パソコンの ポケモンの絵を、白い背景に そのポケモンの色で出す
+
+（くわしい説明）
+  元のゲームでは、ずかんの一覧（緑）と パソコンで ポケモンを選ぶ画面（オレンジ）の 絵だけが 1色でした。
+  手持ちのポケモンの画面と同じように、白い背景に そのポケモンの色で出るようにしました。
+  ・ずかん：カーソルを動かすと、そのポケモンの色に変わります。見たことがないポケモン（？の絵）は 今までどおり 緑です。
+  ・パソコン：ポケモンを あずける・つれていく・うごかす 画面で、選んでいるポケモンの色になります（色ちがいは色ちがいの色）。
+  白黒のゲームボーイでは 今までと同じです。
+
+
+■ 銀・クリスタルに入れるときの手順
+--------------------------------------------------------------------------
+1. アドレスを調べる（元の ROM、またはほかのパッチを当てた後の ROM）
+     python3 tools/picpal_find.py ROM.gbc
+   ・ずかんの絵を読む所（Pokedex_LoadSelectedMonTiles）、パソコンの絵を出す所（PCMonInfo）、
+     画面の色を作る所（_CGB_Pokedex_Init・_CGB_BillsPC の「$ff なら決まった色」）と、使う処理・WRAM を
+     命令の並びで探して DEF の形で出す（英語版の 金・銀・クリスタル でも 全部見つかることを確かめた）。
+   ・クリスタルは 色が WRAM のバンク5 にあるので PP_PALS_WRAMBANK EQU 5 も出る。PP_hCGBPalUpdate は $ffe5 にする。
+
+2. 空きを決めて足す
+       DEF PP_CGB_FREE        EQU $....   ; PP_CGB_BANK（画面の色の処理のバンク）の空き（約90バイト）
+       DEF PP_HOME_DEX        EQU $....   ; ホーム（バンク0）の空き 26バイト
+       DEF PP_HOME_PC         EQU $....   ; ホーム（バンク0）の空き 11バイト
+       DEF PP_wDexPicSpecies  EQU $....   ; 使われていない WRAM 1バイト
+       DEF PP_wPCPicSpecies   EQU $....   ; 使われていない WRAM 1バイト
+   ずかん・パソコンのバンクには空きがないことが多いので、ホームに小さな入口を置いて、色の処理のバンクへ farcall している。
+   ほかのパッチ（features.asm・fps60.asm・minis.asm・バグ修正・ボールの印 など）が使っている所と重ならないようにする
+   （.map ファイルで確かめる。金では ホームの $3f8a・$3fe0、バンク$02 の $7c00、WRAM の $de3e・$de3f を使った）。
+
+3. 1・2 の行を書いた .inc を作り、picpal.asm より前に読みこむ
+   （picpal.asm の DEF は「まだ決まっていなければ」の値なので、先に決めたほうが使われる）。
+     例：rgbasm -P src/picpal_silver.inc -o obj/picpal.o src/picpal.asm
+   ※ PP_DEX_HOOK などを書くときは、1 で出た行と 2 の行を 全部書く（全部そろっていないと組み立てで止まる）。
+
+4. 組み立てて確かめる
+   ・ずかんの一覧：カーソルを動かすと 絵がそれぞれのポケモンの色になる（背景は白）。見たことがない所は 緑の ？
+   ・ずかんの説明のページ・オプション・さがす から 一覧にもどっても 同じ色
+   ・パソコンの あずける・つれていく・うごかす：選んでいるポケモンの色（色ちがいも）。「やめる」では 絵が消える
+   ・ほかの画面（手持ち・つよさをみる・戦闘）の色が 変わっていないこと
+
+
+■ しくみ
+--------------------------------------------------------------------------
+  ・元のゲームは、この2つの画面で wCurPartySpecies = $ff にして 画面の色を作る（$ff なら 決まった1色の色の組）。
+    カーソルを動かしても 絵（タイル）だけを読みかえ、色はそのまま。
+  ・ずかん：Pokedex_LoadSelectedMonTiles の頭の call Pokedex_GetSelectedMon を ホームの入口へ。元の処理のあと、
+    Pokedex_CheckSeen で 見たことがあれば その種類、なければ 0 を wDexPicSpecies にしまい、色の処理を farcall。
+  ・パソコン：PCMonInfo の predef GetMonFrontpic のつぎの「xor a / ld [wBillsPC_MonHasMail], a」を ホームの入口へ。
+    色の処理を farcall して（wCurPartySpecies を wPCPicSpecies にしまう）、元の xor a / ld [wBillsPC_MonHasMail], a。
+  ・色の処理：絵の色は 背景のパレット1。ずかんは GetMonPalettePointer、パソコンは GetPlayerOrMonPalettePointer（個体値で色ちがい）で
+    LoadPalette_White_Col1_Col2_Black（白・色1・色2・黒）を wBGPals1 に書き、画面に出ている wBGPals2 にもうつして hCGBPalUpdate。
+  ・_CGB_Pokedex_Init・_CGB_BillsPC の「ld hl, 決まった色 / call LoadHLPaletteIntoDE」を、しまった種類の色を書く処理への call にする
+    （しまった種類が 0 のときは 元の決まった色）。
