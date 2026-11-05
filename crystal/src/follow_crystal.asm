@@ -93,6 +93,8 @@ DEF wFwLoadedPal       EQU $dfba     ; 読みこんで いる 色（$ff = まだ
 DEF wFwBall            EQU $dfbb     ; ボールの アニメ（0 なし・1 もどる・2 出る）
 DEF wFwBallT           EQU $dfbc     ; のこり フレーム
 DEF wFwHidden          EQU $dfbd     ; ボールに もどった（次に 出る ときは ボールから）
+DEF wFwLoadedFace      EQU $dfbe     ; 今の 色が 正面用（0）か 後ろ・横用（1）か
+DEF wFwMaskOK          EQU $dfbf     ; したじきの VRAM（バンク0 タイル $70〜$77）を あけられた か
 
 ; 種類の 番号（オブジェクト・マップオブジェクト）
 DEF OBJ_MAP_OBJECT_INDEX EQU $01
@@ -116,6 +118,7 @@ DEF MAPOBJ_EVENT_FLAG  EQU $0c
 DEF FW_wTimeOfDayPal  EQU $d834
 DEF FW_POKEPALS_BANK   EQU $7b       ; 固有の 色（follow_data.inc。tools/follow_gen.py が 作る）
 DEF FW_PokemonPalettes EQU $6000     ; FollowerOwnPals 0 = タマゴ、1〜251 × 8バイト（ふつうの 色1・色2、色ちがいの 色1・色2）
+DEF FW_WalkPalettes    EQU $67e0     ; FollowerWalkPals 後ろ・横（歩行グラフィック）用の 色。ならびは 同じ
 DEF FW_GetFarByte2     EQU $3019
 DEF FW_FarCopyWRAM     EQU $3037
 DEF FW_OWN_PAL         EQU 7         ; PAL_OW_ROCK
@@ -142,6 +145,8 @@ SECTION "follow getmonsprite hook", ROMX[$424e], BANK[$05]
 	jp F5_GetMonSprite                ; 元は cp $e0 / jr z, .BreedMon1
 SECTION "follow arrange hook", ROMX[$42d2], BANK[$05]
 	call F5_Prepare                   ; 元は call ArrangeUsedSprites
+SECTION "follow loadusedspritesgfx hook", ROMX[$4202], BANK[$05]
+	call F5_Misc                      ; 元は call LoadMiscTiles（LoadUsedSpritesGFX の さいご）
 SECTION "follow loadmapobjects hook", ROMX[$5573], BANK[$05]
 	call F5_LoadObjects               ; 元は ld a, MAPCALLBACK_OBJECTS / call RunMapCallback
 	nop
@@ -155,6 +160,10 @@ F5_GetMonSprite:
 	jp nz, $4252
 	fw_farcall FW_BANK, Fw_GetSprite
 	ret                               ; carry・de・bc・hl は Fw_GetSprite の もの
+F5_Misc:
+	call $4206                        ; LoadMiscTiles
+	fw_farcall FW_BANK, Fw_ReloadMask
+	ret
 F5_Prepare:
 	fw_farcall FW_BANK, Fw_Prepare
 	jp FW_ArrangeUsedSprites
@@ -162,6 +171,15 @@ F5_LoadObjects:
 	ld a, 2                           ; MAPCALLBACK_OBJECTS（先に。人を 出す・けす の あとで 空きを 決める）
 	call FW_RunMapCallback
 	fw_farcall FW_BANK, Fw_MapLoad
+	ret
+
+; スプライトを 並べた あと（_UpdateSprites $01:$5920 の call InitSprites $01:$5930）に Fw_Underlay
+SECTION "follow updatesprites hook", ROMX[$5930], BANK[$01]
+	call F1_InitSprites
+SECTION "follow bank1 underlay", ROMX[$7fe8], BANK[$01]
+F1_InitSprites:
+	call $5991                        ; InitSprites
+	fw_farcall FW_BANK, Fw_Underlay
 	ret
 
 SECTION "follow handlemap hook", ROMX[$6788], BANK[$25]
@@ -503,6 +521,63 @@ Fw_GetLead:
 	ret
 
 ; 固有の 色を 使うか（手持ちが いれば nc。どこでも 使う）
+; 連れ歩きの 向き：a = 0 正面（下向き・いない）、1 後ろ・横。bc・de・hl は こわさない
+Fw_FaceClass:
+	push bc
+	push de
+	push hl
+	call Fw_FindSlot
+	jr c, .zero
+	ld a, [bc]
+	cp $ff
+	jr z, .zero
+	call FW_GetObjectStruct
+	ld hl, $08                        ; OBJECT_DIRECTION（下 0・上 4・左 8・右 12）
+	add hl, bc
+	ld a, [hl]
+	and a
+	jr z, .done
+	ld a, 1
+	jr .done
+.zero
+	xor a
+.done
+	pop hl
+	pop de
+	pop bc
+	ret
+
+; まいフレーム：向きが 正面 ⇔ 後ろ・横 で かわったら 色を 書きなおす
+Fw_FaceCheck:
+	fw_wram2
+	ld a, [wFwBall]
+	ld e, a
+	ld a, [wFwLoadedFace]
+	ld d, a
+	fw_wram_back
+	ld a, e
+	and a
+	ret nz                            ; ボールの 間は ボールの 色
+	call Fw_FaceClass
+	cp d
+	ret z
+	; 色は すぐ 書かず、次の VBlank で 新しい 向きの 絵（OAM）と いっしょに かわる ように する（すぐ 書くと 1コマ 前の 絵が
+	; 新しい 色で 見えた：アリゲイツの 後ろ姿が 一瞬 赤い）
+	ld e, a
+	fw_wram2
+	ld a, e
+	ld [wFwLoadedFace], a
+	fw_wram_back
+	call Fw_OwnPalMode
+	ret c
+	ld hl, FW_wOBPals1 + FW_OWN_PAL * 8
+	call Fw_PutOwnPal
+	ld hl, FW_wOBPals2 + FW_OWN_PAL * 8
+	call Fw_PutOwnPal
+	ld a, 1
+	ldh [FW_hCGBPalUpdate2], a
+	ret
+
 Fw_OwnPalMode:
 	ld a, [wPartyCount]
 	and a
@@ -534,7 +609,16 @@ Fw_OwnColors:
 	add hl, hl
 	add hl, hl
 	add hl, hl
+	push af
+	push hl
+	call Fw_FaceClass                 ; 正面は 手持ちと 同じ 色、後ろ・横は 歩行グラフィックに あう 色
+	pop hl
 	ld de, FW_PokemonPalettes
+	and a
+	jr z, .front
+	ld de, FW_WalkPalettes
+.front
+	pop af
 	add hl, de
 	and a
 	jr z, .read
@@ -604,6 +688,12 @@ Fw_OwnPalToPals1:
 Fw_OwnPalNow:
 	call Fw_OwnPalMode
 	ret c
+	call Fw_FaceClass
+	ld e, a
+	fw_wram2
+	ld a, e
+	ld [wFwLoadedFace], a
+	fw_wram_back
 	ld hl, FW_wOBPals1 + FW_OWN_PAL * 8
 	call Fw_PutOwnPal
 	ld hl, FW_wOBPals2 + FW_OWN_PAL * 8
@@ -782,6 +872,7 @@ Fw_GetSprite:
 	ld a, c
 	ld [wFwLoadedPal], a
 	fw_wram_back
+	call Fw_LoadMask                  ; 正面の 白い したじき（VRAM バンク0 タイル $70〜$77）
 	call Fw_IndexToGfx
 	ld c, 12
 	ld l, 1                           ; WALKING_SPRITE
@@ -793,6 +884,10 @@ Fw_GetSprite:
 ; ArrangeUsedSprites の 前：wUsedSprites（スプライト・種類 の 組）を 並べかえる
 ;   1番め（主人公の 次）を 連れ歩き（$e2。なければ 足す）に、そのあと この マップの 人が 使う 歩く・立つ スプライトを 前に よせる
 Fw_Prepare:
+	fw_wram2
+	xor a
+	ld [wFwMaskOK], a
+	fw_wram_back
 	ld a, [wPartyCount]
 	and a
 	ret z
@@ -848,20 +943,35 @@ Fw_Prepare:
 
 ; 連れ歩きを 足した ぶん VRAM に のらない とき（元の ArrangeUsedSprites は のらない 組の タイルを 決めない まま にし、
 ; GetUsedSprites が 種類の 数を タイルと して 読みこみ、主人公の 絵を こわす）、この マップで 使わない 組を けす
+; さらに 正面の 白い したじき用に 2つめの 表の $f0〜$f7（VRAM バンク0 タイル $70〜$77）を あける（使わない 組を けす。
+; けせる 組が なく なったら あきらめて wFwMaskOK = 0）
 Fw_FixOverflow:
+	fw_wram2
+	ld a, 1
+	ld [wFwMaskOK], a
+	fw_wram_back
 .again
+	ld e, $f1                         ; 2つめの 表は $f0 まで
 	call Fw_Overflows
 	ret nc
 	call Fw_FindRemovable
-	jr c, .e2
+	jr c, .full
 	call Fw_RemoveEntry
 	jr .again
-.e2
+.full
+	fw_wram2
+	xor a
+	ld [wFwMaskOK], a
+	fw_wram_back
+.again2
+	ld e, 0
+	call Fw_Overflows
+	ret nc
 	; けせる 組が ない：連れ歩きを けす
 	ld c, 1
 	jp Fw_RemoveEntry
 
-; ArrangeUsedSprites と 同じ 数え方で、のらなければ carry
+; ArrangeUsedSprites と 同じ 数え方で、のらなければ carry（e ≠ 0 なら 2つめの 表の おわりが e 以上でも carry）
 Fw_Overflows:
 	ld hl, wUsedSprites
 	ld b, 0
@@ -894,10 +1004,21 @@ Fw_Overflows:
 	call .len
 	add b
 	ret c
+	ld d, a
+	ld a, e
+	and a
+	ld a, d
+	jr z, .nolim
+	cp e
+	jr nc, .ovf
+.nolim
 	ld b, a
 	dec c
 	jr nz, .sloop
 	and a
+	ret
+.ovf
+	scf
 	ret
 .len
 	cp 3
@@ -1284,6 +1405,9 @@ Fw_Update:
 	pop de
 	ret
 .noshow
+	push de
+	call Fw_FaceCheck                 ; 正面 ⇔ 後ろ・横 で 色を かえる
+	pop de
 	ld a, [wScriptMode]
 	and a
 	ret nz                            ; スクリプトの 間は さわらない
@@ -1829,6 +1953,171 @@ Fw_SetInvis:
 	add hl, bc
 	set 0, [hl]
 	ret
+;---------------------------------------------------------------------
+; 正面の 白い したじき
+; 手持ちの アイコンは 目・顔の 白を 透明（色0）で かいて いる（手持ちの 画面は 背景が 白）。スプライトは 透明＋3色 なので、
+; 外と つながって いない 透明の 所（あな）だけ 色1 の 絵（tools/follow_gen.py → gfxdata/follow_icon/mask.bin、バンク $67〜$69、
+; 1匹 128バイト）を VRAM バンク0 の タイル $70〜$77（人の 絵の 2つめの 表の $f0〜$f7。Fw_FixOverflow で あけて おく。
+; あけられない マップ（使う 人の 絵が 多すぎる）では wFwMaskOK = 0 で したじきを 出さない）に 置き、連れ歩きの 正面の 4枚の 後ろに 白（OBJ パレット5 の 色1 ＝ 白。
+; 朝・昼・夜・暗い 所 とも 白）で かさねる。あなから だけ 白が 見えて、手持ちの 画面と 同じ 見た目に なる（ユーザーの 希望）。
+
+; de = 絵の 番号（0〜278）。de は こわさない
+Fw_LoadMask:
+	fw_wram2
+	ld a, [wFwMaskOK]
+	ld l, a
+	fw_wram_back
+	ld a, l
+	and a
+	ret z                             ; VRAM を あけられなかった
+	push de
+	ld a, d
+	and a
+	jr nz, .high
+	ld a, e
+	jr .idx
+.high
+	ld a, e                           ; 256〜278（アンノーン・ボール）
+.idx
+	; バンク ＝ $67 ＋ 番号 / 128、場所 ＝ $4000 ＋（番号 % 128）× 128
+	ld l, e
+	ld h, d
+	add hl, hl                        ; h = 番号 / 128
+	ld a, h
+	add $67
+	ld b, a
+	ld a, e
+	and $7f
+	ld h, 0
+	ld l, a
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl                        ; × 128
+	ld a, h
+	add $40
+	ld d, a
+	ld e, l
+	ld a, b
+	cp $69 + 1
+	jr nc, .done                      ; ボール（したじき なし）
+	ld hl, $8700                      ; VRAM バンク0 の タイル $70（2つめの 表の $f0〜$f7）
+	ld c, 8
+	ldh a, [$ff4f]                    ; rVBK
+	push af
+	xor a
+	ldh [$ff4f], a
+	call FW_Get2bpp
+	pop af
+	ldh [$ff4f], a
+.done
+	pop de
+	ret
+
+; スプライトを 並べた あと：連れ歩きの 正面（止まり タイル $0c〜$0f・歩き $8c〜$8f、VRAM バンク1、パレット7）の
+; 4枚と 同じ 場所に、したじき（タイル $70〜$77、VRAM バンク0、パレット5）を 後ろに 足す
+DEF FW_wStateFlags      EQU $d0ad
+DEF FW_hUsedSpriteIndex EQU $ffbd
+; 人の 絵を 読みこんだ あと（LoadUsedSpritesGFX の さいご）：したじきを 読みなおす（メニューから もどった とき など）
+Fw_ReloadMask::
+	ld a, [wPartyCount]
+	and a
+	ret z
+	call Fw_GetLead
+	ret c
+	jp Fw_LoadMask
+
+Fw_Underlay::
+	ld a, [wPartyCount]
+	and a
+	ret z
+	fw_wram2
+	ld a, [wFwBall]
+	ld e, a
+	fw_wram_back
+	ld a, e
+	and a
+	ret nz                            ; ボールの 間は なし
+	fw_wram2
+	ld a, [wFwMaskOK]
+	ld e, a
+	fw_wram_back
+	ld a, e
+	and a
+	ret z
+	ld a, [FW_wStateFlags]
+	bit 1, a                          ; LAST_12_SPRITE_OAM_STRUCTS_RESERVED_F
+	ld d, $a0
+	jr z, .lim
+	ld d, $70
+.lim
+	ldh a, [FW_hUsedSpriteIndex]
+	ld c, a                           ; もとの おわり
+	ld b, 0
+.loop
+	ld a, b
+	cp c
+	ret nc
+	ld h, $c4                         ; wShadowOAM
+	ld l, b
+	inc l
+	inc l
+	ld a, [hli]                       ; タイル
+	ld e, a
+	ld a, [hl]                        ; 属性
+	and %00001111
+	cp %00001000 | 7                  ; VRAM バンク1・パレット7（連れ歩き）
+	jr nz, .next
+	ld a, e
+	and $7f
+	sub 12
+	cp 4
+	jr nc, .next                      ; 正面 では ない
+	bit 7, e
+	jr z, .stand
+	add 4
+.stand
+	add $70
+	ld e, a                           ; したじきの タイル
+	ldh a, [FW_hUsedSpriteIndex]
+	cp d
+	ret nc                            ; OAM が いっぱい
+	push bc
+	push de
+	ld h, $c4
+	ld l, b
+	ld a, [hli]                       ; Y
+	ld b, a
+	ld a, [hli]                       ; X
+	ld c, a
+	inc l
+	ld a, [hl]
+	and %11100000                     ; 前後・反転 は 同じ
+	or 5                              ; VRAM バンク0・パレット5
+	ld d, a
+	ldh a, [FW_hUsedSpriteIndex]
+	ld l, a
+	ld [hl], b
+	inc l
+	ld [hl], c
+	inc l
+	ld [hl], e
+	inc l
+	ld [hl], d
+	inc l
+	ld a, l
+	ldh [FW_hUsedSpriteIndex], a
+	pop de
+	pop bc
+.next
+	ld a, b
+	add 4
+	ld b, a
+	jr .loop
+
 Fw_ClearInvis:
 	call Fw_FindSlot
 	ret c

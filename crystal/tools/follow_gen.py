@@ -22,6 +22,31 @@ PER=42
 os.makedirs('gfxdata/follow_icon',exist_ok=True)
 ICON='gfxdata/follow_cc/icons/'
 MINIS=open('gfxdata/minis.2bpp','rb').read()
+# 手持ちの アイコンは 目・顔などの 白を 透明（色0）で かいて いる（手持ちの 画面は 背景が 白なので 白に 見える）。
+# フィールドでも 同じに 見せる ため、外と つながって いない 透明の 所（あな）だけ 色1 に した「白い したじき」の 絵を 作る
+# （gfxdata/follow_icon/mask.bin、1匹 128バイト ＝ 正面の 止まり・歩き 各4タイル）。ゲームでは 連れ歩きの 後ろに
+# 白（OBJ パレット5 の 色1）で かさねる（follow_crystal.asm の Fw_Underlay）。絵と 色は 手持ちと まったく 同じ（ユーザーの 希望）。
+MASKS=bytearray()
+def make_mask(d):
+    out=bytearray()
+    for f in range(2):
+        px=[[0]*16 for _ in range(16)]
+        for k,(ox,oy) in enumerate(((0,0),(8,0),(0,8),(8,8))):
+            t=d[f*64+k*16:f*64+k*16+16]
+            for y in range(8):
+                for x in range(8): px[oy+y][ox+x]=((t[y*2]>>(7-x))&1)|(((t[y*2+1]>>(7-x))&1)<<1)
+        seen=set(); st=[(x,y) for x in range(16) for y in (0,15)]+[(x,y) for y in range(16) for x in (0,15)]
+        st=[q for q in st if px[q[1]][q[0]]==0]
+        while st:
+            x,y=st.pop()
+            if (x,y) in seen: continue
+            seen.add((x,y))
+            for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)):
+                a,b=x+dx,y+dy
+                if 0<=a<16 and 0<=b<16 and px[b][a]==0 and (a,b) not in seen: st.append((a,b))
+        m=[[1 if (px[y][x]==0 and (x,y) not in seen) else 0 for x in range(16)] for y in range(16)]
+        out+=tiles(m)
+    return bytes(out)
 GRAY={255:0,170:1,85:2,0:3}
 def icon_frames(name):
     im=Image.open(ICON+name+'.png').convert('L'); px=im.load()
@@ -52,6 +77,7 @@ for i,name in enumerate(order):
     # 正面：手持ちと 同じ 絵（gfxdata/minis.2bpp：0 = タマゴ、1〜251。1匹 8タイル ＝ 2コマ。左右反転しない）
     mi=0 if i==251 else (201 if i>=252 else i+1)
     MF=MINIS[mi*128:mi*128+128]
+    MASKS.extend(make_mask(MF))
     # 後ろ・横は 歩行グラフィック（gfxdata/follow/*.2bpp：止まり 下・上・横、歩き 下・上・横 の 24タイル）の 絵
     A=open(K+name+'.2bpp','rb').read(); T=64
     data=MF[0:T]+A[T:2*T]+A[2*T:3*T]+MF[T:2*T]+A[4*T:5*T]+A[5*T:6*T]
@@ -65,6 +91,11 @@ ball=tiles(bf[0])+tiles(bf[1])+tiles(bf[2])
 ball=ball+ball
 open('gfxdata/follow_icon/ball.2bpp','wb').write(ball)
 out.append('\tINCBIN "gfxdata/follow_icon/ball.2bpp"   ; 278：ボール')
+# 正面の 白い したじき（番号 0〜277、1匹 128バイト）：バンク $67 から 1バンクに 128匹
+open('gfxdata/follow_icon/mask.bin','wb').write(MASKS)
+for k in range(0,len(MASKS),0x4000):
+    out.append('SECTION "follow mask %d", ROMX[$4000], BANK[$%02x]'%(k//0x4000,0x67+k//0x4000))
+    out.append('\tINCBIN "gfxdata/follow_icon/mask.bin", %d, %d'%(k,min(0x4000,len(MASKS)-k)))
 out.append('')
 out.append('SECTION "follow pals", ROMX[$7c00], BANK[FW_BANK]')
 out.append('; 種類 1〜251・タマゴ の フィールドの 色（上 4ビット = ふつう、下 4ビット = 色ちがい。PAL_OW_ の 番号）')
@@ -89,4 +120,14 @@ out2=['; tools/follow_gen.py で 作る（手で 書きかえない）',
 for i in range(252):
     e=CP[i*8:i*8+8]
     out2.append('\tdw '+', '.join('$%04x'%(e[k]|e[k+1]<<8) for k in range(0,8,2)))
+# 後ろ・横（歩行グラフィック）用の 色：元の 連れ歩きキット（follow-mons）と 同じ。色1 ＝ はだ (31,19,10)、
+#   色2 ＝ 一覧.csv の フィールド色（ふつう・色ちがい）。歩行グラフィックは この 色に あわせて かかれて いる
+OW={'RED':(31,7,1),'BLUE':(10,9,31),'GREEN':(7,23,3),'BROWN':(15,10,3),'PURPLE':(18,4,18),'PINK':(18,4,18)}
+def rgb(t): return t[0]|t[1]<<5|t[2]<<10
+SKIN=rgb((31,19,10))
+out2+=['; 後ろ・横 用（歩行グラフィックに あう 色。色1 ＝ はだ、色2 ＝ フィールド色）','FollowerWalkPals:']
+out2.append('\tdw $%04x, $%04x, $%04x, $%04x   ; タマゴ'%(SKIN,rgb(OW['GREEN']),SKIN,rgb(OW['GREEN'])))
+for n in range(1,252):
+    r=byno['%03d'%n]
+    out2.append('\tdw $%04x, $%04x, $%04x, $%04x'%(SKIN,rgb(OW[r[4]]),SKIN,rgb(OW[r[5]])))
 open('src/follow_data.inc','a').write('\n'.join(out2)+'\n')
