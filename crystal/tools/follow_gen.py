@@ -15,8 +15,8 @@ out=['; tools/follow_gen.py で 作る（手で 書きかえない）',
 PER=42
 # 絵：Crystal Crunch の 手持ちの アイコン（gfxdata/follow_cc/icons/*.png。16×32 ＝ 16×16 の 2コマ。tools/follow_cc_extract.py で
 #   取り出した もの）から、Crystal Crunch の GetFollowerIconSprite と 同じ ように 作る：
-#   止まり（下・上・横）＝ 1コマ目、歩き（下・上・横）＝ 2コマ目、そのあと 下向きの 2つを 左右反転（こちらへ 歩く ときと
-#   むこうへ 歩く ときで ちがう ように 見せる）。横は アイコンの 向き、反対は 左右反転（ゲームの しくみ）。
+#   下向き（正面）だけ アイコン：止まり ＝ 1コマ目、歩き ＝ 2コマ目（左右反転。Crystal Crunch と 同じ）。
+#   後ろ・横は 向きの ある 歩行グラフィック（gfxdata/follow/、連れ歩きキットの 絵）を 使う（アイコンには 後ろ・横の 絵が ない）。
 #   アンノーンは 文字ごとの アイコン、タマゴは タマゴの アイコン。
 os.makedirs('gfxdata/follow_icon',exist_ok=True)
 ICON='gfxdata/follow_cc/icons/'
@@ -48,7 +48,9 @@ for i,name in enumerate(order):
     b=0x60+i//PER; a=0x4000+(i%PER)*384
     if i%PER==0: out.append('SECTION "follow gfx %d", ROMX[$4000], BANK[$%02x]'%(i//PER,b))
     f1,f2=icon_frames(icon_name(i,name))
-    data=tiles(f1,True)+tiles(f1)+tiles(f1)+tiles(f2,True)+tiles(f2)+tiles(f2)
+    # 後ろ・横は 歩行グラフィック（gfxdata/follow/*.2bpp：止まり 下・上・横、歩き 下・上・横 の 24タイル）の 絵
+    A=open(K+name+'.2bpp','rb').read(); T=64
+    data=tiles(f1,True)+A[T:2*T]+A[2*T:3*T]+tiles(f2,True)+A[4*T:5*T]+A[5*T:6*T]
     open('gfxdata/follow_icon/%03d.2bpp'%i,'wb').write(data)
     out.append('\tINCBIN "gfxdata/follow_icon/%03d.2bpp"'%i)
 # ボールの 絵（Crystal Crunch の gfx/sprites/anim_pokeball.png。開いた・半分・とじた の 3コマ）→ 番号 278
