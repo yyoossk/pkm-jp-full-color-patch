@@ -410,11 +410,12 @@
        ・Crystal Crunch（joseph-bayer/crystal-for-friends）の 連れ歩きと 同じ 見た目・動き（ユーザーの 希望）。データは
          tools/follow_cc_extract.py で Crystal Crunch の リポジトリから gfxdata/follow_cc/ に 取り出した もの。
        ・絵：Crystal Crunch の 手持ちの アイコン（gfxdata/follow_cc/icons/*.png。16×32 ＝ 2コマ）から GetFollowerIconSprite と 同じに
-         作る：下向き（正面）だけ アイコン（止まり ＝ 1コマ目、歩き ＝ 2コマ目、左右反転）。アイコンには 後ろ・横の 絵が ないので、
+         作る：下向き（正面）は 手持ちと まったく 同じ 絵（gfxdata/minis.2bpp の Polished Crystal の ミニアイコン。止まり ＝ 1コマ目、
+         歩き ＝ 2コマ目、左右反転 しない。ユーザーの 希望）。アイコンには 後ろ・横の 絵が ないので、
          後ろ・横は 向きの ある 歩行グラフィック（gfxdata/follow/*.2bpp の 止まり・歩きの 上・横）を 使う（ユーザーの 希望）。
          アンノーンは 文字ごと、タマゴは タマゴ。
          tools/follow_gen.py → gfxdata/follow_icon/*.2bpp、バンク$60〜$66（278 ＝ ボールの 絵）。
-       ・色：Crystal Crunch と 同じ（戦闘の 絵の 2色を icon_palette_order の あて方（入れかえ・明るい 方を 白）で ならべた もの。
+       ・色：手持ちと 同じ（gfxdata/minipals.bin。以前は Crystal Crunch の 色 gfxdata/follow_cc/pals.bin）。もとの 説明：Crystal Crunch と 同じ（戦闘の 絵の 2色を icon_palette_order の あて方（入れかえ・明るい 方を 白）で ならべた もの。
          gfxdata/follow_cc/pals.bin → FollowerOwnPals $7b:$6000）。Crystal Crunch は 夜・暗い 所で 暗く するが、ユーザーの 希望で しない。
          OBJ パレットの 7本目（PAL_OW_ROCK）を 連れ歩き 専用に（岩・かいりきの 岩の スプライトは パレット 3 に）。LoadMapPals が OBJ の
          色を 写す call FarCopyWRAM（$02:$7203 → $02:$7f80）の あとで 7本目を 書く。読みなおす とき（Fw_CheckReload）は

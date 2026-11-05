@@ -15,11 +15,13 @@ out=['; tools/follow_gen.py で 作る（手で 書きかえない）',
 PER=42
 # 絵：Crystal Crunch の 手持ちの アイコン（gfxdata/follow_cc/icons/*.png。16×32 ＝ 16×16 の 2コマ。tools/follow_cc_extract.py で
 #   取り出した もの）から、Crystal Crunch の GetFollowerIconSprite と 同じ ように 作る：
-#   下向き（正面）だけ アイコン：止まり ＝ 1コマ目、歩き ＝ 2コマ目（左右反転。Crystal Crunch と 同じ）。
+#   下向き（正面）は 手持ちと まったく 同じ 絵（Polished Crystal の ミニアイコン gfxdata/minis.2bpp。止まり ＝ 1コマ目、
+#   歩き ＝ 2コマ目。アンノーンは 手持ちと 同じ 1つの 絵、タマゴは タマゴ）。
 #   後ろ・横は 向きの ある 歩行グラフィック（gfxdata/follow/、連れ歩きキットの 絵）を 使う（アイコンには 後ろ・横の 絵が ない）。
 #   アンノーンは 文字ごとの アイコン、タマゴは タマゴの アイコン。
 os.makedirs('gfxdata/follow_icon',exist_ok=True)
 ICON='gfxdata/follow_cc/icons/'
+MINIS=open('gfxdata/minis.2bpp','rb').read()
 GRAY={255:0,170:1,85:2,0:3}
 def icon_frames(name):
     im=Image.open(ICON+name+'.png').convert('L'); px=im.load()
@@ -47,10 +49,12 @@ def icon_name(i,name):
 for i,name in enumerate(order):
     b=0x60+i//PER; a=0x4000+(i%PER)*384
     if i%PER==0: out.append('SECTION "follow gfx %d", ROMX[$4000], BANK[$%02x]'%(i//PER,b))
-    f1,f2=icon_frames(icon_name(i,name))
+    # 正面：手持ちと 同じ 絵（gfxdata/minis.2bpp：0 = タマゴ、1〜251。1匹 8タイル ＝ 2コマ。左右反転しない）
+    mi=0 if i==251 else (201 if i>=252 else i+1)
+    MF=MINIS[mi*128:mi*128+128]
     # 後ろ・横は 歩行グラフィック（gfxdata/follow/*.2bpp：止まり 下・上・横、歩き 下・上・横 の 24タイル）の 絵
     A=open(K+name+'.2bpp','rb').read(); T=64
-    data=tiles(f1,True)+A[T:2*T]+A[2*T:3*T]+tiles(f2,True)+A[4*T:5*T]+A[5*T:6*T]
+    data=MF[0:T]+A[T:2*T]+A[2*T:3*T]+MF[T:2*T]+A[4*T:5*T]+A[5*T:6*T]
     open('gfxdata/follow_icon/%03d.2bpp'%i,'wb').write(data)
     out.append('\tINCBIN "gfxdata/follow_icon/%03d.2bpp"'%i)
 # ボールの 絵（Crystal Crunch の gfx/sprites/anim_pokeball.png。開いた・半分・とじた の 3コマ）→ 番号 278
@@ -74,12 +78,12 @@ for i in range(0,len(vals),16):
 open('src/follow_data.inc','w').write('\n'.join(out)+'\n')
 print(len(order),'gfx', 'last bank $%02x'%(0x60+(len(order)-1)//PER))
 
-# 連れ歩きの 色：Crystal Crunch と 同じ（gfxdata/follow_cc/pals.bin。戦闘の 絵の 2色を Crystal Crunch の
+# 連れ歩きの 色：手持ちと 同じ（gfxdata/minipals.bin。以前は Crystal Crunch の gfxdata/follow_cc/pals.bin。戦闘の 絵の 2色を Crystal Crunch の
 #   icon_palette_order で あてた もの。0 = タマゴ、1〜251、1匹 8バイト：ふつうの 明るい・暗い、色ちがいの 明るい・暗い）。
 #   夜・暗い 所の 色は ゲームの 中で かえる（follow_crystal.asm の Fw_OwnColors）。
-CP=open('gfxdata/follow_cc/pals.bin','rb').read()
+CP=open('gfxdata/minipals.bin','rb').read()   # 手持ちと 同じ 色（ユーザーの 希望）
 out2=['; tools/follow_gen.py で 作る（手で 書きかえない）',
-      '; 連れ歩きの 色：0 = タマゴ、1〜251。1匹 8バイト（ふつうの 色1・色2、色ちがいの 色1・色2）。Crystal Crunch と 同じ 色',
+      '; 連れ歩きの 色：0 = タマゴ、1〜251。1匹 8バイト（ふつうの 色1・色2、色ちがいの 色1・色2）。手持ちと 同じ 色（minipals.bin）',
       'SECTION "follow own pals", ROMX[$6000], BANK[$7b]',
       'FollowerOwnPals:']
 for i in range(252):
