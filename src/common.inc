@@ -36,3 +36,8 @@ ENDM
 DEF W2_BattleAttrMap EQU $D200
 DEF KitBattleAttrHook EQU $54FA   ; 戦闘の属性の表のあとによぶキット（バンク $13）
 ; ほかのファイルからよぶ処理のラベルは「::」で書く
+
+; バンク $13（キットのバンク）の空き $7800〜。キットの処理を直接 call したいときに使う
+MACRO FreeBank13
+	SECTION FRAGMENT "空きバンク13", ROMX, BANK[$13]
+ENDM
