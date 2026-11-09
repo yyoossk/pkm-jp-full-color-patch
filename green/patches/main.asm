@@ -20,6 +20,7 @@ SECTION "相手HUD de を まもる", ROMX[$5779], BANK[$37]
 KitEnemyHUDKeepDE:
 	push de
 	call $41a5            ; キットの 相手HP数字
+	call KitEnemyHUDFrame
 	pop de
 	ret
 
@@ -36,7 +37,7 @@ SECTION "OAM 消す所 呼ぶ所", ROMX[$45c9], BANK[$01]
 	ld b, $37
 	jp $3500              ; Bankswitch（もどると VBlank へ 帰る）
 
-SECTION "看板の 行の スプライトを かくす", ROMX[$5780], BANK[$37]
+SECTION "看板の 行の スプライトを かくす", ROMX[$5790], BANK[$37]
 KitOAMSignHide:
 	ldh a, [hWY_ADDR]
 	cp KIT_SIGN_WY
@@ -76,5 +77,59 @@ KitOAMSignHide:
 	ld [hl], b
 	add hl, de
 	jr .loop
+
+; ３．相手の HUD の 枠の 線が HP の 数字で とぎれる 直し
+;     相手の HUD を ５行に して、枠の 線を １行 下（４行め）へ うつす（自分側と 同じ 形）。
+;       ２行め: │HP:バー
+;       ３行め: │ のこり／最大     （(1,3) に たて線 $72、(2,3) と (10,3) は 空白）
+;       ４行め: └────────◣  （$74 / $76×8 / $78）
+SECTION "相手HUD の 枠", ROMX[$57e0], BANK[$37]
+KitEnemyHUDFrame:
+	ld hl, $c3a0 + 3 * 20 + 1   ; (1,3)
+	ld a, $72                   ; (1,2) と 同じ たて線（CGB 用 タイル）
+	ld [hli], a
+	ld [hl], $7f                ; (2,3)
+	ld hl, $c3a0 + 3 * 20 + 10  ; (10,3)
+	ld [hl], $7f
+	ld hl, $c3a0 + 4 * 20 + 1   ; (1,4)
+	ld [hl], $74
+	inc hl
+	ld a, $76
+	ld b, 8
+.line
+	ld [hli], a
+	dec b
+	jr nz, .line
+	ld [hl], $78
+	ret
+
+; 相手の HUD を 消す 所を ５行に（４行めの 線が のこらないように）
+SECTION "相手HUD 消す1", ROMX[$4610], BANK[$0f]
+	db 5
+SECTION "相手HUD 消す2", ROMX[$4b13], BANK[$0f]
+	db 5
+SECTION "相手HUD 消す3", ROMX[$4f54], BANK[$0f]
+	db 5
+SECTION "相手HUD 消す4", ROMX[$7310], BANK[$0f]
+	db 5
+SECTION "相手HUD 消す5", ROMX[$6341], BANK[$01]
+	db 5
+
+; 戦闘画面の 色の 割りあて（WRAM2 の 属性の 表 $d200）
+;   相手の HUD（パレット3）を 0〜4行めに、自分の ポケモン（パレット0）を 5行め からに。
+SECTION "戦闘の 属性 相手HUD 行数", ROMX[$702b], BANK[$1c]
+	db 5
+SECTION "戦闘の 属性 自分ポケモン", ROMX[$705a], BANK[$1c]
+	ld hl, $d200 + 5 * 20
+	ld a, $00
+	ld b, 7
+SECTION "戦闘の 属性 たて線 呼ぶ所", ROMX[$7031], BANK[$1c]
+	call KitBattleAttrVLine
+SECTION "戦闘の 属性 たて線", ROMX[$7c00], BANK[$1c]
+KitBattleAttrVLine:
+	call $78b7                  ; 元の 処理（(1,2) を $0b に する など）
+	ld a, $0b                   ; (1,3) も (1,2) と 同じ（VRAMバンク1・パレット3）
+	ld [$d200 + 3 * 20 + 1], a
+	ret
 
 ENDC
