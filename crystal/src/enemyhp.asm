@@ -10,6 +10,9 @@
 ;     「and a / ret z / cp 1 / jr z, .load_15」（6バイト）を「cp 2 / jr nz, .load_15 / nop / nop」に かえて、
 ;     相手の ときも 自分と 同じ（HP バーの 場所 ＋ 21 ＝ 1行 下・1ます 右）に 今の HP を かくように する。
 ;
+; ・EH_LINE_BELOW を DEF すると（クリスタル）、わくの 下の 線を 数字の 下（1行 下）に うつす。そのとき 相手の HUD を けす
+;   所（hlcoord 1, 0 の ClearBox 4行）を 5行に する（EH_CLEAR5 マクロ）。
+;
 ; 銀・クリスタルに 入れるとき：下の DEF を その ROM の 値に する
 ;   （クリスタルは HPBarAnim_UpdateHPRemaining の バイトが 同じか 確かめる。英語版の 金銀クリスタルは
 ;     wWhichHPBar 2（手持ちの 画面）の ずれが 22）
@@ -45,6 +48,27 @@ EnemyHP_Border:
 	ld a, EH_Border_BANK
 	ld hl, EH_Border
 	rst $08
+IF DEF(EH_LINE_BELOW)
+	; わくの 下の 線を 1行 下（数字の 下）に うつす：自分の HUD と 同じ ように、数字に 線が かさならない
+	;   （1,2）たて →（1,3）にも たて、（1,3）かど →（1,4）、（2〜9,3）線 →（2〜9,4）、（10,3）はし →（10,4）
+	ld hl, EH_COORD - 2               ; （1,3）かど
+	ld a, [hl]
+	ld [EH_COORD + 20 - 2], a         ; （1,4）
+	ld a, [EH_COORD - 2 - 20]         ; （1,2）たて
+	ld [hl], a
+	ld a, [EH_COORD + 7]              ; （10,3）はし
+	ld [EH_COORD + 20 + 7], a         ; （10,4）
+	ld a, [EH_COORD - 1]              ; （2,3）線
+	ld hl, EH_COORD + 20 - 1          ; （2,4）〜（9,4）
+	ld b, 8
+.line
+	ld [hli], a
+	dec b
+	jr nz, .line
+	ld a, $7f
+	ld [EH_COORD - 1], a              ; （2,3）・（10,3）は あける
+	ld [EH_COORD + 7], a
+ENDC
 	ld hl, EH_COORD
 	ld a, $7f
 	ld [hli], a

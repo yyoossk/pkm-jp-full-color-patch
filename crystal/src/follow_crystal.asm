@@ -1282,6 +1282,11 @@ Fw_MapLoad:
 	ld a, $ff
 	ld [wObjectFollow_Leader], a
 	ld [wObjectFollow_Follower], a
+	; となりの マップへ 歩いて 入った とき（つながり）は 人の 絵を 読みなおさない。前の マップで 使わない 組を
+	; けして いた（Fw_FixOverflow：連れ歩き・したじきの 場所を あける）ため、新しい マップの 人の 絵が ないと
+	; その 人が 主人公の 絵で 出て いた（コガネシティ → 34ばんどうろ の おじさん）。ない 絵が あれば 読みなおす
+	call Fw_MapSpritesOK
+	call nc, Fw_RefreshAll
 	call Fw_Desired
 	ret c
 	call Fw_FreeSlot
@@ -1318,6 +1323,38 @@ Fw_MapLoad:
 	jp Fw_WriteMapObject
 
 ;---------------------------------------------------------------------
+; この マップの 人（wMapObjects 1〜15）の 絵が ぜんぶ wUsedSprites に あるか（carry ＝ ある）
+Fw_MapSpritesOK:
+	ld hl, wMapObjects + $10 + MAPOBJ_SPRITE
+	ld c, 15
+.obj
+	ld a, [hl]
+	and a
+	jr z, .next
+	push hl
+	ld e, a
+	ld hl, wUsedSprites
+	ld b, 32
+.find
+	ld a, [hli]
+	cp e
+	jr z, .found
+	inc hl
+	dec b
+	jr nz, .find
+	pop hl
+	and a                             ; ない
+	ret
+.found
+	pop hl
+.next
+	ld de, $10
+	add hl, de
+	dec c
+	jr nz, .obj
+	scf
+	ret
+
 ; 主人公が 歩く ときの ぶつかり：連れ歩きは 見ない
 Fw_IsNPCAtCoord:
 	fw_farcall 1, FW_IsNPCAtCoord
@@ -1443,6 +1480,9 @@ Fw_Update:
 	ret c
 	jr .far
 .resync
+	ld a, [wObjectStructs + OBJ_DIR_WALKING]
+	inc a
+	ret nz                            ; 主人公が 歩いて いる 途中は まつ（途中で おくと 連れ歩きの 絵の 場所が 4ドット など ずれた まま に なる）
 	; 主人公の となり か 同じ 場所 なら そのまま follow、はなれて いれば 主人公の 所に おきなおす
 	push de
 	ld a, e
@@ -1452,6 +1492,9 @@ Fw_Update:
 	cp 2
 	jr c, .start
 .far
+	ld a, [wObjectStructs + OBJ_DIR_WALKING]
+	inc a
+	ret nz                            ; 主人公が 歩いて いる 途中は まつ（途中で おくと 連れ歩きの 絵の 場所が 4ドット など ずれた まま に なる）
 	ld a, d
 	push de
 	call FW_DeleteObjectStruct
@@ -1493,6 +1536,9 @@ Fw_Update:
 	ld [hl], c
 	jr .unmask
 .place
+	ld a, [wObjectStructs + OBJ_DIR_WALKING]
+	inc a
+	ret nz                            ; 主人公が 歩いて いる 途中は まつ（途中で おくと 連れ歩きの 絵の 場所が 4ドット など ずれた まま に なる）
 	; 主人公の 場所に おいて 出す
 	ld a, d
 	call FW_GetMapObject
