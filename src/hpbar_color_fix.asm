@@ -26,6 +26,11 @@ KeepDE_PlayerHUD:
 KeepDE_EnemyHUD:
 	push de
 	ld hl, KitEnemyHUDNumbers
+	ld b, KIT_BANK
+	call Bankswitch
+	call EnemyHUDFrameFiveRows    ; src/enemy_hud_frame.asm
+	pop de
+	ret
 KeepDE_Common:
 	ld b, KIT_BANK
 	call Bankswitch

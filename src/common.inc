@@ -26,3 +26,13 @@ DEF KIT_BANK EQU $13
 MACRO FreeBankA
 	SECTION FRAGMENT "空きバンクA", ROMX, BANK[FREE_BANK_A]
 ENDM
+
+; 画面のタイルの表（20x18）
+DEF wTileMap EQU $C3A0
+MACRO coord ; coord 名前, x, y
+	DEF \1 EQU wTileMap + (\3) * 20 + (\2)
+ENDM
+; 戦闘画面の BG 属性の表（カラー化、WRAM バンク 2、20x18）
+DEF W2_BattleAttrMap EQU $D200
+DEF KitBattleAttrHook EQU $54FA   ; 戦闘の属性の表のあとによぶキット（バンク $13）
+; ほかのファイルからよぶ処理のラベルは「::」で書く
