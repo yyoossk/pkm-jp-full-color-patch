@@ -5,3 +5,4 @@ src/free_bank_a.asm
 src/hpbar_color_fix.asm
 src/place_sign_crystal.asm
 src/enemy_hud_frame.asm
+src/dex_types.asm

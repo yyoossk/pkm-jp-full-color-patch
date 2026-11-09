@@ -23,7 +23,6 @@ DEF SIGN_SPEED EQU 2
 ; キットの看板の処理と、バンク0の処理（どの版も同じ番地）
 DEF wSignBuffer EQU $CD7C           ; 看板のバッファ 20x4
 DEF wSignName EQU $CD68             ; 名前の文字列（$50 まで）
-DEF PlaceString EQU $1993
 DEF KitSignToWindow EQU $4D27       ; バッファをウインドウ（$9C00）へ書く
 DEF KitWaitVRAM EQU $4DB1           ; VRAM に書ける時まで待つ
 DEF KitGlyphLoopEnd EQU $4DAF

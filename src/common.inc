@@ -41,3 +41,53 @@ DEF KitBattleAttrHook EQU $54FA   ; 戦闘の属性の表のあとによぶキ�
 MACRO FreeBank13
 	SECTION FRAGMENT "空きバンク13", ROMX, BANK[$13]
 ENDM
+
+; よく使う形
+DEF SCREEN_WIDTH EQU 20
+MACRO hlcoord ; hlcoord x, y
+	ld hl, wTileMap + (\2) * SCREEN_WIDTH + (\1)
+ENDM
+MACRO ldcoord_a ; ldcoord_a x, y
+	ld [wTileMap + (\2) * SCREEN_WIDTH + (\1)], a
+ENDM
+MACRO lb ; lb r16, hi, lo
+	ld \1, LOW(\2) << 8 | LOW(\3)
+ENDM
+MACRO predef ; predef 番号（Predef は版ごと）
+	ld a, \1
+	call Predef
+ENDM
+
+; バンク0 の処理（どの版も同じ番地のもの）
+DEF ClearScreenArea EQU $1902
+DEF FarCopyData EQU $174C     ; a = バンク、hl → de に bc バイト（$CEE4 をこわす）
+DEF hJoy5 EQU $FFB5
+DEF PAD_A EQU 1
+DEF PAD_B EQU 2
+DEF B_PAD_B EQU 1
+DEF LEFT_ALIGN EQU 1 << 6
+
+; WRAM（どの版も同じ）
+DEF wCurSpecies EQU $D092
+DEF wMonHeader EQU $D095
+DEF wMonHBaseHP EQU wMonHeader + 1
+DEF wMonHBaseAttack EQU wMonHeader + 2
+DEF wMonHBaseDefense EQU wMonHeader + 3
+DEF wMonHBaseSpeed EQU wMonHeader + 4
+DEF wMonHBaseSpecial EQU wMonHeader + 5
+DEF wNamedObjectIndex EQU $D0E3   ; wPokedexNum と同じ所
+DEF wNameBuffer EQU $CD68
+
+; ROM のデータ
+DEF EvosMovesPointerTable EQU $715F   ; バンク $0E
+DEF BANK_EvosMovesPointerTable EQU $0E
+DEF EVOLVE_LEVEL EQU 1
+DEF EVOLVE_ITEM EQU 2
+DEF EVOLVE_TRADE EQU 3
+
+; predef の番号
+DEF PRINT_MON_TYPE EQU $4B
+MACRO next ; 文字列の次の行
+	db "<NEXT>", \#
+ENDM
+DEF PlaceString EQU $1993
