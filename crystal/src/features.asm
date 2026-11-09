@@ -34,13 +34,20 @@ RunOrWalkStep:
 
 ;=====================================================================
 ; 2. スタートメニューに「パソコン」
-;    （とじる の代わりに入れる。B／START で閉じられる。むしとり大会中は とじる のまま）
+;    ならび：ずかん・ポケモン・リュック・ポケギア・パソコン・（主人公の名前）・レポート・せってい
+;    （ポケギアの あと、主人公の名前の 前に 入れる。とじる は 出さない。B／START で閉じられる。
+;      むしとり大会中は パソコンは 出さず、さいごに とじる）
 ;=====================================================================
 SECTION "StartMenu items ptr", ROMX[StartMenu_MenuDataItemsPtr], BANK[BANK_STARTMENU]
 	dw StartMenuItemsNew
 
+SECTION "StartMenu pc/status", ROMX[StartMenu_StatusAppend], BANK[BANK_STARTMENU]
+	call StartMenu_PCAndStatus  ; 5バイト（ld a,3 / call .AppendMenuList）
+	nop
+	nop
+
 SECTION "StartMenu exit/pc", ROMX[StartMenu_ExitAppend], BANK[BANK_STARTMENU]
-	call StartMenu_ExitOrPC   ; 5バイト（ld a,6 / call .AppendMenuList）
+	call StartMenu_ExitInContest ; 5バイト（ld a,6 / call .AppendMenuList）
 	nop
 	nop
 
@@ -53,13 +60,21 @@ StartMenuItemsNew:
 .PCDesc:
 	db "どこでも<NEXT>パソコンを　つかう@"
 
-StartMenu_ExitOrPC:
+StartMenu_PCAndStatus:        ; パソコン（むしとり大会中は なし）→ 主人公の名前
 	ld hl, wStatusFlags2
 	bit STATUSFLAGS2_BUG_CONTEST_TIMER_F, [hl]
-	ld a, STARTMENUITEM_EXIT
-	jr nz, .ok
+	jr nz, .status
 	ld a, STARTMENUITEM_PC
-.ok
+	call StartMenu_AppendMenuList
+.status
+	ld a, STARTMENUITEM_STATUS
+	jp StartMenu_AppendMenuList
+
+StartMenu_ExitInContest:      ; とじる は むしとり大会中だけ
+	ld hl, wStatusFlags2
+	bit STATUSFLAGS2_BUG_CONTEST_TIMER_F, [hl]
+	ret z
+	ld a, STARTMENUITEM_EXIT
 	jp StartMenu_AppendMenuList
 
 StartMenu_PC:
