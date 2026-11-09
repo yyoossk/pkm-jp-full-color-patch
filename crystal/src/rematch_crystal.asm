@@ -15,4 +15,11 @@ DEF RM_PARTY_FAR EQU 1               ; トレーナーのバンク（$0e）に�
 DEF RM_PARTY_FAR_ADDR EQU $6100      ; 再戦用の手持ちと 読む処理（同じバンク。$5000〜$603b は カントーの スクリプト）
 DEF RM_PARTY_HOOK_FREE EQU $7710     ; バンク$0e の空き（23バイト）
 DEF RM_BANK0_FREE  EQU $3fe0         ; 60fps版の VBlank の処理（$3f90〜）のあと
+; 16この バッジの あとの 四天王・ワタル・ライバル（src/league.asm）
+DEF RM_LEAGUE EQU 1
+DEF LG_wJohtoBadges    EQU $d84a
+DEF LG_wKantoBadges    EQU $d84b
+DEF LG_wOtherTrainerID EQU $d262     ; wOtherTrainerClass $d260 ＋ 2
+DEF LG_PARTY_ADDR      EQU $6a00     ; RM_SCRIPT_BANK（$6958〜$73ff が 空き）
 INCLUDE "src/rematch.asm"
+INCLUDE "src/league.asm"

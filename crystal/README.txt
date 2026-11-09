@@ -517,6 +517,20 @@
          Crystal Crunch（joseph-bayer / gomojoeb。アイコンで 歩く 絵・色の あて方・動き・SELECT で えらぶ・ボールの アニメ）、
          手持ちの アイコンの 絵と ポケモンの 色 Sour Crystal（SoupPotato）、アンノーンの アイコン Polished Crystal（Rangi42）。
          公開する ときは ブログ用 HTML の クレジットに 書く（連れ歩きキットの クレジット.txt）。
+  51. バッジを 16こ ぜんぶ あつめた あとは、四天王・ワタル・ライバルが 強くなる（src/league.asm。金銀クリスタル共通）
+       ・ジョウトと カントーの バッジが 16こ そろって いると、イツキ・キョウ・シバ・カリン・ワタル と
+         ライバル（オツキミやま・セキエイこうげん）の 手持ちが 6ぴき・Lv67〜76・強い わざ・持ち物 つきに なる
+         （HGSS の 再戦 くらい。src/league_parties.inc。tools/league_gen.py で 名前から 作る）。
+         ライバルの 最後の 1ぴきは 元と 同じ（メガニウム・バクフーン・オーダイル）。オツキミやまは セキエイより 3 レベル 下。
+       ・16こ そろう 前は 元の まま。名前・お金・AI は 元の まま（お金は 最後の ポケモンの レベルで ふえる）。
+       ・しくみ：48 の 再戦と 同じ 入口（ReadTrainerParty の ld a, [wOtherTrainerClass] → $0e:$7710）を つかう。
+         RM_LEAGUE を DEF すると、入口は いつも Rematch_ReadParty を 呼び、その 頭で League_ReadParty が
+         wJohtoBadges（$d84a）と wKantoBadges（$d84b）が どちらも $ff か 見て、表（クラス・番号）に あれば
+         元の TrainerType4 の 写しで 読む。ライバル（RIVAL2 $2a）は wOtherTrainerID（$d262）の 1〜3・4〜6 で 分ける。
+       ・置き場所：$70:$6a00（約 570 バイト）。値は src/rematch_crystal.asm の LG_～。
+       ・金銀に 入れる とき：LG_wJohtoBadges・LG_wKantoBadges・LG_wOtherTrainerID（wOtherTrainerClass ＋ 2）を その ROM の 値に して、
+         RM_LEAGUE と いっしょに rematch.asm の あとに league.asm を INCLUDE する。金銀も ライバルの 番号
+         （オツキミやま 1〜3・セキエイこうげん 4〜6、メガニウム・バクフーン・オーダイルの 順）と クラスの 番号は 同じ。
   ※ 場所の名前の札（金に 足した もの。src/mapsign.asm）は、クリスタルには もとから あるので 入れていない。
   ※ ガンテツの ボールを まとめて 作る（金に 足した もの）は、クリスタルでは もとから 数を えらんで わたせる
      （Kurt_SelectQuantity $22:$40d7・verbosegiveitemvar）ので 入れていない。
@@ -576,6 +590,8 @@
   src/rematch_parties.inc  11 の再戦用の手持ち（金・銀・クリスタル共通。種類・わざ・どうぐの番号は同じ）
   src/rematch_crystal.inc / rematch_crystal.asm  11 のクリスタル用の値／組み立てるファイル
   tools/rematch_find.py    11 のアドレスを ROM から調べて rematch_<版>.inc を作る
+  src/league.asm           51（16この バッジの あとの 四天王・ワタル・ライバル。金・銀・クリスタル共通）
+  src/league_parties.inc   51 の 手持ち（tools/league_gen.py で 作る。金・銀・クリスタル共通の 番号）
   data/wild_crystal.txt・wild_gold.txt・wild_silver.txt  12 の出現表のルール（版ごと）
   tools/wild_find.py       12 のルールから 書きかえる asm を作る（クリスタルは src/wild_crystal.asm）
   src/redballs.asm         17（ボールの印を赤白に。金銀クリスタル共通）
@@ -659,7 +675,7 @@
   バンク$25:$7fa0  60fps（フィールドの処理から呼ぶ所）
   バンク$00:$3f90  60fps（VBlank でもとにもどす所）
   WRAM バンク2 $df00〜  60fps の作業用、$dfb0 アイコンの種類番号
-  バンク$70:$5000  ジムリーダー再戦のスクリプトとセリフ ／ $70:$6100・$6800・$7400 再戦用の手持ち・ジョウトの再戦 ／ バンク$0e:$7710 再戦用の手持ちを読む入口 ／ バンク$00:$3fe0 負けたときのセリフのバンク
+  バンク$70:$5000  ジムリーダー再戦のスクリプトとセリフ ／ $70:$6100・$6800・$7400 再戦用の手持ち・ジョウトの再戦 ／ $70:$6a00 16この バッジの あとの 四天王などの 手持ち ／ バンク$0e:$7710 再戦用の手持ちを読む入口 ／ バンク$00:$3fe0 負けたときのセリフのバンク
   バンク$39:$7e40  せっていの とけい ／ バンク$01:$7ea0 わざの上書き防止
   バンク$33:$7ee0  投げるボールの絵の処理 ／ バンク$70:$5800 ボールの絵 ／ ROM0 $0070 ボールの色
   バンク$70:$5c00  つよさをみるの並べかえ（入口は バンク$13:$7760）
