@@ -94,7 +94,7 @@ DEF wFwBall            EQU $dfbb     ; ボールの アニメ（0 なし・1 も
 DEF wFwBallT           EQU $dfbc     ; のこり フレーム
 DEF wFwHidden          EQU $dfbd     ; ボールに もどった（次に 出る ときは ボールから）
 DEF wFwLoadedFace      EQU $dfbe     ; 今の 色が 正面用（0）か 後ろ・横用（1）か
-DEF wFwMaskOK          EQU $dfbf     ; したじきの VRAM（バンク0 タイル $70〜$77）を あけられた か
+DEF wFwMaskOK          EQU $dfbf     ; したじきの VRAM（バンク0 タイル $64〜$7b）を あけられた か
 
 ; 種類の 番号（オブジェクト・マップオブジェクト）
 DEF OBJ_MAP_OBJECT_INDEX EQU $01
@@ -872,7 +872,7 @@ Fw_GetSprite:
 	ld a, c
 	ld [wFwLoadedPal], a
 	fw_wram_back
-	call Fw_LoadMask                  ; 正面の 白い したじき（VRAM バンク0 タイル $70〜$77）
+	call Fw_LoadMask                  ; 白い したじき（VRAM バンク0 タイル $64〜$7b）
 	call Fw_IndexToGfx
 	ld c, 12
 	ld l, 1                           ; WALKING_SPRITE
@@ -951,7 +951,7 @@ Fw_FixOverflow:
 	ld [wFwMaskOK], a
 	fw_wram_back
 .again
-	ld e, $f1                         ; 2つめの 表は $f0 まで
+	ld e, $e5                         ; 2つめの 表は $e4 まで
 	call Fw_Overflows
 	ret nc
 	call Fw_FindRemovable
@@ -1957,8 +1957,9 @@ Fw_SetInvis:
 ; 正面の 白い したじき
 ; 手持ちの アイコンは 目・顔の 白を 透明（色0）で かいて いる（手持ちの 画面は 背景が 白）。スプライトは 透明＋3色 なので、
 ; 外と つながって いない 透明の 所（あな）だけ 色1 の 絵（tools/follow_gen.py → gfxdata/follow_icon/mask.bin、バンク $67〜$69、
-; 1匹 128バイト）を VRAM バンク0 の タイル $70〜$77（人の 絵の 2つめの 表の $f0〜$f7。Fw_FixOverflow で あけて おく。
-; あけられない マップ（使う 人の 絵が 多すぎる）では wFwMaskOK = 0 で したじきを 出さない）に 置き、連れ歩きの 正面の 4枚の 後ろに 白（OBJ パレット5 の 色1 ＝ 白。
+; 1匹 384バイト。正面・後ろ・横 24タイル）を VRAM バンク0 の タイル $64〜$7b（人の 絵の 2つめの 表の $e4〜$fb。$7c〜 は
+; ポケモンセンターの 回復の 絵。Fw_FixOverflow で あけて おく。
+; あけられない マップ（使う 人の 絵が 多すぎる）では wFwMaskOK = 0 で したじきを 出さない）に 置き、連れ歩きの 絵の 4枚の 後ろに 白（OBJ パレット5 の 色1 ＝ 白。
 ; 朝・昼・夜・暗い 所 とも 白）で かさねる。あなから だけ 白が 見えて、手持ちの 画面と 同じ 見た目に なる（ユーザーの 希望）。
 
 ; de = 絵の 番号（0〜278）。de は こわさない
@@ -1973,39 +1974,17 @@ Fw_LoadMask:
 	push de
 	ld a, d
 	and a
-	jr nz, .high
+	jr z, .ok
 	ld a, e
-	jr .idx
-.high
-	ld a, e                           ; 256〜278（アンノーン・ボール）
-.idx
-	; バンク ＝ $67 ＋ 番号 / 128、場所 ＝ $4000 ＋（番号 % 128）× 128
-	ld l, e
-	ld h, d
-	add hl, hl                        ; h = 番号 / 128
-	ld a, h
-	add $67
-	ld b, a
-	ld a, e
-	and $7f
-	ld h, 0
-	ld l, a
-	add hl, hl
-	add hl, hl
-	add hl, hl
-	add hl, hl
-	add hl, hl
-	add hl, hl
-	add hl, hl                        ; × 128
-	ld a, h
-	add $40
-	ld d, a
-	ld e, l
-	ld a, b
-	cp $69 + 1
+	cp 278 - 256
 	jr nc, .done                      ; ボール（したじき なし）
-	ld hl, $8700                      ; VRAM バンク0 の タイル $70（2つめの 表の $f0〜$f7）
-	ld c, 8
+.ok
+	call Fw_IndexToGfx                ; 絵と 同じ 数え方（b = $60〜、de = 場所）
+	ld a, b
+	add $67 - FW_GFX_BANK
+	ld b, a
+	ld hl, $8640                      ; VRAM バンク0 の タイル $64（2つめの 表の $e4〜$fb）
+	ld c, 24
 	ldh a, [$ff4f]                    ; rVBK
 	push af
 	xor a
@@ -2017,8 +1996,8 @@ Fw_LoadMask:
 	pop de
 	ret
 
-; スプライトを 並べた あと：連れ歩きの 正面（止まり タイル $0c〜$0f・歩き $8c〜$8f、VRAM バンク1、パレット7）の
-; 4枚と 同じ 場所に、したじき（タイル $70〜$77、VRAM バンク0、パレット5）を 後ろに 足す
+; スプライトを 並べた あと：連れ歩きの 絵（止まり タイル $0c〜$17・歩き $8c〜$97、VRAM バンク1、パレット7）の
+; 4枚と 同じ 場所に、したじき（タイル $64〜$7b、VRAM バンク0、パレット5）を 後ろに 足す
 DEF FW_wStateFlags      EQU $d0ad
 DEF FW_hUsedSpriteIndex EQU $ffbd
 ; 人の 絵を 読みこんだ あと（LoadUsedSpritesGFX の さいご）：したじきを 読みなおす（メニューから もどった とき など）
@@ -2074,13 +2053,13 @@ Fw_Underlay::
 	ld a, e
 	and $7f
 	sub 12
-	cp 4
-	jr nc, .next                      ; 正面 では ない
+	cp 12
+	jr nc, .next                      ; 連れ歩きの 絵 では ない
 	bit 7, e
 	jr z, .stand
-	add 4
+	add 12
 .stand
-	add $70
+	add $64
 	ld e, a                           ; したじきの タイル
 	ldh a, [FW_hUsedSpriteIndex]
 	cp d

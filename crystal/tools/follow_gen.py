@@ -24,12 +24,13 @@ ICON='gfxdata/follow_cc/icons/'
 MINIS=open('gfxdata/minis.2bpp','rb').read()
 # 手持ちの アイコンは 目・顔などの 白を 透明（色0）で かいて いる（手持ちの 画面は 背景が 白なので 白に 見える）。
 # フィールドでも 同じに 見せる ため、外と つながって いない 透明の 所（あな）だけ 色1 に した「白い したじき」の 絵を 作る
-# （gfxdata/follow_icon/mask.bin、1匹 128バイト ＝ 正面の 止まり・歩き 各4タイル）。ゲームでは 連れ歩きの 後ろに
+# （gfxdata/follow_icon/mask.bin、1匹 384バイト ＝ 正面・後ろ・横の 止まり・歩き 24タイル。後ろ・横の 歩行グラフィックの
+# すける 所も 白に する。ユーザーの 希望）。ゲームでは 連れ歩きの 後ろに
 # 白（OBJ パレット5 の 色1）で かさねる（follow_crystal.asm の Fw_Underlay）。絵と 色は 手持ちと まったく 同じ（ユーザーの 希望）。
 MASKS=bytearray()
-def make_mask(d):
+def make_mask(d,nf=2):
     out=bytearray()
-    for f in range(2):
+    for f in range(nf):
         px=[[0]*16 for _ in range(16)]
         for k,(ox,oy) in enumerate(((0,0),(8,0),(0,8),(8,8))):
             t=d[f*64+k*16:f*64+k*16+16]
@@ -77,11 +78,11 @@ for i,name in enumerate(order):
     # 正面：手持ちと 同じ 絵（gfxdata/minis.2bpp：0 = タマゴ、1〜251。1匹 8タイル ＝ 2コマ。左右反転しない）
     mi=0 if i==251 else (201 if i>=252 else i+1)
     MF=MINIS[mi*128:mi*128+128]
-    MASKS.extend(make_mask(MF))
     # 後ろ・横は 歩行グラフィック（gfxdata/follow/*.2bpp：止まり 下・上・横、歩き 下・上・横 の 24タイル）の 絵
     A=open(K+name+'.2bpp','rb').read(); T=64
     data=MF[0:T]+A[T:2*T]+A[2*T:3*T]+MF[T:2*T]+A[4*T:5*T]+A[5*T:6*T]
     open('gfxdata/follow_icon/%03d.2bpp'%i,'wb').write(data)
+    MASKS.extend(make_mask(data,6))   # 6コマ（止まり 下・上・横、歩き 下・上・横）ぶんの したじき 24タイル
     out.append('\tINCBIN "gfxdata/follow_icon/%03d.2bpp"'%i)
 # ボールの 絵（Crystal Crunch の gfx/sprites/anim_pokeball.png。開いた・半分・とじた の 3コマ）→ 番号 278
 #   止まりの 下 ＝ 開いた、上 ＝ 半分、横 ＝ とじた（Crystal Crunch の OW_DOWN・OW_UP・OW_LEFT と 同じ）、歩きも 同じ
@@ -91,11 +92,11 @@ ball=tiles(bf[0])+tiles(bf[1])+tiles(bf[2])
 ball=ball+ball
 open('gfxdata/follow_icon/ball.2bpp','wb').write(ball)
 out.append('\tINCBIN "gfxdata/follow_icon/ball.2bpp"   ; 278：ボール')
-# 正面の 白い したじき（番号 0〜277、1匹 128バイト）：バンク $67 から 1バンクに 128匹
+# 白い したじき（番号 0〜277、1匹 384バイト ＝ 24タイル、絵と 同じ ならび）：バンク $67 から 1バンクに 42匹（絵と 同じ 数え方）
 open('gfxdata/follow_icon/mask.bin','wb').write(MASKS)
-for k in range(0,len(MASKS),0x4000):
-    out.append('SECTION "follow mask %d", ROMX[$4000], BANK[$%02x]'%(k//0x4000,0x67+k//0x4000))
-    out.append('\tINCBIN "gfxdata/follow_icon/mask.bin", %d, %d'%(k,min(0x4000,len(MASKS)-k)))
+for k in range(0,len(MASKS),PER*384):
+    out.append('SECTION "follow mask %d", ROMX[$4000], BANK[$%02x]'%(k//(PER*384),0x67+k//(PER*384)))
+    out.append('\tINCBIN "gfxdata/follow_icon/mask.bin", %d, %d'%(k,min(PER*384,len(MASKS)-k)))
 out.append('')
 out.append('SECTION "follow pals", ROMX[$7c00], BANK[FW_BANK]')
 out.append('; 種類 1〜251・タマゴ の フィールドの 色（上 4ビット = ふつう、下 4ビット = 色ちがい。PAL_OW_ の 番号）')

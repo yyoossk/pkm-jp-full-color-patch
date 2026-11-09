@@ -288,11 +288,19 @@ SECTION "follow gfx 6", ROMX[$4000], BANK[$66]
 	INCBIN "gfxdata/follow_icon/277.2bpp"
 	INCBIN "gfxdata/follow_icon/ball.2bpp"   ; 278：ボール
 SECTION "follow mask 0", ROMX[$4000], BANK[$67]
-	INCBIN "gfxdata/follow_icon/mask.bin", 0, 16384
+	INCBIN "gfxdata/follow_icon/mask.bin", 0, 16128
 SECTION "follow mask 1", ROMX[$4000], BANK[$68]
-	INCBIN "gfxdata/follow_icon/mask.bin", 16384, 16384
+	INCBIN "gfxdata/follow_icon/mask.bin", 16128, 16128
 SECTION "follow mask 2", ROMX[$4000], BANK[$69]
-	INCBIN "gfxdata/follow_icon/mask.bin", 32768, 2816
+	INCBIN "gfxdata/follow_icon/mask.bin", 32256, 16128
+SECTION "follow mask 3", ROMX[$4000], BANK[$6a]
+	INCBIN "gfxdata/follow_icon/mask.bin", 48384, 16128
+SECTION "follow mask 4", ROMX[$4000], BANK[$6b]
+	INCBIN "gfxdata/follow_icon/mask.bin", 64512, 16128
+SECTION "follow mask 5", ROMX[$4000], BANK[$6c]
+	INCBIN "gfxdata/follow_icon/mask.bin", 80640, 16128
+SECTION "follow mask 6", ROMX[$4000], BANK[$6d]
+	INCBIN "gfxdata/follow_icon/mask.bin", 96768, 9984
 
 SECTION "follow pals", ROMX[$7c00], BANK[FW_BANK]
 ; 種類 1〜251・タマゴ の フィールドの 色（上 4ビット = ふつう、下 4ビット = 色ちがい。PAL_OW_ の 番号）
