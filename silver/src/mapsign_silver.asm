@@ -34,7 +34,10 @@ DEF wMSTimer           EQU $defc      ; のこりの フレーム
 DEF wMSLast            EQU $defd      ; 前に 見た hVBlankCounter
 DEF MS_hVBlankCounter  EQU $ff9d
 DEF MS_BUF             EQU $d6e5      ; 2行 × 20（濁点の 行・名前の 行）
-DEF MS_TIME            EQU 120        ; 2びょう（クリスタルと 同じ くらい）
+DEF MS_TIME            EQU 118        ; クリスタルと 同じ（59回 × 2フレーム）
+DEF wMSState           EQU $def2      ; 0 なし・1 まち・2 つぎで 出す・3 出て いる（使われていない WRAM）
+DEF MS_hCGB            EQU $ffe8
+DEF MS_wBGPals2_7      EQU $c2b8      ; wBGPals2（$c280）の パレット7
 DEF MS_BANK            EQU $48
-DEF MS_ADDR            EQU $6800
+DEF MS_ADDR            EQU $4600      ; 大きく なったので $6800 から うつした
 INCLUDE "src/mapsign.asm"
