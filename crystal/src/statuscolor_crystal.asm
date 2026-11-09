@@ -568,15 +568,29 @@ StatusColor_Party:
 	ld a, 5
 	call SC_SetColor1
 	; 6ひき ぶんの ますの 色を 0 に（前に バンク1 の しるしが のこらない ように）
-	ld hl, SC_wAttrmap + 8
-	ld bc, 40 - 2
-	ld e, 6
+	;  （色ちがいの ★ $5e・連れ歩きの ★ $5f の ますは そのまま）
+	ld hl, SC_wTilemap + 8
+	ld e, 6 * 3
+	ld d, 3
 .clear
-	xor a
-	ld [hli], a
-	ld [hli], a
-	ld [hl], a
+	ld a, [hl]
+	cp $5e
+	jr z, .keep
+	cp $5f
+	jr z, .keep
+	push hl
+	ld bc, SC_wAttrmap - SC_wTilemap
 	add hl, bc
+	ld [hl], 0
+	pop hl
+.keep
+	inc hl
+	dec d
+	jr nz, .cnext
+	ld bc, 40 - 3
+	add hl, bc
+	ld d, 3
+.cnext
 	dec e
 	jr nz, .clear
 	xor a
@@ -646,12 +660,26 @@ StatusColor_Party:
 	ld hl, SC_TMP + 3
 	inc [hl]
 	jp .loop
-.attr                                ; hl ＝ wTilemap の ます → wAttrmap の 同じ 所に a
+.attr                                ; hl ＝ wTilemap の ます → wAttrmap の 同じ 所に a（★の ますは そのまま）
+	push hl
+	push de
+	ld d, a
+	ld e, 3
+.aloop
+	ld a, [hl]
+	cp $5e
+	jr z, .askip
+	cp $5f
+	jr z, .askip
 	push hl
 	ld bc, SC_wAttrmap - SC_wTilemap
 	add hl, bc
-	ld [hli], a
-	ld [hli], a
-	ld [hl], a
+	ld [hl], d
+	pop hl
+.askip
+	inc hl
+	dec e
+	jr nz, .aloop
+	pop de
 	pop hl
 	ret

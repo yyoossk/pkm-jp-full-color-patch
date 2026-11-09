@@ -101,6 +101,7 @@ DEF OBJ_MAP_OBJECT_INDEX EQU $01
 DEF OBJ_FLAGS1         EQU $04
 DEF OBJ_PALETTE        EQU $06
 DEF OBJ_DIR_WALKING    EQU $07       ; 歩いて いる 向き（$ff = 止まって いる）
+DEF OBJ_DIRECTION      EQU $08       ; 向き（0 下・4 上・8 左・$c 右）
 DEF OBJ_STEP_FRAME     EQU $0c
 DEF OBJ_FACING         EQU $0d
 DEF OBJ_SPRITE_Y_OFFSET EQU $1a
@@ -152,7 +153,85 @@ SECTION "follow loadmapobjects hook", ROMX[$5573], BANK[$05]
 	nop
 	nop
 
+; 人の 絵を VRAM に 写す（GetUsedSprite.CopyToVram の call Get2bpp）：wFwFastCopy が 1 の ときは
+; 画面を 止めずに 写す（1フレームに 8タイル ずつ の かわりに、HBlank・VBlank の 間に すぐ 書く）
+SECTION "follow copytovram hook", ROMX[$4419], BANK[$05]
+	call F5_Copy2bpp                  ; 元は call Get2bpp
+; LoadMapObjects の farcall InitializeVisibleSprites（人の オブジェクトを 作る）の あと：つながりなら すぐ follow
+SECTION "follow initvisible hook", ROMX[$557e], BANK[$05]
+	call F5_InitVisible
+	nop
+	nop
+	nop
 SECTION "follow bank5", ROMX[$7e00], BANK[$05]
+F5_InitVisible:
+	ld a, 2
+	ld hl, $4177                      ; InitializeVisibleSprites
+	rst $08
+	fw_farcall FW_BANK, Fw_AfterObjects
+	ret
+DEF wFwFastCopy  EQU $de40     ; WRAM バンク2（Fw_RefreshConn の 間 だけ 1）
+DEF FW_COPYBUF   EQU $d800     ; WRAM バンク2（256バイト）
+DEF FW_FarCopyBytes EQU $0e77
+DEF FW_Get2bpp_  EQU $0f6c
+; de ＝ 元、hl ＝ VRAM、b ＝ バンク、c ＝ タイルの 数
+F5_SpriteLen:
+	ld a, e
+	call $422d                        ; GetSprite（l ＝ 種類）
+	ld a, l
+	call $4377                        ; GetSpriteLength
+	ld e, a
+	ret
+F5_Copy2bpp:
+	ldh a, [$ff70]
+	push af
+	ld a, FW_VARS_WRAMBANK
+	ldh [$ff70], a
+	ld a, [wFwFastCopy]
+	and a
+	jr nz, .fast
+	pop af
+	ldh [$ff70], a
+	jp FW_Get2bpp_
+.fast
+	push hl
+	push bc
+	ld a, c
+	swap a
+	ld c, a
+	and $0f
+	ld h, a                           ; h ＝ 上
+	ld a, c
+	and $f0
+	ld c, a
+	ld a, b
+	ld b, h
+	ld h, d
+	ld l, e
+	ld de, FW_COPYBUF
+	call FW_FarCopyBytes
+	pop bc
+	pop hl
+	ld de, FW_COPYBUF
+.tile
+	ld b, 16
+.byte
+	di
+.wait
+	ldh a, [$ff41]
+	and 2
+	jr nz, .wait
+	ld a, [de]
+	ld [hli], a
+	ei
+	inc de
+	dec b
+	jr nz, .byte
+	dec c
+	jr nz, .tile
+	pop af
+	ldh [$ff70], a
+	ret
 F5_GetMonSprite:
 	cp $e0
 	jp z, $426a
@@ -872,7 +951,8 @@ Fw_GetSprite:
 	ld a, c
 	ld [wFwLoadedPal], a
 	fw_wram_back
-	call Fw_LoadMask                  ; 白い したじき（VRAM バンク0 タイル $64〜$7b）
+	; 白い したじき（VRAM バンク0 タイル $64〜$7b）は ここでは 読まない（GetSprite は 種類を 見る だけの ときも 呼ばれ、
+	; そのたびに 4フレーム かかって いた）。絵を 読んだ あと（LoadUsedSpritesGFX の さいご・先頭が かわった とき）に 読む
 	call Fw_IndexToGfx
 	ld c, 12
 	ld l, 1                           ; WALKING_SPRITE
@@ -1203,6 +1283,26 @@ Fw_FreeSlot:
 
 ; 連れ歩きの マップオブジェクトを さがす（a = 番号、bc = マップオブジェクト。なければ carry）
 Fw_FindSlot:
+	; ふつうは 人の 数＋1 の 番号（Fw_FreeSlot）なので 先に そこを 見る（まいフレーム 何回も 呼ばれ、
+	; 1番から さがすと 1回 5〜6ライン ぶん かかって いた）
+	ld a, [wCurMapObjectEventCount]
+	inc a
+	cp 16
+	jr nc, .scan
+	push af
+	swap a
+	ld c, a
+	ld b, 0
+	ld hl, wMapObjects
+	add hl, bc
+	ld b, h
+	ld c, l
+	inc hl                            ; MAPOBJ_SPRITE
+	ld a, [hl]
+	cp FW_SPRITE
+	jr z, .found
+	pop af
+.scan
 	ld bc, wMapObjects + $10
 	ld a, 1
 .loop
@@ -1255,7 +1355,15 @@ Fw_WriteMapObject:
 	inc hl
 	ld [hl], d                        ; X
 	inc hl
-	ld [hl], FW_MOVEMENT
+	; 主人公と 同じ 向きで 立つ（つながりを こえた とき、主人公が 上へ 歩いて いても 連れ歩きが 一瞬 正面を 向いて いた）
+	push af
+	ld a, [wObjectStructs + OBJ_DIRECTION]
+	and %1100
+	rrca
+	rrca
+	add FW_MOVEMENT                   ; STANDING_DOWN・UP・LEFT・RIGHT
+	ld [hl], a
+	pop af
 	inc hl
 	ld [hl], 0                        ; 動く はんい
 	inc hl
@@ -1286,7 +1394,15 @@ Fw_MapLoad:
 	; けして いた（Fw_FixOverflow：連れ歩き・したじきの 場所を あける）ため、新しい マップの 人の 絵が ないと
 	; その 人が 主人公の 絵で 出て いた（コガネシティ → 34ばんどうろ の おじさん）。ない 絵が あれば 読みなおす
 	call Fw_MapSpritesOK
-	call nc, Fw_RefreshAll
+	jr c, .spritesok
+	ldh a, [hMapEntryMethod]
+	cp MAPSETUP_CONNECTION
+	jr z, .conn
+	call Fw_RefreshAll
+	jr .spritesok
+.conn
+	call Fw_RefreshConn
+.spritesok
 	call Fw_Desired
 	ret c
 	call Fw_FreeSlot
@@ -1442,15 +1558,19 @@ Fw_Update:
 	pop de
 	ret
 .noshow
-	push de
-	call Fw_FaceCheck                 ; 正面 ⇔ 後ろ・横 で 色を かえる
-	pop de
+	; 正面 ⇔ 後ろ・横 の 色は Fw_Underlay（まいフレーム）が 見る（ここでも 見て いて 2回 して いた）
 	ld a, [wScriptMode]
 	and a
 	ret nz                            ; スクリプトの 間は さわらない
+	; 先頭が かわったか は 主人公が 止まって いる ときだけ 見る（かわるのは メニュー・イベントの あと。
+	; 歩いて いる 間 まいフレーム 見て いて、1歩ごとに 1フレーム おくれる 原因の 1つ だった）
+	ld a, [wObjectStructs + OBJ_DIR_WALKING]
+	inc a
+	jr nz, .noreload
 	push de
 	call Fw_CheckReload
 	pop de
+.noreload
 	ld a, d
 	call FW_GetMapObject
 	ld a, [bc]
@@ -1966,6 +2086,7 @@ Fw_SpawnHere:
 ; スプライトを ぜんぶ 読みなおして、出て いる 人の タイルの 番号も なおす
 Fw_RefreshAll:
 	fw_farcall 5, FW_RefreshSprites
+Fw_RefreshTiles:
 	ld a, 1
 	ldh [hMapObjectIndex], a
 	ld bc, wObjectStructs + $28
@@ -1985,6 +2106,449 @@ Fw_RefreshAll:
 	ld c, l
 	dec e
 	jr nz, .loop
+	ret
+
+; つながりで 人の オブジェクトが できた あと（LoadMapObjects の さいご）：その 場で 主人公を follow する。
+;   ここで して おかないと、マップを 読んだ あと 最初の フレームで 主人公が 先に 歩きだし、主人公が 止まる まで
+;   連れ歩きが 1マス 後ろで 止まった まま（はなれて 見えた）、止まった ときに おきなおして 一瞬 きえて いた
+Fw_AfterObjects:
+	ldh a, [hMapEntryMethod]
+	cp MAPSETUP_CONNECTION
+	ret nz
+	ld a, [wPartyCount]
+	and a
+	ret z
+	call Fw_FindSlot
+	ret c
+	ld d, a
+	call FW_GetMapObject
+	ld a, [bc]
+	cp $ff
+	ret z                             ; オブジェクトに なって いない（かくれて いる など）
+	ld b, 0
+	ld c, d
+	fw_farcall 1, FW_StartFollow
+	ret
+
+; つながり（となりの マップへ 歩いて 入った）で 絵が たりない とき：並びを 作りなおして、前と 同じ 場所に 同じ 絵が
+; ある 組は 読みこまない（ぜんぶ 読みなおすと 画面が 1びょう ちかく 止まって いた）。
+; 町どうしの つながり だけ（文字の 絵などで VRAM が かわって いない）なので、同じ 番号・同じ タイルなら 絵は 同じ。
+; ただし 絵が かわる 人（SPRITE_VARS 以上）は いつも 読む。したじきは あけられる ように なった ときだけ 読む。
+DEF FW_O                 EQU $de00     ; WRAM バンク2（この 間 だけ）：前の 並び 64バイト
+DEF FW_USED              EQU $de48     ; 前の 組を 使った 印 32
+DEF FW_RES               EQU $de68     ; 新しい 組の タイル 32
+DEF FW_PEND              EQU $de88     ; 新しい 組を 読む 印 32
+DEF FW_LENI              EQU $dea8
+DEF FW_TAIL1             EQU $dea9
+DEF FW_TAIL2             EQU $deaa
+DEF FW_TMPEND            EQU $deab
+DEF FW_RefreshList       EQU $4160     ; バンク5 RefreshSprites.Refresh（並びを 作る）
+DEF FW_LoadMiscTiles     EQU $4206     ; バンク5
+DEF FW_MAPCALLBACK_SPRITES EQU 4
+DEF FW_SPRITE_VARS       EQU $f0
+Fw_RefreshConn:
+	; 前の 並び と したじきの 有無を とって おく
+	fw_wram2
+	ld a, [wFwMaskOK]
+	ld b, a
+	fw_wram_back
+	push bc
+	ld hl, wUsedSprites
+	ld de, FW_O
+	ld c, 64
+.save
+	ld a, [hli]
+	push hl
+	ld h, d
+	ld l, e
+	call Fw_Wr2
+	pop hl
+	inc de
+	dec c
+	jr nz, .save
+	ld a, 1
+	call .fast
+	fw_farcall 5, FW_RefreshList      ; 新しい マップの 並び（足りない 絵を 入れて、入らない 組を けした もの）
+	ld a, FW_MAPCALLBACK_SPRITES
+	call FW_RunMapCallback
+	call Fw_Remap
+	jr nc, .full
+	; 前の 場所の まま（前の マップに あった 組は 読まない。新しい 組は 前の 使わない 組の 場所へ）
+	pop bc
+	fw_wram2
+	ld a, b
+	ld [wFwMaskOK], a
+	fw_wram_back
+	ld hl, wUsedSprites
+	ld c, 0
+.rloop
+	ld a, [hli]
+	inc hl
+	and a
+	jr z, .rdone
+	push hl
+	push bc
+	ld hl, FW_PEND
+	ld b, 0
+	add hl, bc
+	call Fw_Rd2
+	pop bc
+	pop hl
+	and a
+	jr z, .rnext
+	push hl
+	push bc
+	dec hl
+	dec hl
+	call .load1
+	pop bc
+	pop hl
+.rnext
+	inc c
+	ld a, c
+	cp 32
+	jr c, .rloop
+.rdone
+	xor a
+	call .fast
+	jp Fw_RefreshTiles
+
+	; 入らなかった：ぜんぶ 読む（画面を 止めずに 写す）
+.full
+	ld hl, wUsedSprites
+	ld c, 32
+.loop
+	ld a, [hl]
+	and a
+	jr z, .done
+	push bc
+	push hl
+	call .load1
+	pop hl
+	pop bc
+	inc hl
+	inc hl
+	dec c
+	jr nz, .loop
+.done
+	fw_farcall 5, FW_LoadMiscTiles
+	xor a
+	call .fast
+	pop bc
+	fw_wram2
+	ld a, [wFwMaskOK]
+	ld c, a
+	fw_wram_back
+	ld a, c
+	and a
+	jr z, .tiles
+	dec b
+	jr z, .tiles                      ; 前から あけて あった
+	call Fw_ReloadMask
+.tiles
+	jp Fw_RefreshTiles
+
+; hl ＝ wUsedSprites の 組 → 絵を 読む
+.load1
+	ld a, [wSpriteFlags]
+	res 5, a                          ; SPRITES_VRAM_BANK_0_F
+	ld [wSpriteFlags], a
+	ld a, [hli]
+	ldh [hUsedSpriteIndex], a
+	ld a, [hl]
+	ldh [hUsedSpriteTile], a
+	bit 7, a
+	jr z, .bank1
+	ld a, [wSpriteFlags]
+	set 5, a
+	ld [wSpriteFlags], a
+.bank1
+	fw_farcall 5, FW_GetUsedSprite
+	ret
+
+.fast
+	ld b, a
+	fw_wram2
+	ld a, b
+	ld [wFwFastCopy], a
+	fw_wram_back
+	ret
+
+; バンク2 の [hl] を a に（a 以外 こわさない）
+Fw_Rd2:
+	ld a, FW_VARS_WRAMBANK
+	ldh [$ff70], a
+	ld a, [hl]
+	push af
+	ld a, 1
+	ldh [$ff70], a
+	pop af
+	ret
+; a を バンク2 の [hl] に
+Fw_Wr2:
+	push af
+	ld a, FW_VARS_WRAMBANK
+	ldh [$ff70], a
+	pop af
+	ld [hl], a
+	push af
+	ld a, 1
+	ldh [$ff70], a
+	pop af
+	ret
+
+; 新しい 並び（wUsedSprites）の 組を、前の 並び（FW_O）と 同じ タイルに おきなおす。
+;   前に あった 絵 → 前と 同じ タイル（読まない。かわる 絵 SPRITE_VARS〜 だけ 読む ＝ PEND 2）
+;   前に なかった 絵 → 前の 並びで 新しい 並びに ない 組の うち、長さが たりる 所（読む ＝ PEND 1）
+;   入る 所が なければ キャリーなし（wUsedSprites は かえない）
+Fw_Remap:
+	ld hl, FW_USED
+	ld c, FW_TMPEND - FW_USED
+.clr
+	xor a
+	call Fw_Wr2
+	inc hl
+	dec c
+	jr nz, .clr
+	; 1：同じ 絵
+	ld hl, wUsedSprites
+	ld c, 0
+.p1
+	ld a, [hli]
+	inc hl
+	and a
+	jr z, .p2start
+	push hl
+	ld d, a
+	push de
+	push bc
+	call .findold                     ; a ＝ タイル、e ＝ 番号
+	pop bc
+	pop hl                            ; h ＝ 絵の 番号
+	jr nc, .p1pend
+	push hl
+	push af
+	ld hl, FW_RES
+	ld b, 0
+	add hl, bc
+	pop af
+	call Fw_Wr2
+	ld hl, FW_USED
+	ld d, 0
+	add hl, de
+	ld a, 1
+	call Fw_Wr2
+	pop af                            ; a ＝ 絵の 番号
+	cp FW_SPRITE_VARS
+	jr c, .p1next
+	ld a, 2
+	jr .p1mark
+.p1pend
+	ld a, 1
+.p1mark
+	ld hl, FW_PEND
+	ld b, 0
+	add hl, bc
+	call Fw_Wr2
+.p1next
+	pop hl
+	inc c
+	ld a, c
+	cp 32
+	jr c, .p1
+	; 2：新しい 絵
+.p2start
+	; 前の 並びの おわり（1つめの 表・2つめの 表）
+	xor a
+	ld hl, FW_TAIL1
+	call Fw_Wr2
+	ld a, $80
+	ld hl, FW_TAIL2
+	call Fw_Wr2
+	ld e, 0
+.tl
+	ld d, 0
+	ld hl, FW_O
+	add hl, de
+	add hl, de
+	call Fw_Rd2
+	and a
+	jr z, .tldone
+	push de
+	call Fw_SpriteLen
+	ld b, e
+	pop de
+	ld hl, FW_O + 1
+	add hl, de
+	add hl, de
+	call Fw_Rd2
+	ld hl, FW_TAIL1
+	bit 7, a
+	jr z, .tl1
+	ld hl, FW_TAIL2
+.tl1
+	add b
+	ld c, a                           ; おわり
+	call Fw_Rd2
+	cp c
+	jr nc, .tlnext
+	ld a, c
+	call Fw_Wr2
+.tlnext
+	inc e
+	ld a, e
+	cp 32
+	jr c, .tl
+.tldone
+	ld c, 0
+.p2
+	ld hl, FW_PEND
+	ld b, 0
+	add hl, bc
+	call Fw_Rd2
+	cp 1
+	jp nz, .p2next
+	ld hl, wUsedSprites
+	add hl, bc
+	add hl, bc
+	ld a, [hl]
+	push bc
+	call Fw_SpriteLen                 ; e ＝ 長さ
+	ld a, e
+	ld hl, FW_LENI
+	call Fw_Wr2
+	pop bc
+	ld e, 0
+.p2j
+	ld d, 0
+	ld hl, FW_USED
+	add hl, de
+	call Fw_Rd2
+	and a
+	jr nz, .p2jnext
+	ld hl, FW_O
+	add hl, de
+	add hl, de
+	call Fw_Rd2
+	and a
+	jp z, .tail
+	push bc
+	push de
+	call Fw_SpriteLen
+	ld b, e
+	pop de
+	ld hl, FW_LENI
+	call Fw_Rd2
+	cp b
+	pop bc
+	jr z, .take
+	jr c, .take
+.p2jnext
+	inc e
+	ld a, e
+	cp 32
+	jr c, .p2j
+	; あいた 組が ない：前の 並びの おわりの 後ろ（1つめは $80 まで、2つめは したじきの $e4 まで）
+.tail
+	ld hl, FW_LENI
+	call Fw_Rd2
+	ld b, a
+	ld hl, FW_TAIL1
+	call Fw_Rd2
+	ld d, a
+	add b
+	cp $81
+	jr nc, .t2
+	call Fw_Wr2
+	ld a, d
+	jr .tset
+.t2
+	ld hl, FW_TAIL2
+	call Fw_Rd2
+	ld d, a
+	add b
+	jr c, .tfail
+	cp $e5
+	jr nc, .tfail
+	call Fw_Wr2
+	ld a, d
+.tset
+	ld hl, FW_RES
+	ld b, 0
+	add hl, bc
+	call Fw_Wr2
+	jr .p2next
+.tfail
+	and a                             ; 入る 所が ない（キャリーなし）
+	ret
+.take
+	ld d, 0
+	ld hl, FW_USED
+	add hl, de
+	ld a, 1
+	call Fw_Wr2
+	ld hl, FW_O + 1
+	add hl, de
+	add hl, de
+	call Fw_Rd2
+	ld hl, FW_RES
+	ld b, 0
+	add hl, bc
+	call Fw_Wr2
+.p2next
+	inc c
+	ld a, c
+	cp 32
+	jp c, .p2
+	; 3：書く
+	ld de, wUsedSprites
+	ld c, 0
+.cm
+	ld a, [de]
+	and a
+	jr z, .cmdone
+	inc de
+	ld hl, FW_RES
+	ld b, 0
+	add hl, bc
+	call Fw_Rd2
+	ld [de], a
+	inc de
+	inc c
+	ld a, c
+	cp 32
+	jr c, .cm
+.cmdone
+	scf
+	ret
+
+; d ＝ 絵の 番号 が FW_O に あれば キャリー、a ＝ タイル、e ＝ 何番め
+.findold
+	ld hl, FW_O
+	ld e, 0
+.fo
+	call Fw_Rd2
+	and a
+	ret z
+	inc hl
+	cp d
+	jr nz, .fonext
+	call Fw_Rd2
+	scf
+	ret
+.fonext
+	inc hl
+	inc e
+	ld a, e
+	cp 32
+	jr c, .fo
+	and a
+	ret
+
+; a ＝ 絵の 番号 → e ＝ タイルの 数（12 か 4）
+Fw_SpriteLen:
+	ld e, a
+	fw_farcall 5, F5_SpriteLen
 	ret
 
 ; 連れ歩きの INVISIBLE を 立てる・もどす（もどすのは 主人公と かさなって いない とき）
@@ -2082,24 +2646,29 @@ Fw_Underlay::
 	jr z, .lim
 	ld d, $70
 .lim
+	; OAM を 属性（パレット7・バンク1）で さがす。連れ歩きの 絵は 4枚 なので 4枚 みつけたら おわり
 	ldh a, [FW_hUsedSpriteIndex]
-	ld c, a                           ; もとの おわり
-	ld b, 0
+	add 3
+	ld c, a                           ; もとの おわり（属性の 場所）
+	ld b, 4                           ; のこり
+	ld hl, $c400 + 3                  ; wShadowOAM の 属性
 .loop
-	ld a, b
+	ld a, l
 	cp c
 	ret nc
-	ld h, $c4                         ; wShadowOAM
-	ld l, b
-	inc l
-	inc l
-	ld a, [hli]                       ; タイル
-	ld e, a
-	ld a, [hl]                        ; 属性
+	ld a, [hl]
 	and %00001111
 	cp %00001000 | 7                  ; VRAM バンク1・パレット7（連れ歩き）
-	jr nz, .next
-	ld a, e
+	jr z, .cand
+.next
+	ld a, l
+	add 4
+	ld l, a
+	jr .loop
+.cand
+	dec l
+	ld a, [hli]                       ; タイル
+	ld e, a
 	and $7f
 	sub 12
 	cp 12
@@ -2114,9 +2683,11 @@ Fw_Underlay::
 	cp d
 	ret nc                            ; OAM が いっぱい
 	push bc
+	push hl
 	push de
-	ld h, $c4
-	ld l, b
+	ld a, l
+	sub 3
+	ld l, a
 	ld a, [hli]                       ; Y
 	ld b, a
 	ld a, [hli]                       ; X
@@ -2139,12 +2710,11 @@ Fw_Underlay::
 	ld a, l
 	ldh [FW_hUsedSpriteIndex], a
 	pop de
+	pop hl
 	pop bc
-.next
-	ld a, b
-	add 4
-	ld b, a
-	jr .loop
+	dec b
+	ret z                             ; 4枚 おわり
+	jr .next
 
 Fw_ClearInvis:
 	call Fw_FindSlot
@@ -2212,6 +2782,7 @@ Fw_CheckReload:
 	ld hl, wSpriteFlags
 	res 5, [hl]                       ; SPRITES_VRAM_BANK_0_F
 	fw_farcall 5, FW_GetUsedSprite
+	call Fw_ReloadMask
 .pal
 	; 色
 	call Fw_OwnPalNow                 ; 固有の 色（7本目）
