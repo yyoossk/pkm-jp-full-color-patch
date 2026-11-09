@@ -2084,3 +2084,219 @@ SafariOffice_MapEvents:
 
 SafariOfficeManScript:
 	jumptextfaceplayer SafariText_OfficeMan
+
+
+;---------------------------------------------------------------------
+; 歩いて いる あいだも 画面の いちばん 下に のこりの 歩数と ボール（ピカチュウ版フルカラーと 同じ）
+;   「あと 498ほ  ボール 30こ」（ボ の ゛ は 上の 行）。サファリゲーム中で サファリの 中（入口は ちがう）の とき だけ。
+; PlaceMapNameSign（$2e:$4098。フィールドで 毎フレーム 呼ばれる）の .disappear（ld a, $90 / ldh [rWY], a /
+; ldh [hWY], a / xor a / ldh [hLCDCPointer], a / ret）を SafariHUD への farcall に する。
+;   ・ウィンドウを 128（下の 2行）に 出し、ウィンドウの 1・2行め（$9c00〜・$9c20〜）に 文字を かく。
+;   ・hWY が 128 で ない（地名の 看板・メニュー・会話の あと）ときは 2行 ぜんぶ かきなおす。数字は 毎フレーム かく。
+;   ・VRAM には STAT の モード 0・1 の ときに 1バイトずつ かく（1フレームに 多くて 90バイト）。
+;   ・色は BG の 8本目（文字の 色。地名の 看板・メニューと 同じ）を 白・黒に する（wBGPals1・2 の 8本目が ちがえば 書いて
+;     hCGBPalUpdate。時間で 色が 読みなおされても もどす）。
+DEF SH_PlaceMapNameSign_Disappear EQU $40bc
+DEF SH_hWY          EQU $ffd2
+DEF SH_hLCDCPointer EQU $ffc6
+DEF SH_hCGBPalUpdate EQU $ffe5
+DEF SH_wBGPals1_7   EQU $d038     ; WRAM バンク5
+DEF SH_wBGPals2_7   EQU $d0b8
+DEF SH_WY           EQU $80
+DEF SH_ROW0         EQU $9c00
+DEF SH_ROW1         EQU $9c20
+DEF SH_ATTR         EQU $87        ; 8本目の 色 ＋ BG を 上に（地名の 看板と 同じ）
+
+SECTION "safari hud hook", ROMX[SH_PlaceMapNameSign_Disappear], BANK[$2e]
+	ld a, BANK(SafariHUD)
+	ld hl, SafariHUD
+	rst $08
+	ret
+
+SECTION "safari hud", ROMX[$7c00], BANK[SAFARI_SCRIPT_BANK]
+SafariHUD:
+	xor a
+	ldh [SH_hLCDCPointer], a
+	ld a, [wStatusFlags2]
+	bit STATUSFLAGS2_SAFARI_GAME_F, a
+	jr z, .off
+	call SafariInZone
+	jr nc, .off
+	call .Pal
+	ldh a, [$ff4f]                   ; rVBK
+	push af
+	ldh a, [SH_hWY]
+	cp SH_WY
+	call nz, .Full
+	call .Digits
+	pop af
+	ldh [$ff4f], a
+	ld a, SH_WY
+	jr .set
+.off
+	ld a, $90
+.set
+	ldh [$ff4a], a                   ; rWY
+	ldh [SH_hWY], a
+	ret
+
+.Pal
+	ldh a, [$ff70]                   ; rSVBK
+	push af
+	ld a, 5
+	ldh [$ff70], a
+	ld hl, SH_wBGPals2_7
+	ld de, .Colors
+	ld b, 8
+.cmp
+	ld a, [de]
+	cp [hl]
+	jr nz, .write
+	inc de
+	inc hl
+	dec b
+	jr nz, .cmp
+	jr .pal_done
+.write
+	ld hl, SH_wBGPals1_7
+	call .CopyPal
+	ld hl, SH_wBGPals2_7
+	call .CopyPal
+	ld a, 1
+	ldh [SH_hCGBPalUpdate], a
+.pal_done
+	pop af
+	ldh [$ff70], a
+	ret
+.CopyPal
+	ld de, .Colors
+	ld b, 8
+.copy
+	ld a, [de]
+	inc de
+	ld [hli], a
+	dec b
+	jr nz, .copy
+	ret
+.Colors
+	dw $7fff, $7fff, $35ad, $0000     ; 白・白・はい色・黒
+
+.Full
+	xor a
+	ldh [$ff4f], a
+	ld hl, SH_ROW0
+	ld de, .Row0
+	call .Put20
+	ld hl, SH_ROW1
+	ld de, .Row1
+	call .Put20
+	ld a, 1
+	ldh [$ff4f], a
+	ld hl, SH_ROW0
+	call .Attr20
+	ld hl, SH_ROW1
+.Attr20
+	ld b, 20
+.attr_loop
+	ld a, SH_ATTR
+	call .Put
+	dec b
+	jr nz, .attr_loop
+	ret
+.Put20
+	ld b, 20
+.put_loop
+	ld a, [de]
+	inc de
+	call .Put
+	dec b
+	jr nz, .put_loop
+	ret
+
+.Digits
+	xor a
+	ldh [$ff4f], a
+	ld a, [wSafariTimeRemaining]
+	ld h, a
+	ld a, [wSafariTimeRemaining + 1]
+	ld l, a
+	ld c, 0
+.hundreds
+	ld a, l
+	sub 100
+	ld e, a
+	ld a, h
+	sbc 0
+	jr c, .hundreds_done
+	ld h, a
+	ld l, e
+	inc c
+	jr .hundreds
+.hundreds_done
+	ld a, l
+	call .Split                      ; d ＝ 10の くらい、e ＝ 1の くらい
+	ld hl, SH_ROW1 + 4
+	ld a, c
+	and a
+	ld a, $7f
+	jr z, .h_blank
+	ld a, c
+	add $f6
+.h_blank
+	call .Put
+	ld a, c
+	or d
+	ld a, $7f
+	jr z, .t_blank
+	ld a, d
+	add $f6
+.t_blank
+	call .Put
+	ld a, e
+	add $f6
+	call .Put
+	ld a, [wSafariBallsRemaining]
+	call .Split
+	ld hl, SH_ROW1 + 14
+	ld a, d
+	and a
+	ld a, $7f
+	jr z, .b_blank
+	ld a, d
+	add $f6
+.b_blank
+	call .Put
+	ld a, e
+	add $f6
+	; fallthrough
+
+.Put                                 ; [hl+] ＝ a（Hブランク・Vブランク の ときに かく）
+	push bc
+	ld c, a
+	di
+.wait
+	ldh a, [$ff41]                   ; rSTAT
+	and %10                          ; モード 0（Hブランク）か 1（Vブランク）まで まつ
+	jr nz, .wait
+	ld [hl], c
+	ei
+	inc hl
+	pop bc
+	ret
+
+.Split                               ; a（0〜99）→ d ＝ 10の くらい、e ＝ 1の くらい
+	ld d, 0
+.split_loop
+	sub 10
+	jr c, .split_done
+	inc d
+	jr .split_loop
+.split_done
+	add 10
+	ld e, a
+	ret
+
+.Row0 ; ボ の ゛
+	db $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $e5, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f
+.Row1 ; 「 あと nnnほ  ボール nnこ   」
+	db $7f, $b1, $c4, $7f, $7f, $7f, $7f, $ce, $7f, $7f, $9c, $e3, $a6, $7f, $7f, $7f, $ba, $7f, $7f, $7f

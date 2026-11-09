@@ -17,4 +17,5 @@ DEF MP_GetFarByte      EQU $3019
 DEF MP_BANK            EQU $76
 DEF MP_ADDR            EQU $6200
 
+DEF MP_PPCOLOR EQU 1                 ; PP の 色（src/statuscolor_crystal.asm）
 INCLUDE "src/movepower.asm"

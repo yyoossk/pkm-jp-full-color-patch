@@ -535,6 +535,45 @@
        ・金銀に 入れる とき：LG_wJohtoBadges・LG_wKantoBadges・LG_wOtherTrainerID（wOtherTrainerClass ＋ 2）を その ROM の 値に して、
          RM_LEAGUE と いっしょに rematch.asm の あとに league.asm を INCLUDE する。金銀も ライバルの 番号
          （オツキミやま 1〜3・セキエイこうげん 4〜6、メガニウム・バクフーン・オーダイルの 順）と クラスの 番号は 同じ。
+  52. ゲームコーナーの 景品の わざマシンに わざの 名前を 出す（src/prizetm_crystal.asm）
+       ・「わざマシン25　5500」→「25　かみなり　　　5500」（コガネ・タマムシの 景品交換所）。
+       ・メニューの 見出し（コガネ $15:$625c・タマムシ $1a:$7491）の 右はしを 15 → 17 に 広げ、
+         中身を 同じ バンクの 空き（$15:$7f00・$1a:$7f80）に 新しく 置く。値段・えらんだ あとの スクリプトは 元の まま。
+  53. サファリゾーンで 歩いて いる あいだも 画面の 下に のこりの 歩数と ボールを 出す（src/safari/safari.asm の SafariHUD）
+       ・「あと 498ほ　ボール 30こ」（ボ の ゛ は 上の 行）。サファリゲーム中で サファリの 中 だけ。
+       ・PlaceMapNameSign の .disappear（$2e:$40be。フィールドで 毎フレーム）を SafariHUD への farcall に して、
+         ウィンドウを 128（下の 2行）に 出し、ウィンドウの 1・2行め（$9c00・$9c20）に STAT を 見て 1バイトずつ かく。
+         hWY が 128 で ない とき（地名の 看板・メニューの あと）は 2行 ぜんぶ、数字は 毎フレーム かく。
+       ・色は BG の 8本目を 白・黒に（wBGPals1・2 の 8本目が ちがえば 書いて hCGBPalUpdate）。
+  54. そだてやで あずけた ポケモンの 今の レベルも おしえる（src/daycarehint.asm の DH_LEVEL。金銀クリスタル共通）
+       ・おじいさん「○○は いま レベル50 じゃ」・おばあさん「…よ」。そのあと 今までの 話（相性・タマゴ・ひきとる か）。
+       ・おじいさんは 41 の 入口（GetBreedMon1LevelGrowth の farcall）で、おばあさんは DayCareLady の
+         farcall GetBreedMon2LevelGrowth（$05:$6c33）を DayCareLevel_Lady に。レベルは e（今の レベル）を
+         wStringBuffer2＋7 に おいて text_decimal で 出す。
+       ・金銀に 入れる とき：DH_LEVEL を DEF して DH_LADY_HOOK・DH_GetBreedMon2LevelGrowth・
+         DH_wBreedMon1Nickname・DH_wBreedMon2Nickname・DH_wLevelTemp・DH_LEVEL_ADDR を その ROM の 値に。
+  55. 状態異常の 文字に 色（src/statuscolor_crystal.asm）
+       ・どく むらさき・やけど 赤・こおり 水色・まひ 黄色・ねむり 灰色。戦闘の 自分と 相手の HP の わく、手持ちの 画面。
+       ・戦闘：相手は 5本目（つかまえた 印と いっしょ。印の 黒を 色1 に うつし、色3 を 状態異常の 色に。
+         src/redballs.asm の RB_STATUSCOLOR）、自分は 6本目。ますの 色は RedBalls_BattlePals の おわりで きめ、
+         色は PlaceNonFaintStatus（$14:$4dca）の あとで かきかえる（$14:$7c00 の 入口から バンク$76 へ）。
+         4本目（けいけんちの バー）は バーの 下の 線が 色3 を つかうので つかわない。
+       ・手持ちの 画面：_CGB_PartyMenu の おわり（$02:$519d）で 状態異常の ます（8〜10, 2×i）を 4〜6本目に。
+         色が つくのは 3種類まで（出て くる 順。4種類め からは 黒）。
+  56. わざを えらぶ とき、PP の のこりが 4分の1 いか なら 黄色、0 なら 赤（src/statuscolor_crystal.asm）
+       ・MovePower_Draw の はじめ（movepower.asm の MP_PPCOLOR）で 右下の わくの「cc／mm」（14〜18, 13）を 読んで 6本目の 色3 を かえる。
+       ・6本目は 自分の 状態異常と 同じ なので、わざを えらぶ 間は 自分の 状態異常の ますを 3本目（黒）に して
+         （wAttrmap と VRAM の バンク1 を STAT を 見て かく）、えらび おわったら もどす
+         （BattleMenu_Fight の call MoveSelectionScreen（$0f:$4461）→ ROM0 $3ff6・$00e6 の 入口 → StatusColor_PPReset）。
+  57. ずかんの 説明の ページで SELECT を おすと、タイプ・種族値・進化の しかたの ページに（src/dexinfo_crystal.asm）
+       ・つかまえた ポケモン だけ。説明の 右下に ▼。SELECT で つぎの ページ、さいごの つぎは 説明に もどる。
+         2ページめ：タイプ・たいりょく・こうげき・ぼうぎょ・すばやさ／3ページめ：とくこう・とくぼう・進化 2行／
+         4ページめ から：進化の のこり（3行ずつ。イーブイ など）。文字は 説明の わく（3行）の 中 だけに かく（見きれない）。
+       ・進化の 行：「なまえ　じょうけん」（レべル nn・どうぐ・つうしん・なつく ひる／よる）。もたせて つうしん・
+         カポエラー など は 2行めに「もたせる　どうぐ」・「こうげきが　たかい」など。
+       ・つかまえたか は wPokedexCaught（$de2d）。ページは WRAM バンク2 の $dfc0・$dfc1。
+  ※ ピカチュウ版の「コインを 買える」（コガネ・タマムシで 50まい 1000円・500まい 10000円）と
+    「自分の パソコンの 道具の 説明（ひきだす・すてる）」は もとの クリスタルに あるので 足して いない。
   ※ 場所の名前の札（金に 足した もの。src/mapsign.asm）は、クリスタルには もとから あるので 入れていない。
   ※ ガンテツの ボールを まとめて 作る（金に 足した もの）は、クリスタルでは もとから 数を えらんで わたせる
      （Kurt_SelectQuantity $22:$40d7・verbosegiveitemvar）ので 入れていない。
@@ -596,6 +635,9 @@
   tools/rematch_find.py    11 のアドレスを ROM から調べて rematch_<版>.inc を作る
   src/league.asm           51（16この バッジの あとの 四天王・ワタル・ライバル。金・銀・クリスタル共通）
   src/league_parties.inc   51 の 手持ち（tools/league_gen.py で 作る。金・銀・クリスタル共通の 番号）
+  src/prizetm_crystal.asm  52（景品の わざマシンの 名前）
+  src/statuscolor_crystal.asm 55・56（状態異常・PP の 色）
+  src/dexinfo_crystal.asm  57（ずかんの タイプ・種族値・進化）
   data/wild_crystal.txt・wild_gold.txt・wild_silver.txt  12 の出現表のルール（版ごと）
   tools/wild_find.py       12 のルールから 書きかえる asm を作る（クリスタルは src/wild_crystal.asm）
   src/redballs.asm         17（ボールの印を赤白に。金銀クリスタル共通）

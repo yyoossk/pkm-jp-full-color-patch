@@ -14,4 +14,12 @@ DEF DH_wBreedingCompatibility EQU $d296   ; DayCare_InitBreeding（$05:$723b）�
 DEF DH_BANK          EQU $76
 DEF DH_ADDR          EQU $6000
 
+; あずけた ポケモンの 今の レベル（DH_LEVEL）
+DEF DH_LEVEL EQU 1
+DEF DH_LADY_HOOK     EQU $6c33       ; DayCareLady .AskWithdrawMon（ld a, $03 / ld hl, $6961 / rst $08）
+DEF DH_GetBreedMon2LevelGrowth EQU $6961
+DEF DH_wBreedMon1Nickname EQU $de8a
+DEF DH_wBreedMon2Nickname EQU $deb9
+DEF DH_wLevelTemp    EQU $d06d       ; wStringBuffer2 ＋ 7（GetPriceToRetrieveBreedmon は ＋0〜＋4 だけ つかう）
+DEF DH_LEVEL_ADDR    EQU $6180
 INCLUDE "src/daycarehint.asm"
