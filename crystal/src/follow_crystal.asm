@@ -2013,6 +2013,9 @@ Fw_Underlay::
 	ld a, [wPartyCount]
 	and a
 	ret z
+	; 向きの 色の 切りかえも ここで 見る（話しかけた とき など スクリプトの 間は Fw_Update が まわらず、こちらを 向いた 正面の 絵が
+	; 後ろ・横の 色の まま 出て 一瞬 色が かわって いた）。OAM と 色は 同じ VBlank で かわる
+	call Fw_FaceCheck
 	fw_wram2
 	ld a, [wFwBall]
 	ld e, a

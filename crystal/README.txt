@@ -426,6 +426,8 @@
          正面と 後ろ・横で 2色の しめる 広さが 同じに なる 方。差が 小さければ、絵が かかれた 元の 色〔はだ (31,19,10)＋フィールド色〕に
          近い 方）。元の 色の まま だと、ピカチュウの 横が はだ色、アリゲイツの 横が 赤 など、正面と ちがって 見えた。連れ歩きの 向き（OBJECT_DIRECTION）が
          正面 ⇔ 後ろ・横 で かわったら Fw_FaceCheck が 7本目の 色を 書きなおす（WRAM バンク2 $dfbe wFwLoadedFace）。
+         Fw_FaceCheck は Fw_Update と Fw_Underlay（スプライトを 並べる たび）の 両方で 呼ぶ（話しかけた とき など スクリプトの 間は
+         Fw_Update が まわらず、向きが かわっても 色が 1秒ほど 前の まま で 一瞬 色が かわって 見えた）。
        ・色：手持ちと 同じ（gfxdata/minipals.bin。以前は Crystal Crunch の 色 gfxdata/follow_cc/pals.bin）。もとの 説明：Crystal Crunch と 同じ（戦闘の 絵の 2色を icon_palette_order の あて方（入れかえ・明るい 方を 白）で ならべた もの。
          gfxdata/follow_cc/pals.bin → FollowerOwnPals $7b:$6000）。Crystal Crunch は 夜・暗い 所で 暗く するが、ユーザーの 希望で しない。
          OBJ パレットの 7本目（PAL_OW_ROCK）を 連れ歩き 専用に（岩・かいりきの 岩の スプライトは パレット 3 に）。LoadMapPals が OBJ の
