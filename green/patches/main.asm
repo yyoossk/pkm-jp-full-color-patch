@@ -6,6 +6,8 @@
 ;   版の 番号は ED_0〜ED_11（tools/build.py の EDITIONS の じゅん）で、IF DEF(ED_4) などで 分けられる。
 ; ・処理の 名前と 番地は ../disasm/ の 逆アセンブル（と ../disasm/include/home_names.inc）を 見る。
 
+INCLUDE "charmap.asm"   ; 字の 番号（pokegold の 日本語の charmap と 同じ。緑で 「ベ」は 「べ」）
+
 ; ===== 直し：Ver.1.8.1 =====
 IF !DEF(ED_2) && !DEF(ED_3) && !DEF(ED_6) && !DEF(ED_7)   ; カラー化のみの 版には 当てない
 
@@ -528,5 +530,8 @@ KitBattleAttrVLine:
 	ld a, $0b                   ; (1,3) も (1,2) と 同じ（VRAMバンク1・パレット3）
 	ld [$d200 + 3 * 20 + 1], a
 	ret
+
+; ５．ずかんの キット（タイプ・進化・種族値）
+INCLUDE "dex_types.asm"
 
 ENDC
