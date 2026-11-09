@@ -553,18 +553,21 @@
        ・金銀に 入れる とき：DH_LEVEL を DEF して DH_LADY_HOOK・DH_GetBreedMon2LevelGrowth・
          DH_wBreedMon1Nickname・DH_wBreedMon2Nickname・DH_wLevelTemp・DH_LEVEL_ADDR を その ROM の 値に。
   55. 状態異常の 文字に 色（src/statuscolor_crystal.asm）
-       ・どく むらさき・やけど 赤・こおり 水色・まひ 黄色・ねむり 灰色。戦闘の 自分と 相手の HP の わく、手持ちの 画面。
+       ・どく むらさき・やけど 赤・こおり 水色・まひ 黄色・ねむり 灰色。戦闘の 自分と 相手の HP の わく、手持ちの 画面（5種類 ぜんぶ）。
        ・戦闘：相手は 5本目（つかまえた 印と いっしょ。印の 黒を 色1 に うつし、色3 を 状態異常の 色に。
-         src/redballs.asm の RB_STATUSCOLOR）、自分は 6本目。ますの 色は RedBalls_BattlePals の おわりで きめ、
-         色は PlaceNonFaintStatus（$14:$4dca）の あとで かきかえる（$14:$7c00 の 入口から バンク$76 へ）。
+         src/redballs.asm の RB_STATUSCOLOR）。自分は 6本目の 色1：文字の 絵を「色1 で かいた もの」に して
+         VRAM の バンク1 $7c〜$7e に 作り、ます（16〜18, 8）を その タイル・6本目＋バンク1 に（6本目の 色3 は PP 用）。
          4本目（けいけんちの バー）は バーの 下の 線が 色3 を つかうので つかわない。
-       ・手持ちの 画面：_CGB_PartyMenu の おわり（$02:$519d）で 状態異常の ます（8〜10, 2×i）を 4〜6本目に。
-         色が つくのは 3種類まで（出て くる 順。4種類め からは 黒）。
+       ・手持ちの 画面（_CGB_PartyMenu の おわり $02:$519d）：どく 4本目・やけど 5本目・こおり 6本目 の 色3、
+         まひ 4本目・ねむり 5本目 の 色1（色1 の 文字を バンク1 $72〜$74・$75〜$77 に 作る）。
+       ・色1 の 文字は PlaceNonFaintStatus（$14:$4dca）の あと（$14:$7c00 の 入口から バンク$76）と 画面の 色を きめる 所の
+         両方で 作る（手持ちの 画面は HP の バーを かく 所で 色を きめ、状態は その あとに かかれる）。
+       ・VRAM の バンク1 の タイル $60〜$7f は 町の タイル（$00〜$5f）にも 戦闘の 相手の 絵の うごき（多くて $61 まで）にも
+         つかわれない（つよさを みる 画面が $7f を つかう だけ）。
   56. わざを えらぶ とき、PP の のこりが 4分の1 いか なら 黄色、0 なら 赤（src/statuscolor_crystal.asm）
        ・MovePower_Draw の はじめ（movepower.asm の MP_PPCOLOR）で 右下の わくの「cc／mm」（14〜18, 13）を 読んで 6本目の 色3 を かえる。
-       ・6本目は 自分の 状態異常と 同じ なので、わざを えらぶ 間は 自分の 状態異常の ますを 3本目（黒）に して
-         （wAttrmap と VRAM の バンク1 を STAT を 見て かく）、えらび おわったら もどす
-         （BattleMenu_Fight の call MoveSelectionScreen（$0f:$4461）→ ROM0 $3ff6・$00e6 の 入口 → StatusColor_PPReset）。
+       ・わざを えらび おわったら 黒に もどす（BattleMenu_Fight の call MoveSelectionScreen（$0f:$4461）→
+         ROM0 $3ff6・$00e6 の 入口 → StatusColor_PPReset。下の テキストの 濁点が 色つきに ならない ように）。
   57. ずかんの 説明の ページで SELECT を おすと、タイプ・種族値・進化の しかたの ページに（src/dexinfo_crystal.asm）
        ・つかまえた ポケモン だけ。説明の 右下に ▼。SELECT で つぎの ページ、さいごの つぎは 説明に もどる。
          2ページめ：タイプ・たいりょく・こうげき・ぼうぎょ・すばやさ／3ページめ：とくこう・とくぼう・進化 2行／

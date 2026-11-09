@@ -1,28 +1,27 @@
 ; 状態異常の 文字に 色・PP の のこりで 色（クリスタル 日本版。ピカチュウ版フルカラーと 同じ 考え）
 ;
 ; ・戦闘の HP の わくの 状態異常（どく むらさき・やけど 赤・こおり 水色・まひ 黄色・ねむり 灰色）と、
-;   手持ちの 画面の 状態異常（同じ 色。手持ちの 画面で 色が つくのは 3種類まで ＝ あいて いる 色が 3本）。
+;   手持ちの 画面の 状態異常（同じ 色。5種類 ぜんぶ）。
 ; ・戦闘で わざを えらぶ とき、右下の わくの PP（「15／30」）が のこり 4分の1 いか なら 黄色、0 なら 赤。
 ;
 ; 色の わりあて（戦闘。BG の 色は 8本 しか なく、7本は つかって いる）
 ;   ・5本目（つかまえた 印。src/redballs.asm）：印の 黒（色3）を 色1 に うつし、色3 を 相手の 状態異常の 色に。
 ;     相手の 状態異常の ます（8〜10, 1）を 5本目に。
-;   ・6本目（あいて いる）：色3 を 自分の 状態異常の 色に。自分の 状態異常の ます（16〜18, 8）を 6本目に。
-;   ・わざを えらぶ 間は 6本目の 色3 を PP の 色に し、自分の 状態異常の ますを 3本目（HP の わく ＝ 黒）に する
-;     （えらぶ 間 だけ 状態異常は 黒）。VRAM の 色の ます（バンク1）も STAT を 見て かく。
-;     わざを えらび おわったら（MoveSelectionScreen の あと）もとに もどす。
+;   ・6本目：色1 を 自分の 状態異常の 色、色3 を PP の 色に（わざを えらぶ 間 だけ。ふだんは 黒）。
+;     自分の 状態異常は 文字の 絵を「色1 で かいた もの」に して VRAM の バンク1 $7c〜$7e（$97c0〜）に 作り、
+;     ます（16〜18, 8）を その タイル・6本目＋バンク1 に する（状態異常が ない ときは もとの 3本目）。
+;     バンク1 の $60〜$7f は 町の タイル（$00〜$5f）にも 戦闘の 相手の 絵の うごき（$00〜$61）にも つかわれない。
 ;     （けいけんちの バーの 4本目は 色3 を バーの 下の 線が つかうので つかえない）
-;   状態異常が ない とき・PP が 多い ときは 色3 ＝ 黒（レベルの 数字など ほかの 文字と 同じ）。
 ;   ・ますの 色（attr）は 戦闘の 画面の 色を きめる 所（_CGB_FinishBattleScreenLayout の おわり ＝ redballs の
-;     RedBalls_BattlePals）で いつも その 色に する（PP の ます 14〜18, 13 も 6本目）。
-;     色3 は HP の わくを かく とき（PlaceNonFaintStatus）・わざの わくを かく とき（MovePower_Draw の はじめ）に かきかえる。
-; 手持ちの 画面：_CGB_PartyMenu の おわり（ApplyAttrmap の 前）で、状態異常の ます（8〜10, 2×i）を
-;   4〜6本目に し、出て くる 順に 色を わりあてる（4種類め からは 黒の まま）。
+;     RedBalls_BattlePals）で きめ、色は HP の わくを かく とき（PlaceNonFaintStatus）・わざの わくを かく とき
+;     （MovePower_Draw の はじめ）に かきかえる。PP の 色は わざを えらび おわったら 黒に もどす。
+; 手持ちの 画面：_CGB_PartyMenu の おわり（ApplyAttrmap の 前）で、状態異常の ます（8〜10, 2×i）を 4〜6本目に
+;   （くわしくは StatusColor_Party の 上）。
 
 INCLUDE "src/charmap_jp.inc"
 
 DEF SC_BANK              EQU $76
-DEF SC_ADDR              EQU $7800
+DEF SC_ADDR              EQU $4600
 DEF SC_wTilemap          EQU $c4a0
 DEF SC_wAttrmap          EQU $cdcd
 DEF SC_wBGPals1          EQU $d000     ; WRAM バンク5
@@ -43,6 +42,7 @@ DEF SC_PAL_PARTY0        EQU 4
 DEF SC_PAL_ENEMY         EQU 5
 DEF SC_PAL_PLAYER        EQU 6
 DEF SC_PAL_PP            EQU 6
+DEF SC_PLAYER_TILE       EQU $7c   ; VRAM バンク1 $97c0〜（戦闘の 相手の 絵の うごきは $00〜$61 まで）
 
 ; HP の わくの 状態異常：PlaceNonFaintStatus（$14:$4dca「ld a, [de] / bit 3, a」）を つぎへ
 SECTION "statuscolor hud hook", ROMX[$4dca], BANK[$14]
@@ -140,6 +140,7 @@ SC_SetColor3:
 	add a
 	add a
 	add 6
+.off
 	ld l, a
 	ld h, HIGH(SC_wBGPals1)
 	ld [hl], c
@@ -158,6 +159,29 @@ SC_SetColor3:
 	pop af
 	ldh [$ff70], a
 	ret
+
+; e ＝ 色の 番号、a ＝ 種類 → 色1（d が 0 で ない なら wBGPals2 も）
+SC_SetColor1:
+	push de
+	add a
+	ld c, a
+	ld b, 0
+	ld hl, SC_Colors
+	add hl, bc
+	ld a, [hli]
+	ld c, a
+	ld b, [hl]
+	pop de
+	ldh a, [$ff70]
+	push af
+	ld a, 5
+	ldh [$ff70], a
+	ld a, e
+	add a
+	add a
+	add a
+	add 2
+	jr SC_SetColor3.off
 
 ; e ＝ 色の 番号 の 色0〜2 を 白・白・はい色 に（wBGPals1）
 SC_SetBase:
@@ -195,13 +219,151 @@ SC_Colors:
 	dw $029a                         ; まひ（黄色）
 	dw $39ce                         ; ねむり（灰色）
 
-; 戦闘の 画面の 色を きめた あと（redballs の RedBalls_BattlePals から。wBGPals1 だけ）
-StatusColor_BattleLayout::
+; 文字の 絵を 色1 で かいた もの（色3 → 色1）を VRAM の バンク1 に 作る
+;   de ＝ 3文字（SC_Strings）、hl ＝ バンク1 の 置き場所（タイル 3枚）。もとの 文字は バンク0
+;   （$80〜 は $8800〜、$00〜$7f は $9000〜。戦闘・手持ちの 画面は LCDC の bit4 ＝ 0）。
+SC_MakeGlyphs:
+	ld b, 3
+.char
+	push bc
+	push hl
+	ld a, [de]
+	inc de
+	push de
+	ld l, a
+	ld h, 0
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl                       ; × 16
+	bit 7, a
+	ld de, $9000
+	jr z, .low
+	ld de, $8000
+.low
+	add hl, de                       ; もとの 文字
+	ld d, h
+	ld e, l
+	pop bc                           ; bc ＝ つぎの 文字
+	pop hl                           ; hl ＝ 置き場所
+	push bc
+	ld b, 8
+.row
+	xor a
+	ldh [$ff4f], a
+	call SC_ReadVRAM                 ; a ＝ [de]（下の 面）
+	inc de
+	inc de
+	ld c, a
+	ld a, 1
+	ldh [$ff4f], a
+	ld a, c
+	call SC_WriteVRAM                ; 下の 面 ＝ そのまま
+	xor a
+	call SC_WriteVRAM                ; 上の 面 ＝ 0（色3 → 色1）
+	dec b
+	jr nz, .row
+	pop de                           ; de ＝ つぎの 文字
+	pop bc
+	dec b
+	jr nz, .char
+	xor a
+	ldh [$ff4f], a
+	ret
+
+SC_ReadVRAM:                         ; a ＝ [de]
+	di
+.wait
+	ldh a, [$ff41]
+	and %10
+	jr nz, .wait
+	ld a, [de]
+	ei
+	ret
+
+SC_WriteVRAM:                        ; [hl+] ＝ a（a は そのまま）
+	push bc
+	ld c, a
+	di
+.wait
+	ldh a, [$ff41]
+	and %10
+	jr nz, .wait
+	ld [hl], c
+	ei
+	inc hl
+	ld a, c
+	pop bc
+	ret
+
+; 自分の 状態異常の ます（16〜18, 8）を「色1 の 文字（バンク1 $7c〜$7e）・6本目」か「もとの 文字・3本目」に
+;   a ＝ 0：もとに（HP の わくの 3本目）、0 以外：文字を 作って 6本目＋バンク1
+SC_PlayerCells:
+	and a
+	jr z, .plain
+	call SC_String
+	ld hl, $9000 + SC_PLAYER_TILE * 16
+	call SC_MakeGlyphs
+	ld hl, SC_wTilemap + SC_PLAYER_CELL
+	ld a, SC_PLAYER_TILE
+	ld [hli], a
+	inc a
+	ld [hli], a
+	inc a
+	ld [hl], a
+	; BG の ますも すぐ かえる（1フレーム ちがう 絵が 出ない ように）
+	xor a
+	ldh [$ff4f], a
+	ld hl, SC_VRAM_PLAYER_CELL
+	ld a, SC_PLAYER_TILE
+	call SC_WriteVRAM
+	inc a
+	call SC_WriteVRAM
+	inc a
+	call SC_WriteVRAM
+	ld a, SC_PAL_PLAYER | 8
+	jr .attr
+.plain
+	ld a, SC_PAL_PLAYER_HP
+.attr
 	ld hl, SC_wAttrmap + SC_PLAYER_CELL
-	ld a, SC_PAL_PLAYER
 	ld [hli], a
 	ld [hli], a
 	ld [hl], a
+	ld c, a
+	ld a, 1
+	ldh [$ff4f], a
+	ld hl, SC_VRAM_PLAYER_CELL
+	ld a, c
+	call SC_WriteVRAM
+	call SC_WriteVRAM
+	call SC_WriteVRAM
+	xor a
+	ldh [$ff4f], a
+	ret
+
+; a ＝ 種類（1〜5）→ de ＝ その 文字（3つ）
+SC_String:
+	dec a
+	ld e, a
+	add a
+	add e
+	ld e, a
+	ld d, 0
+	ld hl, SC_Strings
+	add hl, de
+	ld d, h
+	ld e, l
+	ret
+SC_Strings: ; PlaceNonFaintStatus と 同じ 文字
+	db $70, $b8, $7f                 ; どく
+	db $d4, $b9, $70                 ; やけど
+	db $ba, $b5, $d8                 ; こおり
+	db $cf, $cb, $7f                 ; まひ
+	db $c8, $d1, $d8                 ; ねむり
+
+; 戦闘の 画面の 色を きめた あと（redballs の RedBalls_BattlePals から。wBGPals1 だけ）
+StatusColor_BattleLayout::
 	ld hl, SC_wAttrmap + SC_ENEMY_CELL
 	ld a, SC_PAL_ENEMY
 	ld [hli], a
@@ -214,12 +376,26 @@ StatusColor_BattleLayout::
 	ld [hli], a
 	ld [hli], a
 	ld [hl], a
+	; 自分の 状態異常：ますが もう 色1 の 文字（$7c）なら 6本目＋バンク1
+	ld a, [SC_wTilemap + SC_PLAYER_CELL]
+	cp SC_PLAYER_TILE
+	ld a, SC_PAL_PLAYER | 8
+	jr z, .player
+	ld a, SC_PAL_PLAYER_HP
+.player
+	ld hl, SC_wAttrmap + SC_PLAYER_CELL
+	ld [hli], a
+	ld [hli], a
+	ld [hl], a
 	ld e, SC_PAL_PLAYER
 	call SC_SetBase
 	ld a, [SC_wBattleMonStatus]
 	call SC_Kind
 	ld de, SC_PAL_PLAYER
-	call SC_SetColor3
+	call SC_SetColor1
+	ld de, SC_PAL_PLAYER
+	xor a
+	call SC_SetColor3                ; PP（黒）
 	ld a, [SC_wEnemyMonStatus]
 	call SC_Kind
 	ld de, SC_PAL_ENEMY
@@ -229,24 +405,71 @@ StatusColor_BattleLayout::
 StatusColor_HUD:
 	ld a, [SC_wBattleMode]
 	and a
-	ret z
+	jr z, .party
 	ld hl, SC_wTilemap + SC_PLAYER_CELL
 	call .cmp
-	ld e, SC_PAL_PLAYER
-	jr z, .set
+	jr z, .player
 	ld hl, SC_wTilemap + SC_ENEMY_CELL
 	call .cmp
-	ld e, SC_PAL_ENEMY
-	ret nz
-.set
+	jr nz, .party
 	ld a, d
-	push de
 	call SC_Kind
-	pop de
-	ld d, 1
+	ld de, $0100 | SC_PAL_ENEMY
 	call SC_SetColor3
+	jr .update
+.player
+	ld a, d
+	call SC_Kind
+	push af
+	ld de, $0100 | SC_PAL_PLAYER
+	call SC_SetColor1
+	pop af
+	call SC_PlayerCells
+.update
 	ld a, 1
 	ldh [SC_hCGBPalUpdate], a
+	ret
+.party
+	; 手持ちの 画面：ますの 色が バンク1（StatusColor_Party が まひ・ねむり に した）なら 色1 の 文字に
+	ld hl, SC_wAttrmap - SC_wTilemap
+	add hl, bc
+	bit 3, [hl]
+	ret z
+	push bc
+	ld a, d
+	call SC_Kind                     ; b を つかう
+	pop bc
+	ld e, $72
+	cp 4
+	jr z, .p_make
+	ld e, $75
+	cp 5
+	ret nz
+.p_make
+	push bc
+	push de
+	call SC_String
+	pop hl
+	push hl
+	ld h, 0
+	ld a, l
+	ld l, a
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	ld a, h
+	add HIGH($9000)
+	ld h, a
+	call SC_MakeGlyphs
+	pop de
+	pop hl                           ; hl ＝ ます
+	ld a, e
+	ld [hli], a
+	inc a
+	ld [hli], a
+	inc a
+	ld [hl], a
 	ret
 .cmp
 	ld a, h
@@ -256,7 +479,7 @@ StatusColor_HUD:
 	cp c
 	ret
 
-; わざの わく（MovePower_Draw の はじめ）：PP「cc／mm」（14〜18, 13）の 色
+; わざの わく（MovePower_Draw の はじめ）：PP「cc／mm」（14〜18, 13）の 色（6本目の 色3）
 StatusColor_PP::
 	push bc
 	ld hl, SC_wTilemap + SC_PP_CELL
@@ -287,8 +510,6 @@ StatusColor_PP::
 	call SC_SetColor3
 	ld a, 1
 	ldh [SC_hCGBPalUpdate], a
-	ld a, SC_PAL_PLAYER_HP           ; 自分の 状態異常の ますは えらぶ 間 黒
-	call SC_PlayerCellAttr
 	pop bc
 	ret
 .num2                                ; hl の 2ます（$7f ＝ 0、$f6〜$ff ＝ 0〜9）→ a
@@ -310,54 +531,56 @@ StatusColor_PP::
 	xor a
 	ret
 
-; わざを えらび おわった あと：自分の 状態異常の ますと 色を もどす
+; わざを えらび おわった あと：PP の 色を 黒に
 StatusColor_PPReset:
-	ld a, SC_PAL_PLAYER
-	call SC_PlayerCellAttr
-	ld a, [SC_wBattleMonStatus]
-	call SC_Kind
-	ld de, $0100 | SC_PAL_PLAYER
+	ld de, $0100 | SC_PAL_PP
+	xor a
 	call SC_SetColor3
 	ld a, 1
 	ldh [SC_hCGBPalUpdate], a
 	ret
 
-; 自分の 状態異常の ます（16〜18, 8）の 色を a 本目に（wAttrmap と VRAM の バンク1）
-SC_PlayerCellAttr:
-	ld hl, SC_wAttrmap + SC_PLAYER_CELL
-	ld [hli], a
-	ld [hli], a
-	ld [hl], a
-	ld c, a
-	ldh a, [$ff4f]
-	push af
-	ld a, 1
-	ldh [$ff4f], a
-	ld hl, SC_VRAM_PLAYER_CELL
-	ld b, 3
-.loop
-	di
-.wait
-	ldh a, [$ff41]
-	and %10
-	jr nz, .wait
-	ld [hl], c
-	ei
-	inc hl
-	dec b
-	jr nz, .loop
-	pop af
-	ldh [$ff4f], a
-	ret
-
 ; 手持ちの 画面（_CGB_PartyMenu の おわり。wBGPals1）
+;   どく 4本目 色3・やけど 5本目 色3・こおり 6本目 色3（ふつうの 文字）、
+;   まひ 4本目 色1・ねむり 5本目 色1（ますの 色に バンク1 の しるしを つけ、状態を かく ときに
+;   色1 の 文字を バンク1 $72〜$74・$75〜$77 に 作って ますを その タイルに する）。5種類 ぜんぶ 色が つく。
+;   （_CGB_PartyMenu は HP の バーを かく ところで よばれ、状態は その あとに かかれる）
 StatusColor_Party:
-	ld hl, SC_TMP
+	ld e, 4
+	call SC_SetBase
+	ld e, 5
+	call SC_SetBase
+	ld e, 6
+	call SC_SetBase
+	ld de, 4
+	ld a, 1
+	call SC_SetColor3
+	ld de, 5
+	ld a, 2
+	call SC_SetColor3
+	ld de, 6
+	ld a, 3
+	call SC_SetColor3
+	ld de, 4
+	ld a, 4
+	call SC_SetColor1
+	ld de, 5
+	ld a, 5
+	call SC_SetColor1
+	; 6ひき ぶんの ますの 色を 0 に（前に バンク1 の しるしが のこらない ように）
+	ld hl, SC_wAttrmap + 8
+	ld bc, 40 - 2
+	ld e, 6
+.clear
 	xor a
 	ld [hli], a
 	ld [hli], a
-	ld [hli], a
-	ld [hl], a                       ; SC_TMP＋3 ＝ 何びきめ
+	ld [hl], a
+	add hl, bc
+	dec e
+	jr nz, .clear
+	xor a
+	ld [SC_TMP + 3], a               ; 何びきめ
 .loop
 	ld a, [SC_wPartyCount]
 	ld b, a
@@ -385,50 +608,50 @@ StatusColor_Party:
 	call SC_Kind
 	and a
 	jr z, .next
-	ld b, a
-	ld hl, SC_TMP
-	ld e, SC_PAL_PARTY0              ; 4〜6本目
-.find
-	ld a, [hl]
-	cp b
-	jr z, .found
-	and a
-	jr z, .assign
-	inc hl
-	inc e
-	ld a, e
-	cp 7
-	jr nz, .find
-	jr .next                         ; 4種類め からは 色なし
-.assign
-	ld [hl], b
-	push bc
-	push de
-	call SC_SetBase
-	pop de
-	push de
-	ld a, b
-	ld d, 0
-	call SC_SetColor3
-	pop de
-	pop bc
-.found
-	; ます（8〜10, 2×i）を e 本目に
+	ld [SC_TMP + 2], a
+	; ます（8〜10, 2×i）
 	ld a, [SC_TMP + 3]
-	ld hl, SC_wAttrmap + 8
+	ld hl, SC_wTilemap + 8
 	ld bc, 40
 	and a
-	jr z, .attr
+	jr z, .cell
 .row
 	add hl, bc
 	dec a
 	jr nz, .row
-.attr
-	ld a, e
-	ld [hli], a
-	ld [hli], a
-	ld [hl], a
+.cell
+	ld a, [SC_TMP + 2]
+	cp 4
+	jr nc, .bank1
+	; どく・やけど・こおり：3本目〜（4・5・6）の 色3
+	add 3
+	call .attr
+	jr .next
+.bank1
+	; まひ（4）→ 4本目、ねむり（5）→ 5本目 の 色1（バンク1 の 色1 の 文字。状態を かく 順が どちらでも
+	; いい ように、ここでも PlaceNonFaintStatus の あとでも ますを その タイルに する）
+	push af
+	add 8
+	call .attr
+	pop af
+	ld b, h
+	ld c, l
+	ld d, 1 << 6                     ; まひ
+	cp 4
+	jr z, .p
+	ld d, 1                          ; ねむり
+.p
+	call StatusColor_HUD.party
 .next
 	ld hl, SC_TMP + 3
 	inc [hl]
-	jr .loop
+	jp .loop
+.attr                                ; hl ＝ wTilemap の ます → wAttrmap の 同じ 所に a
+	push hl
+	ld bc, SC_wAttrmap - SC_wTilemap
+	add hl, bc
+	ld [hli], a
+	ld [hli], a
+	ld [hl], a
+	pop hl
+	ret
