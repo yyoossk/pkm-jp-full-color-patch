@@ -32,12 +32,15 @@ def defs(v):
 
 def build(v):
     os.makedirs('obj',exist_ok=True); os.makedirs('out',exist_ok=True)
-    with open('obj/vars.inc','w') as f: f.write(f'INCLUDE "vars/{v}.inc"\n')
-    o=f'obj/{v}.o'
-    subprocess.run([tool('rgbasm'),'-I','obj','-I','src','-I','.']+defs(v)+['-o',o,'src/main.asm'],check=True)
+    with open('obj/vars.inc','w') as f: f.write(f'INCLUDE "vars/{v}.inc"\nINCLUDE "common.inc"\n')
+    objs=[]
+    for src in [l.strip() for l in open('src/files.txt',encoding='utf-8') if l.strip() and not l.startswith(';')]:
+        o=f'obj/{v}_'+os.path.basename(src)[:-4]+'.o'
+        subprocess.run([tool('rgbasm'),'-I','obj','-I','src','-I','.','-P','vars.inc']+defs(v)+['-o',o,src],check=True)
+        objs.append(o)
     out=f'out/{v}.gbc'
-    subprocess.run([tool('rgblink'),'-O',f'base/{v}.gbc','-n',f'out/{v}.sym','-m',f'out/{v}.map','-o',out,o],check=True)
-    subprocess.run([tool('rgbfix'),'-v','-p','0',out],check=True)
+    subprocess.run([tool('rgblink'),'-O',f'base/{v}.gbc','-n',f'out/{v}.sym','-m',f'out/{v}.map','-l','src/layout.link','-o',out]+objs,check=True)
+    subprocess.run([tool('rgbfix'),'-v','-p','0',out],check=True,stderr=subprocess.DEVNULL)
     print('%-14s %08X'%(v,zlib.crc32(open(out,'rb').read())))
 
 if __name__=='__main__':

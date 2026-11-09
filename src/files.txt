@@ -1,0 +1,6 @@
+; 青フルカラー 改良ソース（Ver.2.32 の ROM に当てる）
+; ここに並べた改良のファイルを、1つずつアセンブルして土台の ROM に当てる。
+; どのファイルも、はじめに vars/<版>.inc と src/common.inc が読みこまれる。
+src/free_bank_a.asm
+src/hpbar_color_fix.asm
+src/place_sign_sprites.asm
