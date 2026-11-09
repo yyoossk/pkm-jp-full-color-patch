@@ -120,14 +120,42 @@ out2=['; tools/follow_gen.py で 作る（手で 書きかえない）',
 for i in range(252):
     e=CP[i*8:i*8+8]
     out2.append('\tdw '+', '.join('$%04x'%(e[k]|e[k+1]<<8) for k in range(0,8,2)))
-# 後ろ・横（歩行グラフィック）用の 色：元の 連れ歩きキット（follow-mons）と 同じ。色1 ＝ はだ (31,19,10)、
-#   色2 ＝ 一覧.csv の フィールド色（ふつう・色ちがい）。歩行グラフィックは この 色に あわせて かかれて いる
+# 後ろ・横（歩行グラフィック）用の 色：正面（手持ち）と 同じ その ポケモンの 2色を 使う（ユーザーの 希望）。
+#   歩行グラフィックの 色1（明るい 所）・色2（暗い 所）に どちらを あてるかを ポケモンごとに 自動で 決める：
+#   1) 正面で 色1・色2 が しめる 広さの わりあいと、後ろ・横で 同じ わりあいに なる 方（差が 0.15 より 大きい とき）
+#   2) そうで なければ、歩行グラフィックが かかれた 元の 色（色1 ＝ はだ (31,19,10)、色2 ＝ 一覧.csv の フィールド色）に
+#      色あい・明るさが 近い 方。色ちがいも ふつうと 同じ あて方。
+import colorsys
 OW={'RED':(31,7,1),'BLUE':(10,9,31),'GREEN':(7,23,3),'BROWN':(15,10,3),'PURPLE':(18,4,18),'PINK':(18,4,18)}
-def rgb(t): return t[0]|t[1]<<5|t[2]<<10
-SKIN=rgb((31,19,10))
-out2+=['; 後ろ・横 用（歩行グラフィックに あう 色。色1 ＝ はだ、色2 ＝ フィールド色）','FollowerWalkPals:']
-out2.append('\tdw $%04x, $%04x, $%04x, $%04x   ; タマゴ'%(SKIN,rgb(OW['GREEN']),SKIN,rgb(OW['GREEN'])))
-for n in range(1,252):
-    r=byno['%03d'%n]
-    out2.append('\tdw $%04x, $%04x, $%04x, $%04x'%(SKIN,rgb(OW[r[4]]),SKIN,rgb(OW[r[5]])))
+SKIN=(31,19,10)
+def _un(c): return (c&31,(c>>5)&31,(c>>10)&31)
+def _hls(t): return colorsys.rgb_to_hls(*[x/31 for x in t])
+def _dist(a,b):
+    ha,la,sa=_hls(a); hb,lb,sb=_hls(b)
+    dh=min(abs(ha-hb),1-abs(ha-hb))
+    return dh*2*min(sa,sb)+abs(la-lb)+abs(sa-sb)*0.5
+def _counts(d,frames):
+    n=[0,0,0,0]
+    for f in frames:
+        for k in range(4):
+            t=d[(f*4+k)*16:(f*4+k)*16+16]
+            for y in range(8):
+                for x in range(8): n[((t[y*2]>>(7-x))&1)|(((t[y*2+1]>>(7-x))&1)<<1)]+=1
+    return n
+def walk_swap(i):
+    """i = 色の 表の 番号（0 = タマゴ、1〜251）。True なら 色1・色2 を 入れかえて あてる"""
+    gi=251 if i==0 else i-1
+    d=open('gfxdata/follow_icon/%03d.2bpp'%gi,'rb').read()
+    fa=_counts(d,[0,3]); wa=_counts(d,[1,2,4,5])
+    tf=(fa[1]+fa[2]) or 1; tw=(wa[1]+wa[2]) or 1
+    f1=fa[1]/tf; keep=abs(wa[1]/tw-f1); swap=abs(wa[2]/tw-f1)
+    if abs(keep-swap)>0.15: return swap<keep
+    c1=_un(CP[i*8]|CP[i*8+1]<<8); c2=_un(CP[i*8+2]|CP[i*8+3]<<8)
+    fc=OW['GREEN'] if i==0 else OW[byno['%03d'%i][4]]
+    return _dist(c2,SKIN)+_dist(c1,fc) < _dist(c1,SKIN)+_dist(c2,fc)
+out2+=['; 後ろ・横 用（その ポケモンの 2色。歩行グラフィックの 明るい 所・暗い 所への あて方は ポケモンごと）','FollowerWalkPals:']
+for i in range(252):
+    e=[CP[i*8+k]|CP[i*8+k+1]<<8 for k in range(0,8,2)]
+    if walk_swap(i): e=[e[1],e[0],e[3],e[2]]
+    out2.append('\tdw '+', '.join('$%04x'%v for v in e)+('   ; タマゴ' if i==0 else ''))
 open('src/follow_data.inc','a').write('\n'.join(out2)+'\n')
