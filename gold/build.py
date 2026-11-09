@@ -55,7 +55,7 @@ FILES=[
     'src/legendrevive.asm',
     'src/contestpc.asm',
     'src/monmenu_fix.asm']
-EXPECT={'kin.gbc':0x282A970B,'kin60.gbc':0x25F5129D}   # Ver.1.2.1
+EXPECT={'kin.gbc':0xB87442D9,'kin60.gbc':0x7C3EB7B8}   # Ver.1.2.1 ＋ 場所の名前の札をクリスタルと同じに（まだリリースしていない）
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)
