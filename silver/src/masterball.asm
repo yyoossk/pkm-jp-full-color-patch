@@ -59,6 +59,19 @@ MasterBallGetMart: ; e = 店の 番号 → b = 表の バンク、de = 表
 SECTION "masterball mart", ROMX[MB_ADDR], BANK[MB_BANK]
 MasterBallMart:
 	ld b, MB_GETMART_BANK
+IF DEF(MB_MART251)
+	; 251匹そろう版：コガネデパート 4F（ドーピングの 店）に しんかの いし・おうじゃのしるし を 足した 表に かえる
+	ld a, e
+	cp LOW(MB_MART251)
+	jr nz, .not251
+	ld a, d
+	cp HIGH(MB_MART251)
+	jr nz, .not251
+	ld b, BANK(MasterBallMart251)
+	ld de, MasterBallMart251
+	ret
+.not251
+ENDC
 	ld a, e
 	cp LOW(MB_MART_INDIGO)
 	ret nz
@@ -77,3 +90,11 @@ MasterBallMartIndigo:
 	db MASTER_BALL
 	db ULTRA_BALL, MAX_REPEL, HYPER_POTION, MAX_POTION, FULL_RESTORE, REVIVE, FULL_HEAL
 	db -1
+
+IF DEF(MB_MART251)
+MasterBallMart251:
+	db 12
+	db PROTEIN, IRON, CARBOS, CALCIUM, HP_UP
+	db FIRE_STONE, WATER_STONE, THUNDERSTONE, LEAF_STONE, MOON_STONE, SUN_STONE, KINGS_ROCK
+	db -1
+ENDC

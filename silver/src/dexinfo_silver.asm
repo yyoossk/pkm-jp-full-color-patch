@@ -556,7 +556,11 @@ DI_EvoFirst:
 .Day   db "ひる@"
 .Nite  db "よる@"
 .Level db "レべル@"
+IF DEF(DI_TRADE251)
+.Trade db "レべル", $f6 + 3, $f6 + 7, "@"     ; 251匹そろう版
+ELSE
 .Trade db "つうしん@"
+ENDC
 
 ; 2行め（もたせる どうぐ・こうげきと ぼうぎょ）：hl ＝ 行の 左
 DI_EvoSecond:
