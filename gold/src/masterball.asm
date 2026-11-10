@@ -59,6 +59,18 @@ MasterBallGetMart: ; e = 店の 番号 → b = 表の バンク、de = 表
 SECTION "masterball mart", ROMX[MB_ADDR], BANK[MB_BANK]
 MasterBallMart:
 	ld b, MB_GETMART_BANK
+IF DEF(MB_ED251)
+	ld a, e
+	cp LOW(MB_MART_GOLDENROD_4F)
+	jr nz, .not4f
+	ld a, d
+	cp HIGH(MB_MART_GOLDENROD_4F)
+	jr nz, .not4f
+	ld b, BANK(EdMartGoldenrod4F)
+	ld de, EdMartGoldenrod4F
+	ret
+.not4f
+ENDC
 	ld a, e
 	cp LOW(MB_MART_INDIGO)
 	ret nz
@@ -71,6 +83,15 @@ MasterBallMart:
 	ld b, BANK(MasterBallMartIndigo)
 	ld de, MasterBallMartIndigo
 	ret
+
+IF DEF(MB_ED251)
+DEF MB_MART_GOLDENROD_4F EQU $6675   ; 元の 表「05 1b 1c 1d 1f 1a ff」
+EdMartGoldenrod4F:
+	db 12
+	db PROTEIN, IRON, CARBOS, CALCIUM, HP_UP
+	db FIRE_STONE, WATER_STONE, THUNDERSTONE, LEAF_STONE, MOON_STONE, SUN_STONE, KINGS_ROCK
+	db -1
+ENDC
 
 MasterBallMartIndigo:
 	db 8

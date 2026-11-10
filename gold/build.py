@@ -2,7 +2,7 @@
 #   つかいかた：python3 build.py
 #   ・このフォルダに 元の ROM（ポケットモンスター金 後期版。CRC32 4EF7F2A5）を base.gbc の 名前で おく
 #   ・RGBDS 1.0.4 の rgbasm・rgblink・rgbfix を PATH に 入れる（または 環境変数 RGBDS に その フォルダ）
-#   ・できる もの：kin.gbc（通常版）・kin60.gbc（60fps版）
+#   ・できる もの：kin.gbc（通常版）・kin60.gbc（60fps版）、kin251.gbc・kin251_60.gbc（251ひき そろう版の 通常版・60fps版）
 import subprocess,sys,os,zlib
 T=os.environ.get('RGBDS','')
 if T and not T.endswith('/'): T+='/'
@@ -59,7 +59,11 @@ FILES=[
     'src/prizetm_gold.asm',
     'src/statuscolor_gold.asm',
     'src/dexinfo_gold.asm']
-EXPECT={'kin.gbc':0xD4AF6B5B,'kin60.gbc':0xF22C69C6}   # Ver.1.3.3
+# 251ひき そろう版：野生・ショップ・ずかんの 文字の ファイルを かえて、edition251_gold.asm を 足す
+FILES251=[{'src/wild_gold.asm':'src/wild251_gold.asm','src/masterball.asm':'src/masterball251.asm',
+           'src/dexinfo_gold.asm':'src/dexinfo251_gold.asm'}.get(f,f) for f in FILES]+['src/edition251_gold.asm']
+EXPECT={'kin.gbc':0xD4AF6B5B,'kin60.gbc':0xF22C69C6,   # Ver.1.3.3
+        'kin251.gbc':0x42EEF643,'kin251_60.gbc':0x40D3C6D4}   # 251ひき そろう版（まだ リリースして いない）
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)
@@ -84,3 +88,5 @@ if __name__=='__main__':
     if zlib.crc32(open('base.gbc','rb').read())!=0x4EF7F2A5: print('注意：base.gbc の CRC32 が 4EF7F2A5（後期版）では ありません')
     build(FILES,'kin.gbc')
     build(FILES+['src/fps60.asm'],'kin60.gbc')
+    build(FILES251,'kin251.gbc')
+    build(FILES251+['src/fps60.asm'],'kin251_60.gbc')
