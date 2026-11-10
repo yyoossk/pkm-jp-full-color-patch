@@ -59,7 +59,7 @@ FILES=[
     'src/prizetm_gold.asm',
     'src/statuscolor_gold.asm',
     'src/dexinfo_gold.asm']
-EXPECT={'kin.gbc':0x7A2908AB,'kin60.gbc':0x867FDB62}   # Ver.1.3.0
+EXPECT={'kin.gbc':0xEDF43780,'kin60.gbc':0xB0041D37}   # Ver.1.3.0 ＋ 手持ちの ★の 場所の 修正（まだリリースしていない）
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)

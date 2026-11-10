@@ -644,7 +644,9 @@ Fw_PartySelect:
 	call Fw_PartyMark
 	jp FW_WaitBGMap2
 
-; 手持ちの 画面に 赤い ★（えらんだ ポケモンの「：Ｌ」の 右上 hlcoord 9, 0 ＋ 2行 × 番号。色ちがいの ★（hlcoord 8, 0）の となり）
+; 手持ちの 画面に 赤い ★（えらんだ ポケモンの HP の 数字の 右 hlcoord 19, 0 ＋ 2行 × 番号）。
+;   状態異常の 文字（hlcoord 8〜10, 0）・色ちがいの ★（11, 0）と かさならない 所に おく
+;   （9, 0 だと「ねむり」の「む」が ★の ますに なって こわれた）。手持ちの 画面を 開いた ときの 色は statuscolor_gold.asm の .marks
 ;   赤は HP の 赤の パレット（BG 3）の 色2 で かく。★の 絵は タイル $5f に 書く（$5e は 色ちがいの ★）
 DEF FW_MARK_TILE2      EQU $5f
 DEF FW_MARK_PAL2       EQU 3
@@ -672,8 +674,8 @@ Fw_PartyMark::
 	jr nc, .chosen
 	ld c, $ff
 .chosen
-	ld hl, $c3a0 + 9                  ; hlcoord 9, 0
-	ld de, $cccd + 9
+	ld hl, $c3a0 + 19                 ; hlcoord 19, 0
+	ld de, $cccd + 19
 	ld b, 0
 .slot
 	ld a, [wPartyCount]

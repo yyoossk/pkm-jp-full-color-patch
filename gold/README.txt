@@ -1,9 +1,14 @@
 ポケットモンスター金 追加機能パッチ　ソース（Ver.1.3.0）
 ==============================================
 
-このフォルダで python3 build.py を 実行すると、Ver.1.3.0 の ROM が できます。
-  ・kin.gbc（通常版）　CRC32 7A2908AB
-  ・kin60.gbc（60fps版）CRC32 867FDB62
+このフォルダで python3 build.py を 実行すると、今の ROM が できます。
+  ・kin.gbc（通常版）　CRC32 EDF43780
+  ・kin60.gbc（60fps版）CRC32 B0041D37
+  （Ver.1.3.0 の あと、まだ リリースして いない もの：
+    ・手持ちの 画面の ★の 場所を かえた。状態異常の 文字と かさなって「ねむり」が こわれて いた。
+      色ちがいの ★は「ＨＰ：」の 上（src/partyshiny.asm）、連れ歩きの 赤い ★は HP の 数字の 右（src/follow_gold_update.inc）、
+      その ますの 色は src/statuscolor_gold.asm の .marks
+    Ver.1.3.0 の リリースは 通常版 7A2908AB・60fps版 867FDB62）
   （Ver.1.3.0 で 足した もの：
     ・場所の名前の札を クリスタルと 同じに した
     ・全ポケモンの 連れ歩き（src/follow_gold.asm。金銀連れ歩きキットから。話しかけると 会話・ピカチュウは 表情の 絵、

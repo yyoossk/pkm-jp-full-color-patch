@@ -568,7 +568,7 @@ StatusColor_Party:
 	ld b, a
 	ld a, [SC_TMP + 3]
 	cp b
-	ret nc
+	jr nc, .marks
 	ld e, a
 	ld d, 0
 	ld hl, SC_wPartySpecies
@@ -650,6 +650,36 @@ StatusColor_Party:
 	jr nz, .aloop
 	pop de
 	pop hl
+	ret
+.marks
+	; 色ちがいの ★（$5e。hlcoord 11, 0）・連れ歩きの ★（$5f。hlcoord 19, 0）の ますの 色。
+	;   この 行の 11〜19 は HP の バーの 色に されるので、ここで なおす（色ちがい：0 本目、連れ歩き：3 本目の 色2 ＝ 赤）
+	ld hl, SC_wTilemap + 11
+	ld b, 6 * 2
+.mloop
+	ld a, [hl]
+	ld c, 0
+	cp $5e
+	jr z, .mset
+	ld c, 3
+	cp $5f
+	jr nz, .mnext
+.mset
+	push hl
+	ld de, SC_wAttrmap - SC_wTilemap
+	add hl, de
+	ld [hl], c
+	pop hl
+.mnext
+	ld a, b
+	ld de, 19 - 11
+	bit 0, a
+	jr z, .madd
+	ld de, 40 - (19 - 11)
+.madd
+	add hl, de
+	dec b
+	jr nz, .mloop
 	ret
 
 ; PlaceNonFaintStatus の 元の 処理（文字を かく）＋ 色。bc ＝ ます、de ＝ 状態 → hl ＝ ます ＋ 2、f は 元と 同じ
