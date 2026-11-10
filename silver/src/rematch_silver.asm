@@ -14,4 +14,11 @@ DEF RMJ_SCRIPT_ADDR EQU $5200        ; ジョウトの スクリプト・セリ�
 DEF RMJ_PARTY_ADDR EQU $5a00         ; ジョウトの 再戦用の 手持ち（$6000〜 は ボールの 絵）
 DEF RM_PARTY_HOOK_FREE EQU $7fe0     ; バンク$0e の空き（バグ修正が $7fc8〜$7fd9 を使っている）
 DEF RM_BANK0_FREE  EQU $3f8a         ; ROM0 の空き（$3f8a〜$3f9f。$3fe0〜 は ずかんとパソコンの絵の色の入口）
+; 16この バッジの あとの 四天王・ワタル・ライバル（src/league.asm。クリスタル追加機能キットの 51）
+DEF RM_LEAGUE EQU 1
+DEF LG_wJohtoBadges    EQU $d56f
+DEF LG_wKantoBadges    EQU $d570
+DEF LG_wOtherTrainerID EQU $d10d     ; wOtherTrainerClass $d10a ＋ 3（金銀は ＋3。ReadTrainerParty の ld a, [wOtherTrainerID] で 確かめた）
+DEF LG_PARTY_ADDR      EQU $4a40     ; RM_SCRIPT_BANK（$4a20〜$4fff が 空き）
 INCLUDE "src/rematch.asm"
+INCLUDE "src/league.asm"

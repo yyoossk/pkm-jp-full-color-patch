@@ -254,23 +254,28 @@ ENDR
 	pop hl
 	; 画面に出ている色（wOBPals2）にも書くのは、画面が できあがって いる ときだけ。
 	; 開く とちゅう（白い 画面）に 書くと、アイコン だけ 先に 色が ついて 見える ことが ある。
-	; できあがって いるか どうかは BG パレット0 が wBGPals1 と wBGPals2 で 同じか で 見る
-	; （ちがう ときは、このあとの SetDefaultBGPAndOBP が wOBPals1 から うつす）
+	; できあがって いるか どうかは、画面に 出て いる BG パレット0（wBGPals2）の 色1 が
+	; 白（$7fff・ClearBGPalettes の $ffff）でも 黒（$0000）でも ないか で 見る
+	; （白・黒の ときは、このあとの SetDefaultBGPAndOBP が wOBPals1 から うつす）。
+	; （前は wBGPals1 と wBGPals2 の BG パレット0 が 同じか で 見て いたが、ならびかえの とき wBGPals1 だけ
+	;   一時 かわる ので、入れかえた アイコンが 少しの 間 前の 色（フィールドの 茶色など）で 見えた）
 	push hl
 	push de
-	ld hl, wBGPals1
-	ld de, wBGPals2
-	ld a, 8
-.cmp
-	push af
-	ld a, [de]
-	cp [hl]
-	jr nz, .notshown
-	pop af
-	inc hl
-	inc de
-	dec a
-	jr nz, .cmp
+	ld a, [wBGPals2 + 2]
+	ld e, a
+	ld a, [wBGPals2 + 3]
+	ld d, a
+	ld a, e
+	cp $ff
+	jr nz, .notwhite
+	ld a, d
+	and $7f
+	cp $7f
+	jr z, .notshown                   ; 白
+.notwhite
+	ld a, e
+	or d
+	jr z, .notshown                   ; 黒
 	pop de
 	pop hl
 	push de
@@ -279,7 +284,6 @@ ENDR
 	pop de
 	jp .write
 .notshown
-	pop af
 	pop de
 	pop hl
 	ret

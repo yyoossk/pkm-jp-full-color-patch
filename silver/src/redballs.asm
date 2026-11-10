@@ -99,6 +99,17 @@ RedBalls_HudAttr:
 ;---------------------------------------------------------------------
 ; 2. つかまえた印の絵（0 = 白、2 = 赤、3 = 黒。パレット5）
 SECTION "redballs caught gfx", ROMX[RB_CAUGHT_GFX], BANK[RB_CAUGHT_BANK]
+IF DEF(RB_STATUSCOLOR)
+	; 黒を 色1 に（色3 は 相手の 状態異常の 色。src/statuscolor_crystal.asm）
+	db %00000000, %00000000
+	db %01111000, %00000000
+	db %10000100, %01011000
+	db %10000100, %01111000
+	db %11111100, %00000000
+	db %10000100, %00000000
+	db %01111000, %00000000
+	db %00000000, %00000000
+ELSE
 	db %00000000, %00000000
 	db %01111000, %01111000
 	db %10000100, %11011100
@@ -107,6 +118,7 @@ SECTION "redballs caught gfx", ROMX[RB_CAUGHT_GFX], BANK[RB_CAUGHT_BANK]
 	db %10000100, %10000100
 	db %01111000, %01111000
 	db %00000000, %00000000
+ENDC
 
 SECTION "redballs battle pal hook", ROMX[RB_BATTLEPAL_HOOK], BANK[RB_BATTLEPAL_BANK]
 	ld a, RB_BANK
@@ -157,10 +169,19 @@ IF RB_PALS_WRAMBANK
 ENDC
 	ld a, RB_BG_PAL
 	ld [RB_wAttrmap + 1 * 20 + 1], a   ; hlcoord 1, 1
+IF DEF(RB_STATUSCOLOR)
+	ld a, BANK(StatusColor_BattleLayout)
+	ld hl, StatusColor_BattleLayout
+	rst $08
+ENDC
 	ret
 
 RedBalls_BallPal:
+IF DEF(RB_STATUSCOLOR)
+	dw $7fff, $0000, $109f, $0000   ; 白・黒・赤・（色3 は 相手の 状態異常）
+ELSE
 	dw $7fff, $7fff, $109f, $0000   ; 白・白・赤・黒（赤は ピカチュウ版・投げるボールと同じ）
+ENDC
 
 ; 3. ずかんの絵を読む（画面を消しているとき）
 RedBalls_DexLoadLCDOff:

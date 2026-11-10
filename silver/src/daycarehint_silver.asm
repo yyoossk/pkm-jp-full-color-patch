@@ -12,4 +12,13 @@ DEF DH_wStepsToEgg   EQU $dc02
 DEF DH_wBreedingCompatibility EQU $d143
 DEF DH_BANK          EQU $48
 DEF DH_ADDR          EQU $5600
+
+; あずけた ポケモンの 今の レベル（DH_LEVEL。クリスタル追加機能キットの 54）
+DEF DH_LEVEL EQU 1
+DEF DH_LADY_HOOK     EQU $6d5a       ; DayCareLady .AskWithdrawMon（ld a, $03 / ld hl, $6989 / rst $08）
+DEF DH_GetBreedMon2LevelGrowth EQU $6989
+DEF DH_wBreedMon1Nickname EQU $dbd5  ; wDayCareMan ＋ 1
+DEF DH_wBreedMon2Nickname EQU $dc04  ; wDayCareLady ＋ 3（英語版と 同じ ならび）
+DEF DH_wLevelTemp    EQU $cf99       ; wStringBuffer2（$cf92）＋ 7
+DEF DH_LEVEL_ADDR    EQU $5780
 INCLUDE "src/daycarehint.asm"

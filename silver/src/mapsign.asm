@@ -116,7 +116,17 @@ MapSign_Frame:
 	rst $08
 	ld a, [wMSState]
 	and $7f
+IF DEF(MS_IDLE)
+	; 札が 出て いない とき：ほかの 機能（銀は サファリの 歩数・ボールの 表示）
+	jr nz, .active
+	ld a, BANK(MS_IDLE)
+	ld hl, MS_IDLE
+	rst $08
+	ret
+.active
+ELSE
 	ret z
+ENDC
 	dec a
 	jr z, .first                      ; 1：ループの 1回め（クリスタルの タイマー 60。まだ 出さない）
 	dec a

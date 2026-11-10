@@ -75,9 +75,11 @@ SECTION "rematch party hook", ROMX[RM_ReadTrainerParty_Class], BANK[RM_PARTY_BAN
 
 SECTION "rematch party check", ROMX[RM_PARTY_HOOK_FREE], BANK[RM_PARTY_BANK]
 Rematch_CheckParty:
+IF !DEF(RM_LEAGUE)
 	ld a, [RM_wScriptBank]
 	cp RM_SCRIPT_BANK
 	jr nz, .no
+ENDC                             ; RM_LEAGUE：四天王なども 見るので いつも 呼ぶ（新しいスクリプトかは 呼んだ先で 見る）
 	ld a, BANK(Rematch_ReadParty)
 	ld hl, Rematch_ReadParty
 	rst $08                      ; キャリー = 再戦用の手持ちを読んだ
@@ -90,6 +92,16 @@ Rematch_CheckParty:
 
 SECTION "rematch party far", ROMX[RM_PARTY_FAR_ADDR], BANK[RM_SCRIPT_BANK]
 Rematch_ReadParty:
+IF DEF(RM_LEAGUE)
+	call League_ReadParty        ; 16この バッジの あとの 四天王・ワタル・ライバル（src/league.asm）
+	ret c
+	ld a, [RM_wScriptBank]
+	cp RM_SCRIPT_BANK
+	jr z, .script
+	and a                        ; キャリーなし
+	ret
+.script
+ENDC
 	ld a, [RM_wOtherTrainerClass]
 	ld c, a
 	ld hl, .table

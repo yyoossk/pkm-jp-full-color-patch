@@ -43,7 +43,7 @@ SECTION "partyshiny hook", ROMX[PS_HOOK], BANK[PS_HOOK_BANK]
 SECTION "partyshiny", ROMX[PS_ADDR], BANK[PS_BANK]
 PartyShiny:
 	; 「やめる」（hlcoord 1, 1 ＋ 2行 × 手持ちの 数）
-	ld hl, $c3a0 + 20 + 1
+	ld hl, PS_COORD - 8 + 20 + 1        ; hlcoord 1, 1
 	ld de, 2 * 20
 	ld a, [PS_wPartyCount]
 	and a
@@ -87,6 +87,12 @@ PartyShiny:
 	ld a, b
 	cp 6
 	jr c, .slot
+IF DEF(PS_FOLLOW_MARK)
+	; 連れ歩く ポケモンの ★（follow_crystal.asm）
+	ld a, BANK(Fw_PartyMark)
+	ld hl, Fw_PartyMark
+	rst $08
+ENDC
 	ret
 
 ; b ばんめ が 色ちがい なら キャリー（b は かえない）

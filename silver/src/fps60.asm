@@ -55,7 +55,7 @@ Fps60_VBlank:
 	ld hl, wFps60Flag
 	ld a, [hl]
 	and a
-	jr z, .done
+	ret z
 	ld [hl], 0
 	inc hl
 	ld c, [hl]          ; OAM の数
@@ -68,23 +68,7 @@ Fps60_VBlank:
 	ldh [hSCY], a
 	ld de, wShadowOAM
 	inc c
-	jr .next
-.loop
-	ld a, [de]
-	call .one_h
-	ld [de], a
-	inc de
-	ld a, [de]
-	call .one_h
-	ld [de], a
-	inc de
-	inc de
-	inc de
-.next
-	dec c
-	jr nz, .loop
-.done
-	ret
+	jp Fps60_RestoreOAM.next
 
 ; a = 表示中の値、[hl] = (まん中, 今) → まん中のままなら今の値を返す
 .one_h
@@ -96,16 +80,70 @@ Fps60_VBlank:
 	inc hl
 	ret
 
+; a = 今の値、[hl] = (まん中, 前の値)：[de] と [hl] に まん中、[hl+1] に 今の値、hl += 2（c を つかう）
+MACRO fps60_coord
+	ld c, a
+	inc hl
+	ld a, [hl]                   ; 前
+	ld [hl], c                   ; 今
+	dec hl
+	sub c                        ; 前 - 今
+	jr z, .same\@
+	add FPS60_MAXDIFF
+	cp FPS60_MAXDIFF * 2 + 1
+	jr nc, .same\@               ; 大きく 動いた（ワープ・出現 など）
+	sub FPS60_MAXDIFF
+	sra a
+	add c                        ; 今 + (前 - 今) / 2
+	jr .put\@
+.same\@
+	ld a, c
+.put\@
+	ld [hli], a
+	inc hl
+	ld [de], a
+ENDM
+
+; OAM を もどす ループ（速くするため .one_h を 中に 書く。ホームの 空きが たりないので 分けた：
+; 使われていない PlaceBCDNumberSprite $3e9e〜$3edc の うしろ。前は 連れ歩き follow.asm）
+SECTION "60fps vblank oam", ROM0[$3ec2]
+Fps60_RestoreOAM:
+.loop
+	ld a, [de]
+	cp [hl]
+	inc hl
+	jr nz, .k1
+	ld a, [hl]
+	ld [de], a
+.k1
+	inc hl
+	inc e
+	ld a, [de]
+	cp [hl]
+	inc hl
+	jr nz, .k2
+	ld a, [hl]
+	ld [de], a
+.k2
+	inc hl
+	inc e
+	inc e
+	inc e
+.next
+	dec c
+	jr nz, .loop
+	ret
+
 ;---------------------------------------------------------------------
 SECTION "60fps main", ROMX[NEW_ADDR_FPS], BANK[BANK_NEW]
 
 ; HandleMapBackground と同じことをして、すぐにまん中の位置を出す
 Fps60_Background:
+	ldh a, [hVBlankCounter]      ; スプライトを 並べる 前に 見る（並べて いる 間に VBlank を こえたら、もう おそいので まん中は 出さない）
+	push af
 	ld a, UpdateSprites_Bank
 	ld hl, _UpdateSprites
 	rst $08
-	ldh a, [hVBlankCounter]
-	push af
 	ld a, ScrollScreen_Bank
 	ld hl, ScrollScreen
 	rst $08
@@ -128,10 +166,10 @@ Fps60_Background:
 .in_time
 	ld a, [wFps60Valid]
 	and a
-	jr z, .record_only
+	jp z, .record_only
 	ldh a, [hVBlankCounter]
 	cp b
-	jr nz, .record_only          ; 今の位置がもう表示された → この回は補間しない
+	jp nz, .record_only          ; 今の位置がもう表示された → この回は補間しない
 
 ; 背景
 	ld hl, wFps60Buf
@@ -141,30 +179,30 @@ Fps60_Background:
 	ldh a, [hSCY]
 	call .coord
 	ld e, a
-; OAM（前から、隠れている物が出てくるまで）
+; OAM（前から、隠れている物が出てくるまで。速くするため .coord を 中に 書く）
 	push de
+	push bc
 	ld de, wShadowOAM
-	ld c, 0
 .loop
 	ld a, [de]
 	cp OAM_HIDDEN_Y
 	jr z, .oam_done
-	call .coord
-	ld [de], a
-	inc de
+	fps60_coord
+	inc e
 	ld a, [de]
-	call .coord
-	ld [de], a
-	inc de
-	inc de
-	inc de
-	inc c
-	ld a, c
-	cp 40
-	jr nz, .loop
+	fps60_coord
+	inc e
+	inc e
+	inc e
+	ld a, e
+	cp 40 * 4
+	jr c, .loop
 .oam_done
-	ld a, c
+	ld a, e
+	srl a
+	srl a
 	ld [wFps60Count], a
+	pop bc
 	pop de
 ; 背景もまん中にして「もどす」印をつける（その間に VBlank があったらやめる）
 	di

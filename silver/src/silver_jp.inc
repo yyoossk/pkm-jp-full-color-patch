@@ -73,6 +73,7 @@ DEF StartMenu_Items       EQU $696e   ; 9項目 × 6バイト
 DEF StartMenu_MenuDataItemsPtr EQU $696c
 DEF StartMenu_AppendMenuList EQU $6b28
 DEF StartMenu_ExitAppend  EQU $6b0b   ; ld a, STARTMENUITEM_EXIT / call .AppendMenuList
+DEF StartMenu_StatusAppend EQU $6aed  ; ld a, STARTMENUITEM_STATUS / call .AppendMenuList（ポケギアの あと）
 DEF PCScript_Bank         EQU $36
 DEF PCScript              EQU $4145   ; opentext / special PokemonCenterPC / closetext / end
 
@@ -134,6 +135,7 @@ DEF STEP_BIKE             EQU 2
 DEF B_BUTTON              EQU %00000010
 DEF STARTMENUITEM_EXIT    EQU 6
 DEF STARTMENUITEM_PC      EQU 9
+DEF STARTMENUITEM_STATUS  EQU 3
 DEF MONMENU_MENUOPTION    EQU 1
 DEF MONMENUITEM_CANCEL    EQU $12
 DEF MONMENUITEM_NAME      EQU $16

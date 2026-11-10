@@ -12,4 +12,5 @@ DEF PS_VRAM            EQU $9000 + PS_TILE * 16
 DEF PS_COORD           EQU $c3a0 + 8      ; hlcoord 8, 0（1ぴきめ。2行 ごと）
 DEF PS_BANK            EQU $48
 DEF PS_ADDR            EQU $6600
+DEF PS_FOLLOW_MARK EQU 1         ; 連れ歩く ポケモンの ★（follow.asm）
 INCLUDE "src/partyshiny.asm"

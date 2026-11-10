@@ -35,10 +35,23 @@ SECTION "Run surf", ROMX[DoPlayerMovement_surf], BANK[BANK_PLAYERMOVE]
 SECTION "StartMenu items ptr", ROMX[StartMenu_MenuDataItemsPtr], BANK[BANK_STARTMENU]
 	dw StartMenuItemsNew
 
+IF DEF(StartMenu_StatusAppend)
+; ならびを ずかん・ポケモン・リュック・ポケギア・パソコン・主人公の名前・レポート・せってい に（クリスタルの キットと 同じ）。
+; 「とじる」は むしとり大会中 だけ（大会中は パソコンを 出さない）
+SECTION "StartMenu pc/status", ROMX[StartMenu_StatusAppend], BANK[BANK_STARTMENU]
+	call StartMenu_PCAndStatus  ; 5バイト（ld a,3 / call .AppendMenuList）
+	nop
+	nop
+SECTION "StartMenu exit/pc", ROMX[StartMenu_ExitAppend], BANK[BANK_STARTMENU]
+	call StartMenu_ExitInContest ; 5バイト（ld a,6 / call .AppendMenuList）
+	nop
+	nop
+ELSE
 SECTION "StartMenu exit/pc", ROMX[StartMenu_ExitAppend], BANK[BANK_STARTMENU]
 	call StartMenu_ExitOrPC   ; 5バイト（ld a,6 / call .AppendMenuList）
 	nop
 	nop
+ENDC
 
 SECTION "Bank4 new", ROMX[BANK4_FREE], BANK[BANK_STARTMENU]
 StartMenuItemsNew:
@@ -125,6 +138,14 @@ RunOrWalkStep:
 	ret
 
 ; --- スタートメニュー（バンク4から呼ばれる）
+IF DEF(StartMenu_StatusAppend)
+StartMenu_ExitInContest:      ; とじる は むしとり大会中だけ（バンク4 に 空きが ないので ここ）
+	ld hl, wStatusFlags2
+	bit STATUSFLAGS2_BUG_CONTEST_TIMER_F, [hl]
+	ret z
+	ld a, STARTMENUITEM_EXIT
+	jp StartMenu_AppendMenuList
+ELSE
 StartMenu_ExitOrPC:
 	ld hl, wStatusFlags2
 	bit STATUSFLAGS2_BUG_CONTEST_TIMER_F, [hl]
@@ -133,6 +154,8 @@ StartMenu_ExitOrPC:
 	ld a, STARTMENUITEM_PC
 .ok
 	jp StartMenu_AppendMenuList
+ENDC
+
 
 StartMenu_PC:
 	ld a, PCScript_Bank
@@ -449,3 +472,18 @@ ForgotMoveText:
 	db 1
 	dw wStringBuffer2
 	db 0, "を<LINE>きれいに　わすれた！<PROMPT>"
+
+IF DEF(StartMenu_StatusAppend)
+; バンク4・ホームの 空きが たりないので、ホームの $3fcd〜$3fdf（60fps の VBlank の うしろ）に 置く
+SECTION "StartMenu pc/status body", ROM0[$3fcd]
+StartMenu_PCAndStatus:        ; パソコン（むしとり大会中は なし）→ 主人公の名前
+	ld hl, wStatusFlags2
+	bit STATUSFLAGS2_BUG_CONTEST_TIMER_F, [hl]
+	jr nz, .status
+	ld a, STARTMENUITEM_PC
+	call StartMenu_AppendMenuList
+.status
+	ld a, STARTMENUITEM_STATUS
+	jp StartMenu_AppendMenuList
+
+ENDC

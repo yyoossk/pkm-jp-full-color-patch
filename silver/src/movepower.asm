@@ -56,6 +56,9 @@ SECTION "movepower hook", ROMX[MP_HOOK], BANK[MP_HOOK_BANK]
 
 SECTION "movepower", ROMX[MP_ADDR], BANK[MP_BANK]
 MovePower_Draw:
+IF DEF(MP_PPCOLOR)
+	call StatusColor_PP          ; PP の のこりで 色（src/statuscolor_crystal.asm。b は そのまま）
+ENDC
 	; 14〜16行めの 右の わく（x 10〜18）を けす（「わざタイプ」・その 濁点・「／タイプ」）
 	; b = わざの タイプ（呼ぶ 前に 入って いる）は とって おく
 	push bc

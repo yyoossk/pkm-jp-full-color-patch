@@ -40,4 +40,5 @@ DEF MS_hCGB            EQU $ffe8
 DEF MS_wBGPals2_7      EQU $c2b8      ; wBGPals2（$c280）の パレット7
 DEF MS_BANK            EQU $48
 DEF MS_ADDR            EQU $4600      ; 大きく なったので $6800 から うつした
+DEF MS_IDLE EQUS "SafariHUD"            ; 札が 出て いない とき：サファリの 歩数・ボール（src/safari/safari_silver.asm）
 INCLUDE "src/mapsign.asm"

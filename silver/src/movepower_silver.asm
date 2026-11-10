@@ -15,4 +15,5 @@ DEF MP_GetFarByte      EQU $30e4
 DEF MP_COORD           EQU $c3a0      ; hlcoord 0, 0
 DEF MP_BANK            EQU $48
 DEF MP_ADDR            EQU $5800
+DEF MP_PPCOLOR EQU 1                  ; PP の のこりで 色（src/statuscolor_silver.asm）
 INCLUDE "src/movepower.asm"
