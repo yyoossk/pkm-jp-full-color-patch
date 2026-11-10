@@ -23,4 +23,4 @@ IPS を 作る：python3 mkips.py feat.gbc 通常版.ips base.gbc
 ■ 251匹そろう版（別の 版）
   python3 build.py e.gbc $(cat buildlist251.txt)
   python3 build.py e60.gbc src/fps60.asm $(cat buildlist251.txt)
-  （通常版 BE98FBAD、60fps版 60EF6F72。ふつうの 版の ROM は かわらない）
+  （通常版 ADC14540、60fps版 02EFF5FF。ふつうの 版の ROM は かわらない）
