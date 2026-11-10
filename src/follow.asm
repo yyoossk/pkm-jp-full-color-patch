@@ -136,6 +136,8 @@ FollowerTick::
 	ldh [rSVBK], a
 	ret
 
+DEF wPlayerImageIdx EQU $C102          ; 主人公の絵の番号（$FF = かくしている）
+
 FwTick:
 	xor a
 	ld [wFwDrawn], a
@@ -243,6 +245,11 @@ FwTick:
 	ld a, [wFwGdma]
 	cp 2
 	ret z                         ; 絵を読んでいるところ
+	; 人のスプライトがかくされている（ショップ・わざを思い出す人などのリストの間：HideSprites で
+	; 主人公の絵の番号 $C102 が $FF）ときは、連れ歩きも出さない（動きの処理は上でそのまま）
+	ld a, [wPlayerImageIdx]
+	inc a
+	ret z
 	jp FwDraw
 
 ; e = 連れ歩く種類（0 = なし）、d = 1 ならひんし
