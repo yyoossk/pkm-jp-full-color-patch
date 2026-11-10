@@ -28,6 +28,8 @@ DEF FW_MASK_PAL       EQU 5      ; 下じき（色1 が 白）
 DEF FW_VRAM_GFX       EQU $8000  ; VRAMバンク1 の タイル $00〜$17
 DEF FW_VRAM_MASK      EQU $8180  ; VRAMバンク1 の タイル $18〜$2F
 DEF FW_VRAM_STAR      EQU $8300  ; VRAMバンク1 の タイル $30（手持ちの 画面の ★）
+DEF FW_VRAM_EMOTE     EQU $8340  ; タイル $34〜$37（気持ちの アイコン）
+DEF FW_VRAM_BALL      EQU $8380  ; タイル $38〜$43（ボール：開いた・半分・とじた）
 DEF wFollowSlot       EQU $d689  ; 連れ歩く 手持ちの 番号（レポートに 書かれる 所。0 = 1 匹め、$FF = だれも）
 DEF wCurrentMenuItem  EQU $cc26
 DEF wMenuItemToSwap   EQU $cc35
@@ -59,11 +61,34 @@ DEF FW_MX             EQU $d022
 DEF FW_NMAP           EQU $d023  ; この フレームの マップ・たて・横
 DEF FW_NMY            EQU $d024
 DEF FW_NMX            EQU $d025
+DEF FW_EMOTE          EQU $d026  ; 気持ちの アイコンを 出す（話しかけた とき）
+DEF FW_BALL           EQU $d027  ; ボールの アニメの のこり フレーム（bit7 = もどる）
+DEF FW_INBALL         EQU $d028  ; ボールに もどって いる（次に 出る とき ボールから）
+DEF FW_DRAWN          EQU $d029  ; 前の フレームで ポケモンを かいた
 DEF wCurMap_          EQU $d2dd
 DEF wYCoord_          EQU $d2e0
 DEF wXCoord_          EQU $d2e1
 
 DEF wShadowOAM        EQU $c300
+
+; 連れ歩きの 画面の 位置（b = Y、c = X、hl = OAM の 空き）
+MACRO FW_POS
+	ldh a, [hOAMBufOfs]
+	ld l, a
+	ld h, HIGH(wShadowOAM)
+	ld a, [FW_OY]
+	ld b, a
+	ld a, [wPlayerYPixels]
+	add b
+	add 16
+	ld b, a
+	ld a, [FW_OX]
+	ld c, a
+	ld a, [wPlayerXPixels]
+	add c
+	add 8
+	ld c, a
+ENDM
 
 ; 16×16 を OAM に 4 枚（hl = OAM、b = Y、c = X、d = タイル、FW_FLIP・FW_ATTR）
 MACRO FW_OBJ
@@ -102,7 +127,7 @@ SECTION "連れ歩き マップを 読む 所", ROM0[$2b7f]
 SECTION "連れ歩き 人の 絵を 読みなおす 所", ROM0[$3d27]
 	ld b, $37
 	ld hl, FwOnReload
-SECTION "連れ歩き 手持ちから はずす 所", ROM0[$384a]
+SECTION "連れ歩き 手持ちから はずす 所", ROM0[$3849]
 	ld hl, FwRemove
 	ld b, $37
 SECTION "連れ歩き 手持ち SELECT も 見る", ROM0[$2d36]
@@ -146,6 +171,7 @@ FwBankLoad\@:
 	ldh [$ff53], a
 	ld a, LOW(\3)
 	ldh [$ff54], a
+	di                    ; 待つ あいだに VBlank で VRAM バンクが かわらないように
 	ld a, 1
 	ldh [$ff4f], a
 	ldh a, [$ff40]
@@ -164,7 +190,7 @@ FwBankLoad\@:
 .done\@
 	xor a
 	ldh [$ff4f], a
-	ret
+	reti                  ; ei ＋ ret
 SECTION "連れ歩き データ \1 中身", ROMX[$4100], BANK[\1]
 	INCBIN \2
 ENDM
@@ -305,6 +331,11 @@ FwStar:
 	ld hl, FwStarGfx
 	ld de, FW_VRAM_STAR
 	ld c, 8
+	call FwVcopy
+	jr FwStarOam
+
+; VRAMバンク1 へ 書く（hl = もと、de = 行き先、c = 2 バイトの 数）。画面が 出て いる ときは HBlank を まつ
+FwVcopy:
 .gfx
 	di
 	ld a, 1
@@ -335,6 +366,8 @@ FwStar:
 	ei
 	dec c
 	jr nz, .gfx
+	ret
+FwStarOam:
 	ld hl, wShadowOAM + 39 * 4
 	ld a, [wFollowSlot]
 	cp 6
@@ -411,7 +444,8 @@ FwFrame:
 	ld c, a
 	ld a, [wXCoord_]
 	ld l, a
-; 2. WRAMバンク7 で 動きと OAM（ここでは call / push / pop を しない）
+; 2. WRAMバンク7 で 動きと OAM（ここでは call / push / pop を しない。割りこみも 止める）
+	di
 	ldh a, [rSVBK_]
 	ld e, a
 	ld a, 7
@@ -435,7 +469,7 @@ FwFrame:
 	ld a, $5a
 	ld [hli], a
 	xor a
-	ld b, FW_FLIP - FW_OY + 1
+	ld b, FW_DRAWN - FW_OY + 1
 .zero
 	ld [hli], a
 	dec b
@@ -630,10 +664,36 @@ FwFrame:
 .progOk
 	ld [FW_PROG], a
 .moveDone
-	; 絵が VRAM に あるか
+	; ボールの アニメの のこり
+	ld a, [FW_BALL]
+	and $7f
+	jr z, .ballZero
+	ld a, [FW_BALL]
+	dec a
+	ld h, a
+	and $7f
+	ld a, h
+	jr nz, .ballSet
+	xor a                  ; のこり 0 なら おわり（もどる しるしも けす）
+.ballSet
+	ld [FW_BALL], a
+.ballZero
 	ld a, d
 	and a
-	jp z, .noDraw
+	jr nz, .haveWant
+	; 連れ歩かなく なった：見えて いたら ボールに もどる
+	ld a, [FW_DRAWN]
+	and a
+	jp z, .ballOnly
+	xor a
+	ld [FW_DRAWN], a
+	ld a, $80 | 12
+	ld [FW_BALL], a
+	ld a, 1
+	ld [FW_INBALL], a
+	jp .ballOnly
+.haveWant
+	; 絵が VRAM に あるか
 	ld hl, FW_DEX
 	cp [hl]
 	jr nz, .needGfx
@@ -643,27 +703,30 @@ FwFrame:
 .needGfx
 	ld a, d
 	ld [FW_REQ], a
-	jp .noDraw
+	jp .notDrawn
 .gfxOk
 	ld a, [FW_OY]
 	ld b, a
 	ld a, [FW_OX]
-	ld c, a
 	or b
-	jp z, .noDraw          ; 主人公と 同じ ます
+	jp z, .notDrawn        ; 主人公と 同じ ます
+	ld a, [FW_INBALL]      ; ボールから 出る
+	and a
+	jr z, .noOpen
+	xor a
+	ld [FW_INBALL], a
+	ld a, 12
+	ld [FW_BALL], a
+.noOpen
+	ld a, [FW_BALL]
+	and a
+	jp nz, .ballOnly       ; 出る とちゅう
 	ldh a, [hOAMBufOfs]
-	cp $a0 - 8 * 4 + 1
-	jp nc, .noDraw         ; OAM が たりない
-	ld l, a
-	ld h, HIGH(wShadowOAM)
-	ld a, [wPlayerYPixels]
-	add b
-	add 16
-	ld b, a
-	ld a, [wPlayerXPixels]
-	add c
-	add 8
-	ld c, a
+	cp $a0 - 12 * 4 + 1
+	jp nc, .notDrawn       ; OAM が たりない
+	ld a, 1
+	ld [FW_DRAWN], a
+	FW_POS
 	; 絵の コマ：0 下・1 上・2 横（＋3 で 歩き）
 	ld a, [FW_FACE]
 	cp 3
@@ -685,7 +748,7 @@ FwFrame:
 	add a
 	ld d, a                ; タイルの はじめ
 	ld a, [FW_FACE]
-	cp 3
+	cp 2                   ; 横の 絵は 右向き → 左は はんてん
 	ld a, 0
 	jr nz, .noFlip
 	inc a
@@ -694,7 +757,7 @@ FwFrame:
 	and a
 	ld a, $08 | FW_PAL     ; VRAMバンク1
 	jr z, .attr
-	or $20                 ; 右は 左向きを はんてん
+	or $20                 ; X はんてん
 .attr
 	ld [FW_ATTR], a
 	FW_OBJ
@@ -706,6 +769,65 @@ FwFrame:
 	or FW_MASK_PAL
 	ld [FW_ATTR], a
 	FW_OBJ
+	; 気持ちの アイコン（話しかけた とき）
+	ld a, [FW_EMOTE]
+	and a
+	jp z, .oamDone
+	xor a
+	ld [FW_FLIP], a
+	ld a, $08 | FW_MASK_PAL
+	ld [FW_ATTR], a
+	ld a, b
+	sub 16
+	ld b, a
+	ld d, LOW(FW_VRAM_EMOTE / 16)
+	FW_OBJ
+	jp .oamDone
+.notDrawn
+	xor a
+	ld [FW_DRAWN], a
+.ballOnly
+	; ボールの アニメ（もどる：開いた→半分→とじた、出る：とじた→半分→開いた）
+	ld a, [FW_BALL]
+	and $7f
+	jp z, .noDraw
+	ld a, [FW_OY]
+	ld b, a
+	ld a, [FW_OX]
+	or b
+	jp z, .noDraw
+	ldh a, [hOAMBufOfs]
+	cp $a0 - 4 * 4 + 1
+	jp nc, .noDraw
+	FW_POS
+	ld a, [FW_BALL]
+	ld d, a
+	and $7f
+	cp 9
+	ld a, 0                ; 1 コマめ
+	jr nc, .bf
+	ld a, [FW_BALL]
+	and $7f
+	cp 5
+	ld a, 1
+	jr nc, .bf
+	ld a, 2
+.bf
+	bit 7, d
+	jr nz, .closing
+	cpl                    ; 出る ときは 逆じゅん
+	add 3
+.closing
+	add a
+	add a
+	add LOW(FW_VRAM_BALL / 16)
+	ld d, a                ; 0 開いた・1 半分・2 とじた
+	xor a
+	ld [FW_FLIP], a
+	ld a, $08 | FW_MASK_PAL
+	ld [FW_ATTR], a
+	FW_OBJ
+.oamDone
 	ld a, l
 	ldh [hOAMBufOfs], a
 .noDraw
@@ -719,6 +841,7 @@ FwFrame:
 	ld b, a
 	ld a, e
 	ldh [rSVBK_], a
+	ei
 
 ; 3. 絵を 読む（c = ずかん番号）
 	ld a, c
@@ -763,7 +886,9 @@ FwFrame:
 	ld hl, $4000
 	call $3500
 	pop bc
+	call FwLoadBall
 	pop bc                 ; c = ずかん番号
+	di
 	ldh a, [rSVBK_]
 	ld e, a
 	ld a, 7
@@ -775,6 +900,7 @@ FwFrame:
 	ld [FW_FLAGS], a
 	ld a, e
 	ldh [rSVBK_], a
+	ei
 .noLoad
 
 ; 4. 色（OBJ パレット 6 を 手持ちの アイコンと 同じ 色に）
@@ -792,6 +918,7 @@ FwFrame:
 	ld bc, FwWalkPals      ; 後ろ・横：歩行グラフィック 用の 色
 .front
 	add hl, bc             ; hl = 色1・色2
+	di
 	ldh a, [rSVBK_]
 	ld e, a
 	ld a, 2
@@ -841,7 +968,40 @@ FwFrame:
 .palDone
 	ld a, e
 	ldh [rSVBK_], a
+	ei
 	ret
+
+; ボールの 絵（12 タイル）を VRAMバンク1 に（VBlank の 中、HDMA）
+FwLoadBall:
+	ld hl, FwBallGfx
+	ld a, h
+	ldh [$ff51], a
+	ld a, l
+	ldh [$ff52], a
+	ld a, HIGH(FW_VRAM_BALL)
+	ldh [$ff53], a
+	ld a, LOW(FW_VRAM_BALL)
+	ldh [$ff54], a
+	di
+	ld a, 1
+	ldh [rVBK_], a
+	ldh a, [$ff40]
+	bit 7, a
+	ld a, 12 - 1
+	jr z, .now
+	or $80
+	ldh [$ff55], a
+.wait
+	ldh a, [$ff55]
+	inc a
+	jr nz, .wait
+	jr .done
+.now
+	ldh [$ff55], a
+.done
+	xor a
+	ldh [rVBK_], a
+	reti
 
 FwGfxBanks:  db $2e, $2f, $30, $31
 FwMaskBanks: db $32, $36, $38, $39
@@ -941,14 +1101,42 @@ FwInFront:
 FwTalk:
 	ld a, [wFollowSlot]
 	ld c, a
+	call FwChooseTalk      ; de = 気持ちの アイコン ＋ 文（1 = なまえ、<DONE> か "@" で おわり）
+	push de
+	; 気持ちの アイコン の 絵（1 つ 64 バイト）
+	ld a, [de]
+	ld l, a
+	ld h, 0
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	ld bc, FwEmoteGfx
+	add hl, bc
+	ld de, FW_VRAM_EMOTE
+	ld c, 32
+	call FwVcopy
+	ld a, 1
+	call FwSetEmote
+	call $0a8e             ; DelayFrame（OAM を 作りなおして ふりむきと アイコンを 見せる）
+	; 鳴く
+	ld a, [wFollowSlot]
+	ld c, a
 	ld b, 0
 	ld hl, wPartySpecies
 	add hl, bc
 	ld a, [hl]
-	push bc
 	call PlayCry_
-	pop bc
+	ld c, 20
+	call $3661             ; DelayFrames
+	xor a
+	call FwSetEmote
+	call $0a8e
 	; 文を 作る：表（1 つ）→ 文
+	pop de
+	inc de
 	ld hl, FW_TEXT
 	ld a, LOW(FW_TEXT + 2)
 	ld [hli], a
@@ -956,18 +1144,26 @@ FwTalk:
 	ld [hli], a
 	ld [hl], 0             ; text
 	inc hl
-	push hl
-	call FwChooseTalk      ; de = 文（1 = なまえ、<DONE> で おわり）
-	pop hl
+	push de
 .copy
 	ld a, [de]
 	inc de
 	cp 1
 	jr z, .name
 	ld [hli], a
-	cp "<DONE>"
+	cp CHARVAL("<DONE>")
+	jr z, .copied
+	cp CHARVAL("@")
 	jr nz, .copy
-	jr .show
+	; "@" で おわる 文（どうぐを みつけた）：つづきは はい・いいえ
+	ld a, $08              ; text_asm
+	ld [hli], a
+	ld a, $c3              ; jp FwFindAsm
+	ld [hli], a
+	ld a, LOW(FwFindAsm)
+	ld [hli], a
+	ld [hl], HIGH(FwFindAsm)
+	jr .copied
 .name
 	push de
 	ld a, [wFollowSlot]
@@ -986,7 +1182,7 @@ FwTalk:
 	ld b, 6
 .nameLoop
 	ld a, [de]
-	cp "@"
+	cp CHARVAL("@")
 	jr z, .nameDone
 	and a
 	jr z, .nameDone
@@ -997,7 +1193,8 @@ FwTalk:
 .nameDone
 	pop de
 	jr .copy
-.show
+.copied
+	pop de
 	ld a, FW_TEXT_ID
 	ldh [hTextID], a
 	ld hl, FW_TEXT - (FW_TEXT_ID - 1) * 2
@@ -1011,6 +1208,45 @@ FwTalk:
 	ldh a, [$ffed]
 	ld [hl], a
 	ret
+
+; 気持ちの アイコンを 出す（a = 1）・けす（a = 0）
+FwSetEmote:
+	ld c, a
+	di
+	ldh a, [rSVBK_]
+	ld e, a
+	ld a, 7
+	ldh [rSVBK_], a
+	ld a, c
+	ld [FW_EMOTE], a
+	ld a, e
+	ldh [rSVBK_], a
+	ei
+	ret
+
+; 「どうぐを みつけた」の つづき（text_asm）：はい なら きんのたまを もらう
+FwFindAsm:
+	call $3516             ; YesNoChoice
+	ld a, [wCurrentMenuItem]
+	and a
+	jr nz, .end
+	ld b, $31              ; きんのたま
+	ld c, 1
+	call $3d3e             ; GiveItem（b = どうぐ, c = かず）
+	ld hl, FwTxtGot
+	jr c, .print
+	ld hl, FwTxtFull
+.print
+	call $3b59             ; PrintText
+.end
+	ld hl, FwTextEnd
+	ret
+FwTextEnd:
+	db "@"
+FwTxtGot:
+	db 0, "<PLAYER>は<LINE>きんのたまを てにいれた！<PROMPT>"
+FwTxtFull:
+	db 0, "りュックが いっぱいで<LINE>もてなかった<……><PROMPT>"
 
 ; c = 手持ちの 番号 → de = 文
 FwChooseTalk:
@@ -1123,6 +1359,10 @@ FwChooseTalk:
 	ld l, a
 	jr .ret
 .normal
+	ldh a, [$ff04]         ; たまに どうぐを みつける（32 回に 1 回）
+	and 31
+	ld hl, FwTxtFind
+	jr z, .ret
 	ld hl, FwTxtNormal
 .ret
 	ld d, h
@@ -1162,29 +1402,36 @@ FwTalkTable:
 	fw_talk   0, T_GHOST, $04, $04, FwTxtGhost
 	db $ff
 
-; 1 = なまえ
-FwTxtSleep:    db 1, "は<LINE>すこし ねむそうだ<DONE>"
-FwTxtPoison:   db 1, "は<LINE>ぐあいが わるそうだ<DONE>"
-FwTxtBurn:     db 1, "は<LINE>すこし いたそうだ<DONE>"
-FwTxtFreeze:   db 1, "は<LINE>こおりづけに なっている！<DONE>"
-FwTxtPara:     db 1, "は<LINE>うごきが にぶく なっている<DONE>"
-FwTxtBulba1:   db 1, "は<LINE>つるを くねくね させた！<DONE>"
-FwTxtBulba2:   db 1, "は<LINE>つるを ぴしっと ならした！<DONE>"
-FwTxtCharm:    db 1, "は<LINE>しっぽの ほのおを もやした！<DONE>"
-FwTxtPika1:    db 1, "は<LINE>たのしく おどった！<DONE>"
-FwTxtPika2:    db 1, "は うれしくて<LINE>おどりだした！<DONE>"
-FwTxtSquirtle: db 1, "は ころんで<LINE>ちょっと くやしそうだ！<DONE>"
-FwTxtClef1:    db 1, "は<LINE>そらを みあげている！<DONE>"
-FwTxtClef2:    db 1, "は<LINE>とつぜん おどりだした！<DONE>"
-FwTxtOnix:     db 1, "は たのしそうに<LINE>じめんに もぐっている！<DONE>"
-FwTxtRock1:    db 1, "は たのしそうに<LINE>ころがっている！<DONE>"
-FwTxtRock2:    db 1, "は<LINE>いわを けずりはじめた！<DONE>"
-FwTxtRock3:    db 1, "は たのしそうに<LINE>いわを ぶつけている！<DONE>"
-FwTxtRock4:    db 1, "は じめんを<LINE>たたいて ならしはじめた！<DONE>"
-FwTxtDiglett:  db 1, "は からだを<LINE>のばして くつろいでいる！<DONE>"
-FwTxtPsychic:  db "<……> <……> <……> <……><PARA>", 1, "は<LINE>だまって うなずいた！<DONE>"
-FwTxtPorygon:  db 1, "は<LINE>なにか つぶやいた<……><DONE>"
-FwTxtDitto:    db "<……>おや？ ", 1, "の<LINE>すがたは<……><PARA>かわらなかった！<DONE>"
-FwTxtFlying:   db 1, "は<LINE>ゆうがに そらを とんでいる！<DONE>"
-FwTxtGhost:    db 1, "は たのしそうに<LINE>ゆらゆら ゆれている<DONE>"
-FwTxtNormal:   db 1, "は<LINE>あなたと いっしょで うれしそうだ！<DONE>"
+; 1 バイトめ = 気持ちの アイコン（0 びっくり・1 はてな・2 うれしい・3 かなしい・4 ハート・5 いなずま・6 ねむり）、文の 中の 1 = なまえ
+FwTxtSleep:    db 6, 1, "は<LINE>すこし ねむそうだ<DONE>"
+FwTxtPoison:   db 3, 1, "は<LINE>ぐあいが わるそうだ<DONE>"
+FwTxtBurn:     db 0, 1, "は<LINE>すこし いたそうだ<DONE>"
+FwTxtFreeze:   db 0, 1, "は<LINE>こおりづけに なっている！<DONE>"
+FwTxtPara:     db 5, 1, "は<LINE>うごきが にぶく なっている<DONE>"
+FwTxtBulba1:   db 2, 1, "は<LINE>つるを くねくね させた！<DONE>"
+FwTxtBulba2:   db 2, 1, "は<LINE>つるを ぴしっと ならした！<DONE>"
+FwTxtCharm:    db 2, 1, "は<LINE>しっぽの ほのおを もやした！<DONE>"
+FwTxtPika1:    db 4, 1, "は<LINE>たのしく おどった！<DONE>"
+FwTxtPika2:    db 4, 1, "は うれしくて<LINE>おどりだした！<DONE>"
+FwTxtSquirtle: db 3, 1, "は ころんで<LINE>ちょっと くやしそうだ！<DONE>"
+FwTxtClef1:    db 2, 1, "は<LINE>そらを みあげている！<DONE>"
+FwTxtClef2:    db 4, 1, "は<LINE>とつぜん おどりだした！<DONE>"
+FwTxtOnix:     db 2, 1, "は たのしそうに<LINE>じめんに もぐっている！<DONE>"
+FwTxtRock1:    db 2, 1, "は たのしそうに<LINE>ころがっている！<DONE>"
+FwTxtRock2:    db 2, 1, "は<LINE>いわを けずりはじめた！<DONE>"
+FwTxtRock3:    db 2, 1, "は たのしそうに<LINE>いわを ぶつけている！<DONE>"
+FwTxtRock4:    db 2, 1, "は じめんを<LINE>たたいて ならしはじめた！<DONE>"
+FwTxtDiglett:  db 2, 1, "は からだを<LINE>のばして くつろいでいる！<DONE>"
+FwTxtPsychic:  db 1, "<……> <……> <……> <……><PARA>", 1, "は<LINE>だまって うなずいた！<DONE>"
+FwTxtPorygon:  db 1, 1, "は<LINE>なにか つぶやいた<……><DONE>"
+FwTxtDitto:    db 1, "<……>おや？ ", 1, "の<LINE>すがたは<……><PARA>かわらなかった！<DONE>"
+FwTxtFlying:   db 2, 1, "は<LINE>ゆうがに そらを とんでいる！<DONE>"
+FwTxtGhost:    db 2, 1, "は たのしそうに<LINE>ゆらゆら ゆれている<DONE>"
+FwTxtNormal:   db 2, 1, "は<LINE>あなたと いっしょで うれしそうだ！<DONE>"
+FwTxtFind:     db 1, 1, "は なにか<LINE>みつけた ようだ<PARA>ひろいますか？@"
+
+SECTION "連れ歩き ボールと 気持ちの アイコンの 絵", ROMX[$7800], BANK[$37]
+FwBallGfx:
+	INCBIN "follow/ball.bin"      ; 開いた・半分・とじた（キットの follow_icon/ball.2bpp）
+FwEmoteGfx:
+	INCBIN "follow/emotes.bin"    ; びっくり・はてな・うれしい・かなしい・ハート・いなずま・ねむり（pokecrystal gfx/emotes）

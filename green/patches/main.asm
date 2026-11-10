@@ -295,6 +295,7 @@ KitOAMSignHide:
 IF DEF(FOLLOW)
 	call FwFrame          ; 連れ歩きを OAM に 足す（看板の 下に かくす 前に）
 ENDC
+	di                    ; ここは DelayFrame の 中（割りこみ あり）。WRAMバンクを かえる あいだ 止める
 	ldh a, [rSVBK_]
 	ld e, a
 	ld a, 7
@@ -450,6 +451,7 @@ ENDC
 	ld a, e
 	ldh [rSVBK_], a
 .clear                   ; ここから 元の 「使わない OAM を 消す」 処理
+	ei
 	ldh a, [hOAMBufOfs]
 	ld l, a
 	ld h, $c3
