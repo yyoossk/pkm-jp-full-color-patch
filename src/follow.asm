@@ -1463,6 +1463,7 @@ FwRemoveMon:
 DEF hSpriteIndexOrTextID EQU $FF8C
 DEF hRandomAdd EQU $FFD3
 DEF wTextPredefFlag EQU $CF0C
+DEF wAutoTextBoxDrawingControl EQU $CF07 ; bit 0 = 1：DisplayTextIDInit が窓の枠をかかない
 DEF wMapTextPtr EQU $D2EB
 DEF wPartyMon1Status EQU $D12B + 4
 DEF wPartyMonNicks EQU $D257
@@ -1612,7 +1613,16 @@ FwTalk:
 	ld a, [wFwTalkText]
 	add FW_TEXT_ID
 	ldh [hSpriteIndexOrTextID], a
+	; 窓の枠をかく。オーキド博士の研究所などは、マップのスクリプトが「枠をかかない」
+	; （wAutoTextBoxDrawingControl の bit 0）にしているので、会話の間だけ 0 にして、あとで元にもどす
+	; （この bit を読むのは DisplayTextIDInit（01:717D）だけ）
+	ld a, [wAutoTextBoxDrawingControl]
+	push af
+	res 0, a
+	ld [wAutoTextBoxDrawingControl], a
 	call DisplayTextID
+	pop af
+	ld [wAutoTextBoxDrawingControl], a
 	pop de
 	ld hl, wMapTextPtr
 	ld a, e
