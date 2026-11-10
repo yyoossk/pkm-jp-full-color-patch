@@ -869,6 +869,8 @@ Fw_Underlay::
 	ld b, a                           ; b ＝ 下じきの タイル
 	ld d, $a0                         ; （金は いつも 40枚）
 	ldh a, [hUsedSpriteIndex]
+	cp d
+	ret nc                            ; OAM が もう いっぱい（人が 多い 所。さがしても おけない ので さがさない）
 	add 3
 	ld c, a                           ; もとの おわり（属性の 場所）
 	ld e, 4                           ; のこり

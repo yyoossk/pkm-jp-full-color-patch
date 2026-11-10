@@ -26,7 +26,11 @@
 IF !DEF(FC_INIT_HOOK)
 DEF FC_OBJ_BANK        EQU $01
 DEF FC_INIT_HOOK       EQU $5996   ; InitSprite の xor a / bit IN_GRASS_F, e / jr z / or OAM_PRIO / ldh [hCurSpriteOAMFlags], a（9バイト）
-DEF FC_ATTR_HOOK       EQU $5a14   ; .addsprite の and OAM_PAL1|XFLIP|YFLIP|PRIO / or d / ld [bc], a（4バイト）
+DEF FC_ATTR_HOOK       EQU $5a14   ; .addsprite の and OAM_PAL1|XFLIP|YFLIP|PRIO / or d / ld [bc], a（4バイト。FC_END_HOOK が ある ときは 使わない）
+DEF FC_END_HOOK        EQU $5a20   ; InitSprite の さいごの ld a, c / ldh [hUsedSpriteIndex], a（79 e0 bf）
+DEF FC_hUsedSpriteIndex EQU $ffbf
+DEF FC_wShadowOAM      EQU $c300
+DEF FC_END_FREE        EQU $7b3f   ; FieldColors_End を 置く 所（使われて いない IsObjectFacingSomeoneElse。44バイト。$7fc8〜 に 入りきらない）
 DEF FC_hCurSpriteOAMFlags EQU $ffc4
 DEF FC_FREE            EQU $7fc8   ; 同じバンクの空き（50バイト）
 DEF FC_BALLGFX_BANK    EQU $31     ; PokeBallSpriteGFX（道具のボールの絵）
@@ -64,9 +68,16 @@ SECTION "fieldcolors init hook", ROMX[FC_INIT_HOOK], BANK[FC_OBJ_BANK]
 	call FieldColors_InitFlags
 	ds 6, 0                      ; のこり 6バイトは nop
 
+IF DEF(FC_END_HOOK)
+; ボールの 下の 2枚は、その 人の OAM を 書きおえた あと（InitSprite の さいごの ld a, c / ldh [hUsedSpriteIndex], a）で
+; まとめて なおす（1枚 ごとに call して いると、人の 多い 所で 60fps版が 重く なった）
+SECTION "fieldcolors end hook", ROMX[FC_END_HOOK], BANK[FC_OBJ_BANK]
+	call FieldColors_End
+ELSE
 SECTION "fieldcolors attr hook", ROMX[FC_ATTR_HOOK], BANK[FC_OBJ_BANK]
 	call FieldColors_Attr
 	nop
+ENDC
 
 SECTION "fieldcolors body", ROMX[FC_FREE], BANK[FC_OBJ_BANK]
 ; bc = object_struct、e = OBJECT_FLAGS2（元の処理 ＋ ボールなら bit0）
@@ -91,6 +102,40 @@ FieldColors_InitFlags:
 	ldh [FC_hCurSpriteOAMFlags], a
 	ret
 
+IF DEF(FC_END_HOOK)
+IF DEF(FC_END_FREE)
+SECTION "fieldcolors end", ROMX[FC_END_FREE], BANK[FC_OBJ_BANK]
+ENDC
+; c = この 人の OAM の おわり（元の ld a, c / ldh [hUsedSpriteIndex], a ＋ ボールなら 下の 2枚の パレット）
+; 人の 絵の タイルの はじめは 4 の 倍数 なので、OAM の タイルの bit1 ＝ 下の 2枚
+FieldColors_End:
+	ldh a, [FC_hCurSpriteOAMFlags]
+	rra
+	jr nc, .set
+	ldh a, [FC_hUsedSpriteIndex]      ; この 人の 最初の OAM
+	ld l, a
+	ld h, HIGH(FC_wShadowOAM)
+.loop
+	ld a, l
+	cp c
+	jr nc, .set
+	inc l
+	inc l
+	ld a, [hli]                       ; タイル
+	and 2
+	jr z, .next
+	ld a, [hl]
+	and $f8
+	or FC_PAL_EMOTE
+	ld [hl], a
+.next
+	inc l
+	jr .loop
+.set
+	ld a, c
+	ldh [FC_hUsedSpriteIndex], a
+	ret
+ELSE
 ; a = facing の attr、d = パレット、[hl - 1] = facing のタイル番号（元の and / or d / ld [bc], a ＋ ボールの下の2枚）
 FieldColors_Attr:
 	and $f0                      ; OAM_PAL1 | OAM_XFLIP | OAM_YFLIP | OAM_PRIO
@@ -111,6 +156,7 @@ FieldColors_Attr:
 	ld a, e
 	ld [bc], a
 	ret
+ENDC
 
 SECTION "fieldcolors ball gfx", ROMX[FC_BALLGFX], BANK[FC_BALLGFX_BANK]
 ; 道具のボール（ピカチュウ版の道具のボールの絵。赤は 8ドットめまで）

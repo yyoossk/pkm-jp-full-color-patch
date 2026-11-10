@@ -24,6 +24,33 @@ DEF wFps60Buf         EQU FPS60_WRAM + 4 ; (まん中, 今) × (SCX, SCY, OAM 40
 DEF FPS60_MAXDIFF     EQU 4          ; これより大きく動いた物は補間しない（ワープ・出現など）
 DEF OAM_HIDDEN_Y      EQU $a0
 DEF rLY_FPS           EQU $ff44
+DEF hROMBank_FPS      EQU $ff9f
+
+; a = 今の値、[hl] = (まん中, 前の値) → a = まん中、[hl] = (まん中, 今の値)、hl += 2（b・c を こわす）
+MACRO FPS60_COORD
+	ld c, a
+	inc hl
+	ld b, [hl]
+	ld [hl], c
+	dec hl
+	sub b
+	jr z, .same\@
+	cp FPS60_MAXDIFF + 1
+	jr c, .half\@
+	cp -FPS60_MAXDIFF
+	jr c, .same\@
+.half\@
+	cpl
+	inc a
+	sra a
+	add c
+	jr .st\@
+.same\@
+	ld a, c
+.st\@
+	ld [hli], a
+	inc hl
+ENDM
 DEF FPS60_LY_LIMIT    EQU 110        ; この行より後なら、そのフレームは補間しない（計算が1フレームに収まらないので。120 で遅れなし、余裕を見て 110）
 
 ;---------------------------------------------------------------------
@@ -48,14 +75,33 @@ SECTION "60fps vblank hook", ROM0[VBlank_ClearOccurred]
 	nop
 
 SECTION "60fps vblank", ROM0[HOME_FREE_FPS]
+; もどす 処理（Fps60_Restore）は BANK_NEW に 置き、ここは 入口 だけ
+; （人の 多い 所で 重かったので OAM の ループを call なしで 書いたら ROM0 に 入りきらなく なった）
 Fps60_VBlank:
 	xor a
 	ld [wVBlankOccurred], a
-.restore
+	ld a, [wFps60Flag]
+	and a
+	ret z
+	ldh a, [hROMBank_FPS]
+	push af
+	ld a, BANK(Fps60_Restore)
+	rst $10                      ; Bankswitch
+	call Fps60_Restore
+	pop af
+	rst $10
+	ret
+
+;---------------------------------------------------------------------
+SECTION "60fps main", ROMX[NEW_ADDR_FPS], BANK[BANK_NEW]
+
+; まん中の 値の まま 変わって いない 所を 今の 値に もどす（VBlank・Fps60_Background から）
+; （VBlank の 中で まいかい 40 こ ぶん まわるので、OAM は call を つかわず 1 こ ずつ 書いた）
+Fps60_Restore:
 	ld hl, wFps60Flag
 	ld a, [hl]
 	and a
-	jr z, .done
+	ret z
 	ld [hl], 0
 	inc hl
 	ld c, [hl]          ; OAM の数
@@ -66,24 +112,33 @@ Fps60_VBlank:
 	ldh a, [hSCY]
 	call .one_h
 	ldh [hSCY], a
+	ld a, c
+	and a
+	ret z
 	ld de, wShadowOAM
-	inc c
-	jr .next
 .loop
 	ld a, [de]
-	call .one_h
+	cp [hl]
+	inc hl
+	jr nz, .ky
+	ld a, [hl]
 	ld [de], a
-	inc de
+.ky
+	inc hl
+	inc e
 	ld a, [de]
-	call .one_h
+	cp [hl]
+	inc hl
+	jr nz, .kx
+	ld a, [hl]
 	ld [de], a
-	inc de
-	inc de
-	inc de
-.next
+.kx
+	inc hl
+	inc e
+	inc e
+	inc e
 	dec c
 	jr nz, .loop
-.done
 	ret
 
 ; a = 表示中の値、[hl] = (まん中, 今) → まん中のままなら今の値を返す
@@ -95,9 +150,6 @@ Fps60_VBlank:
 .keep
 	inc hl
 	ret
-
-;---------------------------------------------------------------------
-SECTION "60fps main", ROMX[NEW_ADDR_FPS], BANK[BANK_NEW]
 
 ; HandleMapBackground と同じことをして、すぐにまん中の位置を出す
 Fps60_Background:
@@ -112,7 +164,7 @@ Fps60_Background:
 	pop bc                       ; b = 位置が決まる前の VBlank の回数
 
 	di
-	call Fps60_VBlank.restore    ; 前のぶんが残っていたらもどす
+	call Fps60_Restore           ; 前のぶんが残っていたらもどす
 	ei
 
 ; マップの新しい列を読みこんだフレームなどで、もう VBlank が近いときは まん中の計算をしない。
@@ -128,10 +180,10 @@ Fps60_Background:
 .in_time
 	ld a, [wFps60Valid]
 	and a
-	jr z, .record_only
+	jp z, .record_only
 	ldh a, [hVBlankCounter]
 	cp b
-	jr nz, .record_only          ; 今の位置がもう表示された → この回は補間しない
+	jp nz, .record_only          ; 今の位置がもう表示された → この回は補間しない
 
 ; 背景
 	ld hl, wFps60Buf
@@ -141,30 +193,32 @@ Fps60_Background:
 	ldh a, [hSCY]
 	call .coord
 	ld e, a
-; OAM（前から、隠れている物が出てくるまで）
+; OAM（前から、隠れている物が出てくるまで）。1 こ ずつ その場で 計算する（call・push を へらした）
 	push de
+	push bc
 	ld de, wShadowOAM
-	ld c, 0
 .loop
 	ld a, [de]
 	cp OAM_HIDDEN_Y
 	jr z, .oam_done
-	call .coord
+	FPS60_COORD
 	ld [de], a
-	inc de
+	inc e
 	ld a, [de]
-	call .coord
+	FPS60_COORD
 	ld [de], a
-	inc de
-	inc de
-	inc de
-	inc c
-	ld a, c
-	cp 40
+	inc e
+	inc e
+	inc e
+	ld a, e
+	cp 40 * 4
 	jr nz, .loop
 .oam_done
-	ld a, c
+	ld a, e
+	srl a
+	srl a
 	ld [wFps60Count], a
+	pop bc
 	pop de
 ; 背景もまん中にして「もどす」印をつける（その間に VBlank があったらやめる）
 	di
@@ -186,7 +240,7 @@ Fps60_Background:
 .undo
 	ld a, 1
 	ld [wFps60Flag], a
-	call Fps60_VBlank.restore    ; OAM をもとにもどす
+	call Fps60_Restore           ; OAM をもとにもどす
 	ei
 	jr .done
 

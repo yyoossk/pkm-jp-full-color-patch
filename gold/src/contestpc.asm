@@ -2,7 +2,9 @@
 ;   元の ゲームは 大会の ポケモンは 1匹だけで、2匹めを つかまえると「いれかえる？」と きかれ、えらばなかった ほうは にがす。
 ;   ・「はい」（入れかえる）→ 前の ポケモンを「○○を パソコンに おくりますか？」→ はい なら パソコンへ。
 ;   ・「いいえ」（入れかえない）→ つかまえた ポケモンを「○○を パソコンに おくりますか？」→ はい なら パソコンへ。
-;   ・いいえ なら 元の ゲームと 同じ（にがす）。ボックスが いっぱい（30匹）の ときは「ボックスが いっぱいなので…」で にがす。
+;   ・いいえ なら 元の ゲームと 同じ（にがす）。
+;   ・いまの ボックスが いっぱい（30匹）なら、次の あいて いる ボックスへ おくる（「○○を ボックス２に おくりました！」）。
+;     ぜんぶ いっぱいの ときは「ボックスが いっぱいなので…」で にがす。
 ; しくみ
 ;   ・BugContest_SetCaughtContestMon（$03:$6a4d）の「lb bc, 14, 12 / call PlaceYesNoBox / ret c」（$03:$6a62。7バイト）を
 ;     farcall ContestPC_YesNo / ret c に。
@@ -41,6 +43,10 @@ DEF CP_wNamedObjectIndex EQU $d143
 DEF CP_wCurPartySpecies EQU $cffe
 DEF CP_wCurSpecies     EQU $ce54
 DEF CP_wStringBuffer1  EQU $cf87
+DEF CP_wCurBox         EQU $d8af
+DEF CP_sBox            EQU $ad10      ; SRAM バンク1（いまの ボックス）
+DEF CP_BOX_SIZE        EQU $54a
+DEF CP_wStringBuffer2  EQU $cf92      ; 写す 間：[4] ＝ 元の SRAM バンク・[5] ＝ 先の SRAM バンク。文：[0] ＝ ボックスの 数字・[1] ＝ "@"
 DEF CP_SAVE            EQU $ddbe      ; wOTPartyMon6（48バイト。野生の 戦いでは 使わない）
 DEF CP_BANK            EQU $45
 DEF CP_ADDR            EQU $7c00
@@ -90,14 +96,57 @@ ContestPC_Ask:
 	ld bc, $0e0c                      ; 「入れかえる？」と 同じ 場所（右下）
 	jp CP_PlaceYesNoBox
 
-; wContestMon を ボックスへ
+; wContestMon を ボックスへ。いまの ボックスが いっぱい なら、次の あいて いる ボックスへ 直接 おくる
+; （大会中は レポートを 書けない ので ボックスは 切りかえない。大会が おわれば いつもの 自動切りかえが 動く）
 ContestPC_Send:
 	ld a, 1                           ; BANK(sBoxCount)
 	call CP_OpenSRAM
 	ld a, [CP_sBoxCount]
 	cp 30
 	call CP_CloseSRAM
-	jr nc, .full
+	jr c, .here
+	call ContestPC_FindBox            ; a ＝ おくる ボックス
+	jr c, .full
+	; 戦いの 中なので SaveBox・LoadBox は 使わない（wBoxPartialData が 戦いの データと 同じ 所）。SRAM から SRAM へ 写す
+	push af
+	push af
+	ld a, [CP_wCurBox]
+	ld e, 1                           ; sBox → いまの ボックスの 場所
+	call ContestPC_BoxCopy
+	pop af
+	push af
+	ld e, 0                           ; おくる ボックス → sBox
+	call ContestPC_BoxCopy
+	call .insert
+	pop af
+	ld e, 1                           ; sBox → おくる ボックス
+	call ContestPC_BoxCopy
+	ld a, [CP_wCurBox]
+	ld e, 0                           ; いまの ボックス → sBox
+	call ContestPC_BoxCopy
+	ld a, [CP_wCurPartySpecies]
+	ld [CP_wNamedObjectIndex], a
+	call CP_GetPokemonName
+	pop af
+	add $f7                           ; 「１」〜（名前を 作る 処理が wStringBuffer2 を 使うので ここで 書く）
+	ld [CP_wStringBuffer2], a
+	ld a, $50
+	ld [CP_wStringBuffer2 + 1], a
+	ld hl, ContestPC_SentBoxText
+	jp CP_PrintText
+.here
+	call .insert
+	ld a, [CP_wCurPartySpecies]
+	ld [CP_wNamedObjectIndex], a
+	call CP_GetPokemonName
+	ld hl, ContestPC_SentText
+	jp CP_PrintText
+.full
+	ld hl, ContestPC_FullText
+	jp CP_PrintText
+
+; wContestMon を sBox に 入れる
+.insert
 	ld a, [CP_wContestMon]
 	ld [CP_wCurPartySpecies], a
 	ld [CP_wCurSpecies], a
@@ -126,15 +175,116 @@ ContestPC_Send:
 	ld de, CP_sBoxMonNicknames
 	ld bc, 6
 	call CP_CopyBytes
-	call CP_CloseSRAM                 ; （金銀は つかまえた 場所の データが ない）
-	ld a, [CP_wCurPartySpecies]
-	ld [CP_wNamedObjectIndex], a
-	call CP_GetPokemonName
-	ld hl, ContestPC_SentText
-	jp CP_PrintText
-.full
-	ld hl, ContestPC_FullText
-	jp CP_PrintText
+	jp CP_CloseSRAM                   ; （金銀は つかまえた 場所の データが ない）
+
+; いまの 次から じゅんに あいて いる ボックスを さがす。a ＝ ボックス（0〜）、キャリー ＝ ぜんぶ いっぱい
+ContestPC_FindBox:
+	ld a, [CP_wCurBox]
+	ld c, a
+	ld b, 9 - 1
+.loop
+	inc c
+	ld a, c
+	cp 9
+	jr c, .ok
+	ld c, 0
+.ok
+	push bc
+	call ContestPC_BoxAddr            ; d ＝ バンク、hl ＝ 場所
+	ld a, d
+	call CP_OpenSRAM
+	ld a, [hl]
+	call CP_CloseSRAM
+	pop bc
+	cp 30
+	jr c, .found
+	dec b
+	jr nz, .loop
+	scf
+	ret
+.found
+	ld a, c
+	and a
+	ret
+
+; c ＝ ボックス（0〜）→ d ＝ SRAM バンク、hl ＝ 場所
+ContestPC_BoxAddr:
+	ld b, 0
+	ld hl, ContestPC_Boxes
+	add hl, bc
+	add hl, bc
+	add hl, bc
+	ld d, [hl]
+	inc hl
+	ld a, [hli]
+	ld h, [hl]
+	ld l, a
+	ret
+
+; a ＝ ボックス（0〜）、e ＝ 0：その ボックス → sBox ／ 1：sBox → その ボックス（SRAM から SRAM へ 1バイトずつ）
+ContestPC_BoxCopy:
+	ld c, a
+	ld a, e
+	push af
+	call ContestPC_BoxAddr
+	pop af                            ; a ＝ e
+	and a
+	jr nz, .tobox
+	; その ボックス（d:hl）→ sBox
+	ld a, d
+	ld [CP_wStringBuffer2 + 4], a
+	ld a, 1
+	ld [CP_wStringBuffer2 + 5], a
+	ld de, CP_sBox
+	jr .go
+.tobox
+	ld a, d
+	ld [CP_wStringBuffer2 + 5], a
+	ld a, 1
+	ld [CP_wStringBuffer2 + 4], a
+	ld d, h
+	ld e, l
+	ld hl, CP_sBox
+.go
+	ld bc, CP_BOX_SIZE
+	ld a, $0a                         ; SRAM を つかえる ように（OpenSRAM と 同じ）
+	ld [$0000], a
+.copy
+	ld a, [CP_wStringBuffer2 + 4]
+	ld [$4000], a
+	ld a, [hli]
+	push af
+	ld a, [CP_wStringBuffer2 + 5]
+	ld [$4000], a
+	pop af
+	ld [de], a
+	inc de
+	dec bc
+	ld a, b
+	or c
+	jr nz, .copy
+	jp CP_CloseSRAM
+
+; ボックス 1〜9 の 場所（GetBoxCount.BoxBankAddresses $03:$6953 と 同じ。SRAM の バンク, 場所）
+ContestPC_Boxes:
+	db $2
+	dw $a000
+	db $2
+	dw $a54a
+	db $2
+	dw $aa94
+	db $2
+	dw $afde
+	db $2
+	dw $b528
+	db $2
+	dw $ba72
+	db $3
+	dw $a000
+	db $3
+	dw $a54a
+	db $3
+	dw $aa94
 
 ; a ＝ 2：wContestMon → よける所、1：よける所 → wContestMon（48バイト）
 ContestPC_Copy:
@@ -156,5 +306,12 @@ ContestPC_SentText: ; ○○を パソコンに おくりました！
 	db $01
 	dw CP_wStringBuffer1
 	db $00, "を", $4f, "パソコンに　おくりました！", $58
+ContestPC_SentBoxText: ; ○○を ボックス２に おくりました！
+	db $01
+	dw CP_wStringBuffer1
+	db $00, "を", $4f, $1c, "ックス", $50
+	db $01
+	dw CP_wStringBuffer2
+	db $00, "に　おくりました！", $58
 ContestPC_FullText: ; ボックスが いっぱいなので パソコンに おくれません！
 	db $00, $1c, "ックスが　いっぱいなので", $4f, "パソコンに　おくれません！", $58
