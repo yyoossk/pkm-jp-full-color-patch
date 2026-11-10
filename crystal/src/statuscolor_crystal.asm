@@ -660,26 +660,14 @@ StatusColor_Party:
 	ld hl, SC_TMP + 3
 	inc [hl]
 	jp .loop
-.attr                                ; hl ＝ wTilemap の ます → wAttrmap の 同じ 所に a（★の ますは そのまま）
-	push hl
-	push de
-	ld d, a
-	ld e, 3
-.aloop
-	ld a, [hl]
-	cp $5e
-	jr z, .askip
-	cp $5f
-	jr z, .askip
+.attr                                ; hl ＝ wTilemap の ます → wAttrmap の 同じ 所に a
+	; （★の ますも かえる。状態異常が ある ときは 状態の 文字が ★の ますに 上がきされる。
+	;   ★を のこすと、連れ歩きの ポケモンが ねむりの とき「む」の ますが VRAM バンク0 の ままで 字が こわれた）
 	push hl
 	ld bc, SC_wAttrmap - SC_wTilemap
 	add hl, bc
-	ld [hl], d
-	pop hl
-.askip
-	inc hl
-	dec e
-	jr nz, .aloop
-	pop de
+	ld [hli], a
+	ld [hli], a
+	ld [hl], a
 	pop hl
 	ret
