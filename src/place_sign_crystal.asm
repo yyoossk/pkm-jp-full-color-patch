@@ -179,9 +179,18 @@ SignFrameGfx:
 
 ; VBlank の中の空き（rst $10 のあとの nop）から呼ぶ
 SECTION "看板 VBlank の呼び出し", ROM0[$1FE7]
-	ld b, BANK(SignVBlank)
-	ld hl, SignVBlank
+	ld b, BANK(VBlankHooks)
+	ld hl, VBlankHooks
 	call Bankswitch
+
+FreeBank13
+VBlankHooks:
+IF HAS_FOLLOW
+	ld b, BANK(FollowerVBlank)
+	ld hl, FollowerVBlank
+	call Bankswitch
+ENDC
+	jp SignVBlank
 
 ; ★ WRAM バンクを VBlank に入った時のバンク以外にしているあいだは、
 ;   スタックが $DFxx にあるので call / push / pop を使わない。
@@ -394,6 +403,11 @@ SECTION "看板 スプライトをかくす 呼び出し", ROMX[$49C4], BANK[$01
 
 FreeBank13
 PrepareOAM_HideUnderSign:
+IF HAS_FOLLOW
+	ld b, BANK(FollowerTick)
+	ld hl, FollowerTick
+	call Bankswitch
+ENDC
 	ld d, $FF
 	ldh a, [rSVBK]
 	ld e, a

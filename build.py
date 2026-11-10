@@ -33,6 +33,8 @@ def defs(v):
 def build(v):
     os.makedirs('obj',exist_ok=True); os.makedirs('out',exist_ok=True)
     with open('obj/vars.inc','w') as f: f.write(f'INCLUDE "vars/{v}.inc"\nINCLUDE "common.inc"\n')
+    if 'HAS_FOLLOW EQU 1' in open(f'vars/{v}.inc',encoding='utf-8').read():
+        subprocess.run([sys.executable,'scripts/mkfollow.py',f'base/{v}.gbc','obj'],check=True)
     objs=[]
     for src in [l.strip() for l in open('src/files.txt',encoding='utf-8') if l.strip() and not l.startswith(';')]:
         o=f'obj/{v}_'+os.path.basename(src)[:-4]+'.o'

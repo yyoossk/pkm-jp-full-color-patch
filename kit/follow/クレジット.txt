@@ -1,0 +1,23 @@
+【クレジットの書き方】
+
+連れ歩きを入れたパッチを公開するときは、ブログ用 HTML（クレジットの節。なければ作る）と、リリース用 zip の中の説明（あれば）に、下のクレジットを必ず書いてください。
+文言は変えてもかまいませんが、名前とリンクは省かないでください。
+
+----- ここから -----
+■連れ歩き（全ポケモン）
+・連れ歩きのしくみ：Vulcandth さん、AtmaBuster さん
+  （fellowship-of-the-roms/pokecrystal 「follow-mons」）
+  https://github.com/fellowship-of-the-roms/pokecrystal/tree/follow-mons
+・連れ歩きの見た目と動き（アイコンで歩く絵・色・2コマの歩き・SELECT で選ぶ・ボールのアニメ）：Pokémon Crystal Crunch（gomojoeb さん）
+  https://github.com/joseph-bayer/crystal-for-friends
+・連れ歩きのアイコンの絵とポケモンの色：Sour Crystal（SoupPotato さん）
+  https://github.com/SoupPotato/sourcrystal
+・手持ちのアイコン（連れ歩きの正面の絵）：Polished Crystal（Rangi42 さん）
+  https://github.com/Rangi42/polishedcrystal
+・土台：pret/pokecrystal・pret/pokeyellow・pret/pokered
+  https://github.com/pret/pokecrystal
+  https://github.com/pret/pokeyellow
+  https://github.com/pret/pokered
+----- ここまで -----
+
+※どのリポジトリにもライセンスの表記はありません。歩行グラフィックやコードを使わせてもらっていることが分かるように、クレジットは必ず残してください。

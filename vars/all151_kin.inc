@@ -7,3 +7,4 @@ DEF DelayFrames EQU $36E0
 DEF JoypadLowSensitivity EQU $37D8
 DEF GetItemName EQU $2F86
 DEF PrintNumber EQU $3BEC
+DEF HAS_FOLLOW EQU 1           ; 連れ歩き（金銀グラフィックの完全版・151匹そろう版）
