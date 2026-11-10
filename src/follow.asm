@@ -18,6 +18,7 @@ DEF FOLLOW_MASK_BANK EQU $3A      ; $3A〜$3D
 DEF FOLLOW_PER_BANK EQU 42
 
 DEF rLY EQU $FF44
+DEF rSTAT EQU $FF41
 DEF rVBK EQU $FF4F
 DEF rHDMA1 EQU $FF51
 DEF rHDMA2 EQU $FF52
@@ -78,6 +79,10 @@ DEF wFwJump EQU $D038             ; 主人公が段差をとんでいる
 DEF wFwHop EQU $D039              ; 1 = 次に追いつくとき段差をとぶ
 DEF wFwHopping EQU $D03A          ; 1 = とんでいるところ、2 = 追いつくだけ
 DEF wFwLandWait EQU $D03B         ; なみのりからおりたとき 1歩待つ
+DEF wFwPalPend EQU $D03C          ; 1 = 次の VBlank でパレット6 の色1・色2 をじかに書く
+DEF wFwPalNew EQU $D044           ; その4バイト
+DEF rOCPS EQU $FF6A
+DEF rOCPD EQU $FF6B
 DEF BALL_TILE EQU 48              ; ボールの絵（VRAM1 タイル 48〜59：開いた・半分・とじた）
 DEF wFwPals EQU $D028             ; 8: 正面の色1・色2、後ろ・横の色1・色2
 DEF wFwBuf EQU $D100              ; 絵 384 ＋ 下じき 384（VBlank で VRAM1 $8000 へ）
@@ -999,6 +1004,21 @@ FwSetPal:
 	ld a, 1
 	ld [W2_ObjPalSend], a
 	ld [W2_ObjPalRecalc], a
+	; カラー化の転送は1フレームおくれるので、新しい絵の OAM と同じ VBlank でじかにも書く
+	;（クリスタルの「色を切りかえるときは絵とずれないように次の VBlank で書く」）
+	ld a, W7
+	ldh [rSVBK], a
+	ld hl, wFwPalNew
+	ld a, b
+	ld [hli], a
+	ld a, c
+	ld [hli], a
+	ld a, d
+	ld [hli], a
+	ld [hl], e
+	ld a, 1
+	ld [wFwPalPend], a
+	ret
 .back
 	ld a, W7
 	ldh [rSVBK], a
@@ -1128,6 +1148,26 @@ FollowerVBlank::
 	ldh [rSVBK], a
 	ld hl, wFwFrame
 	inc [hl]
+	; パレット6 の色1・色2
+	ld a, [wFwPalPend]
+	and a
+	jr z, .noPal
+	xor a
+	ld [wFwPalPend], a
+	ld a, $80 | (FW_PAL * 8 + 2)
+	ldh [rOCPS], a
+	ld hl, wFwPalNew
+	ld c, 4
+.palByte                          ; VBlank がおそくなって画面をかきはじめていても、絵をかいている間（モード3）はさける
+	ldh a, [rSTAT]
+	and 3
+	cp 3
+	jr z, .palByte
+	ld a, [hli]
+	ldh [rOCPD], a
+	dec c
+	jr nz, .palByte
+.noPal
 	ld a, [wFwGdma]
 	and a
 	jr z, .done
@@ -1168,7 +1208,7 @@ FollowerVBlank::
 ; --- 手持ちの画面：SELECT で連れ歩くポケモンをえらぶ（赤い ★） -------------------------
 ;   HandlePartyMenuInput（$00:$1474）の「call HandleMenuInput_ / call PlaceUnfilledArrowMenuCursor /
 ;   ld b, a / xor a」を、ここをよぶ形にする。SELECT ならえらんでもう一度まつ。ほかのキーなら
-;   b = キーで $1489 にもどる。★は OAM の 40枚目（VRAM1 タイル 60・パレット6。パレットはぬけるときにもどす）。
+;   b = キーで $1489 にもどる。★はレベルの右（hlcoord 11, 名前の行）に OAM の 40枚目（VRAM1 タイル 60・パレット6。パレットはぬけるときにもどす）。
 DEF wMenuWatchedKeysInit EQU $1467 ; PartyMenuInit の「ld a, A_BUTTON | B_BUTTON」
 DEF wCurrentMenuItem EQU $CC26
 DEF wMenuItemToSwap EQU $CC35
@@ -1177,7 +1217,6 @@ DEF wWhichPokemon EQU $CF79
 DEF wRemoveMonFromBox EQU $CF7C
 DEF STAR_TILE EQU 60
 DEF STAR_OAM EQU wShadowOAM + 39 * 4
-DEF rSTAT EQU $FF41
 DEF wFwSavedPal EQU $D040         ; WRAM7：手持ちの画面に入るときのパレット6
 DEF SFX_SELECT EQU $90
 
@@ -1337,11 +1376,11 @@ FwStarPut:
 	jr nc, .y
 	ld a, c
 	swap a                        ; × 16
-	add 16
+	add 16 + 8                    ; 名前の行（状態異常の行には「どく」などが出るのでさける）
 .y
 	ld hl, STAR_OAM
 	ld [hli], a
-	ld a, 9 * 8 + 8
+	ld a, 11 * 8 + 8              ; レベル（「：L100」まで）の右・HP の数字の左
 	ld [hli], a
 	ld a, STAR_TILE
 	ld [hli], a
