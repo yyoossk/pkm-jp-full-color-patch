@@ -220,18 +220,25 @@ MapSign_SetPal7:
 	ret
 
 MapSign_Hide:
+	; 先に 札（ウィンドウ）を 消して から パレット7 を もどす。もどす のが 先だと、札を かいて いる 行
+	; （LY 112〜143）の 間に 書いた とき、その フレームだけ 札が 白く 出た
+	ld a, $90
+	ldh [MS_hWY], a
+	ldh [rWY_], a
 	ld a, [wMSState]
 	bit 7, a
 	jr z, .no_pal
+.wait_ly
+	ldh a, [$ff44]                    ; rLY：札の 行（112〜143）を かいて いる 間は まつ
+	sub $70
+	cp $90 - $70
+	jr c, .wait_ly
 	ld hl, MS_wBGPals2_7              ; パレット7 を もとに
 	call MapSign_SetPal7
 .no_pal
 	xor a
 	ld [wMSState], a
 	ld [wMSTimer], a
-	ld a, $90
-	ldh [MS_hWY], a
-	ldh [rWY_], a
 	ret
 
 MapSign_Event:

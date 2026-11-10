@@ -59,7 +59,7 @@ FILES=[
     'src/prizetm_gold.asm',
     'src/statuscolor_gold.asm',
     'src/dexinfo_gold.asm']
-EXPECT={'kin.gbc':0xED41E1F6,'kin60.gbc':0xD2516C02}   # Ver.1.3.2
+EXPECT={'kin.gbc':0xD4AF6B5B,'kin60.gbc':0xF22C69C6}   # Ver.1.3.2 ＋ 場所の名前の札が消えるとき1フレーム白くなるのを直した（まだリリースしていない）
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)
