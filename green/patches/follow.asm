@@ -18,6 +18,9 @@ DEF wPlayerYStep      EQU $c103
 DEF wPlayerYPixels    EQU $c104
 DEF wPlayerXStep      EQU $c105
 DEF wPlayerXPixels    EQU $c106
+DEF wPlayerSprImage   EQU $c102  ; $ff = 見えない
+DEF FW_PLAYER_Y        EQU $3c    ; ふだんの 主人公の 絵の 場所
+DEF FW_PLAYER_X        EQU $40
 DEF wPartyCount       EQU $d123
 DEF wPartySpecies     EQU $d124
 DEF wPartyMon1HP      EQU $d12c
@@ -76,17 +79,21 @@ MACRO FW_POS
 	ldh a, [hOAMBufOfs]
 	ld l, a
 	ld h, HIGH(wShadowOAM)
-	ld a, [FW_OY]
+	ld a, [wPlayerYPixels] ; 段差の ジャンプは いっしょに はねる。そらをとぶ・テレポートの ときは もとの 場所
+	cp FW_PLAYER_Y + 1
+	jr nc, .stdY\@
+	cp FW_PLAYER_Y - 16
+	jr nc, .gotY\@
+.stdY\@
+	ld a, FW_PLAYER_Y
+.gotY\@
 	ld b, a
-	ld a, [wPlayerYPixels]
+	ld a, [FW_OY]
 	add b
 	add 16
 	ld b, a
 	ld a, [FW_OX]
-	ld c, a
-	ld a, [wPlayerXPixels]
-	add c
-	add 8
+	add FW_PLAYER_X + 8
 	ld c, a
 ENDM
 
@@ -396,8 +403,21 @@ FwStarGfx:
 
 ; ---------------------------------------------------------------- 毎フレーム（VBlank、PrepareOAMData の さいご）
 FwFrame:
+	; 主人公の 絵が 消えて いる（そらをとぶの 地図から もどる とちゅう など）ときは 何も しない
+	ld a, [wPlayerSprImage]
+	inc a
+	ret z
 ; 1. 連れ歩く ポケモンの ずかん番号を d に（0 = なし）
 	ld d, 0
+	; そらをとぶ・テレポート・あなを ほる・穴に おちる（主人公の 絵が 画面の まん中から はなれる）ときは ボールに もどる
+	ld a, [wPlayerXPixels]
+	cp FW_PLAYER_X
+	jr nz, .gotWant
+	ld a, [wPlayerYPixels]
+	cp FW_PLAYER_Y + 1
+	jr nc, .gotWant
+	cp FW_PLAYER_Y - 16
+	jr c, .gotWant
 	ld a, [wWalkBikeSurfState]
 	and a
 	jr nz, .gotWant
@@ -721,9 +741,15 @@ FwFrame:
 	ld a, [FW_BALL]
 	and a
 	jp nz, .ballOnly       ; 出る とちゅう
+	ld a, [FW_EMOTE]       ; OAM が たりない（ポケモンと 下じきで 8 まい、アイコンも 出すなら 12 まい）
+	and a
 	ldh a, [hOAMBufOfs]
+	jr z, .needOam8
 	cp $a0 - 12 * 4 + 1
-	jp nc, .notDrawn       ; OAM が たりない
+	jp nc, .notDrawn
+.needOam8
+	cp $a0 - 8 * 4 + 1
+	jp nc, .notDrawn
 	ld a, 1
 	ld [FW_DRAWN], a
 	FW_POS
