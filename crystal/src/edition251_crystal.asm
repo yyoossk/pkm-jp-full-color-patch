@@ -2,6 +2,7 @@
 ;  ・つうしん こうかんで しんかする ポケモンは Lv37 で しんかする
 ;     （ヤドンだけは Lv37 で ヤドラン。おうじゃのしるしを もたせて Lv37 なら ヤドキング）
 ;  ・ウツギ はかせの けんきゅうじょで 3びき とも もらえる
+;     （まえの 版の セーブデータで すでに 1ぴき もらって いる ときは、ウツギ はかせに はなしかけると のこりの 2ひきを くれる）
 ;  ・殿堂入りの あと：
 ;     アルフの いせきの けんきゅうじょで オムナイトと カブトを もらえる（Lv30）
 ;     シロガネやまの いちばん おく（レッドの へや）に ミュウツー（Lv70）
@@ -99,18 +100,21 @@ ED_GotCyndaquil:
 	ed_rest 5, 6
 	ed_give $9e                      ; ワニノコ
 	ed_give $98                      ; チコリータ
+	callasm Ed_SetElmAll
 	db $90
 ED_GotTotodile:
 	db $2d, $9e, 5, $ad, $00
 	ed_rest 4, 6
 	ed_give $9b
 	ed_give $98
+	callasm Ed_SetElmAll
 	db $90
 ED_GotChikorita:
 	db $2d, $98, 5, $ad, $00
 	ed_rest 4, 5
 	ed_give $9b
 	ed_give $9e
+	callasm Ed_SetElmAll
 	db $90
 
 ED_RestText:
@@ -365,3 +369,130 @@ SECTION "ed251 price kingsrock", ROMX[$69fa + (KINGS_ROCK - 1) * 7], BANK[$01]
 ; ---- ずかんの 進化の ページ（dexinfo）------------------------------------------
 ; 251版で のこる「つうしん」は ヤドン（おうじゃのしるし → ヤドキング）だけなので、「つうしん」の 文字は
 ; src/dexinfo_trade251_crystal.asm（「レべル37」）に かえて 組む（buildlist251.txt で src/dexinfo_trade_crystal.asm の かわり）。
+
+; ---- まえの セーブデータ：ウツギ はかせが のこりの 2ひきを くれる ----------------
+; EVENT_GOT_A_POKEMON_FROM_ELM（$1a）の あと、えらんで いない（EVENT_GOT_〜_FROM_ELM $1b・$1c・$1d が ない）で
+; まだ もらって いない（wEdFlags ビット 4 ヒノアラシ・5 ワニノコ・6 チコリータ）ポケモンを くれる。
+; 新しく はじめた ときは けんきゅうじょで 3びき もらった とき ビット 4〜6 を ぜんぶ たてる。
+; ウツギ はかせ（ElmsLab の 1人め）の スクリプトの 場所（$1b:$7302。元は $61f5）を $1b:$7ff8 の farsjump EdElmScript に。
+DEF ED_ELM0 EQU 4
+SECTION "ed251 elm ptr", ROMX[$7302], BANK[$1b]
+	dw $7ff8
+SECTION "ed251 elm stub", ROMX[$7ff8], BANK[$1b]
+	farsjump EdElmScript
+
+SECTION "ed251 elm", ROMX[$6e00], BANK[ED_BANK]
+Ed_SetElmAll:
+	ld a, [wEdFlags]
+	or %01110000
+	ld [wEdFlags], a
+	ret
+
+; c = 0 ヒノアラシ・1 ワニノコ・2 チコリータ → wScriptVar = 1（くれる）
+Ed_ElmNeed:
+	xor a
+	ld [ED_wScriptVar], a
+	ld a, [ED_wEventFlags + $1a / 8]
+	bit $1a % 8, a
+	ret z
+	push bc
+	ld a, c
+	add $1b % 8
+	ld c, a
+	call Ed_Mask
+	ld a, [ED_wEventFlags + $1b / 8]
+	and b
+	pop bc
+	ret nz
+	ld a, c
+	add ED_ELM0
+	ld c, a
+	call Ed_Mask
+	ld a, [wEdFlags]
+	and b
+	ret nz
+	ld a, 1
+	ld [ED_wScriptVar], a
+	ret
+
+Ed_ElmNeedAny:
+	ld c, 0
+	call Ed_ElmNeed
+	ld a, [ED_wScriptVar]
+	and a
+	ret nz
+	ld c, 1
+	call Ed_ElmNeed
+	ld a, [ED_wScriptVar]
+	and a
+	ret nz
+	ld c, 2
+	jp Ed_ElmNeed
+
+MACRO ed_elm_give ; 番号, ポケモン
+	callasm .need\1
+	iffalse .skip\1
+	db $40, \2, $00                 ; getmonname
+	db $4b, $1b
+	dw $68ba                         ; 「〜を もらった！」
+	db $84, $02, $00                 ; playsound SFX_CAUGHT_MON
+	db $85
+	db $54
+	db $2d, \2, 5, $00, $00         ; givepoke
+	ifequal 2, .full
+	callasm .set\1
+.skip\1
+ENDM
+
+EdElmScript:
+	callasm Ed_ElmNeedAny
+	iffalse .normal
+	faceplayer
+	opentext
+	writetext EdElm_Text
+	promptbutton
+	ed_elm_give 0, $9b
+	ed_elm_give 1, $9e
+	ed_elm_give 2, $98
+	writetext EdElm_Text2
+	waitbutton
+	closetext
+	end
+.full
+	writetext EdElm_FullText
+	waitbutton
+	closetext
+	end
+.normal
+	db farsjump_command, $1b          ; 元の ウツギ はかせの スクリプト
+	dw $61f5
+.need0
+	ld c, 0
+	jp Ed_ElmNeed
+.need1
+	ld c, 1
+	jp Ed_ElmNeed
+.need2
+	ld c, 2
+	jp Ed_ElmNeed
+.set0
+	ld c, ED_ELM0
+	jp Ed_Set
+.set1
+	ld c, ED_ELM0 + 1
+	jp Ed_Set
+.set2
+	ld c, ED_ELM0 + 2
+	jp Ed_Set
+
+EdElm_Text:
+	db $00, "ウツギ『やあ　", $52, "くん！", $51
+	db "じつは　のこりの　ポケモンも", $4f
+	db "きみに　つれていって　ほしいんだ！", $57
+EdElm_Text2:
+	db $00, "ウツギ『みんな　だいじに", $4f
+	db "そだてて　あげてね！", $57
+EdElm_FullText:
+	db $00, "ウツギ『おや　もう　もてない", $4f
+	db "みたいだね", $51
+	db "ボックスを　あけて　また　おいで", $57
