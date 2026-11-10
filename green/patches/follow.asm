@@ -27,6 +27,12 @@ DEF FW_PAL            EQU 6      ; 連れ歩きの OBJ パレット
 DEF FW_MASK_PAL       EQU 5      ; 下じき（色1 が 白）
 DEF FW_VRAM_GFX       EQU $8000  ; VRAMバンク1 の タイル $00〜$17
 DEF FW_VRAM_MASK      EQU $8180  ; VRAMバンク1 の タイル $18〜$2F
+DEF FW_VRAM_STAR      EQU $8300  ; VRAMバンク1 の タイル $30（手持ちの 画面の ★）
+DEF wFollowSlot       EQU $d689  ; 連れ歩く 手持ちの 番号（レポートに 書かれる 所。0 = 1 匹め、$FF = だれも）
+DEF wCurrentMenuItem  EQU $cc26
+DEF wMenuItemToSwap   EQU $cc35
+DEF wPartyMenuType    EQU $d05a
+DEF wIsInBattle_      EQU $d034
 ; WRAMバンク2（カラー化の パレット）
 DEF w2ObPal6Src       EQU $d040 + FW_PAL * 8 + 2
 DEF w2ObPal6Cur       EQU $d744 + FW_PAL * 8 + 2
@@ -96,6 +102,24 @@ SECTION "連れ歩き マップを 読む 所", ROM0[$2b7f]
 SECTION "連れ歩き 人の 絵を 読みなおす 所", ROM0[$3d27]
 	ld b, $37
 	ld hl, FwOnReload
+SECTION "連れ歩き 手持ち SELECT も 見る", ROM0[$2d36]
+	db PAD_A | PAD_B | 4
+SECTION "連れ歩き 手持ち ボタン", ROM0[$2d4c]
+	ld hl, FwPartyInput
+	ld b, $37
+	call $3500
+	ld b, e
+	nop
+	nop
+SECTION "連れ歩き 手持ち ならびかえ", ROM0[$2db2]
+	ld b, $37
+	ld hl, FwSwap
+SECTION "連れ歩き 手持ち かく", ROM0[$2dbd]
+	dw FwDrawParty
+SECTION "連れ歩き 手持ち かきなおす", ROM0[$2dc2]
+	dw FwRedrawParty
+SECTION "連れ歩き 手持ち かく バンク", ROM0[$2dc5]
+	db $37
 
 ; 1 匹 ぶん（24 タイル）を VRAMバンク1 に 読む（e = バンクの 中の 番号。Bankswitch が bc を こわすので e で わたす）
 MACRO FW_DATA_BANK
@@ -176,8 +200,139 @@ FwSetFlags:
 
 ; 連れ歩く 手持ちの 番号（0〜5、$FF = だれも）
 FwGetSlot:
-	xor a
+	ld a, [wFollowSlot]
 	ret
+
+; ---------------------------------------------------------------- 手持ちの 画面
+; SELECT で 連れ歩く ポケモンを えらぶ（もう一度 おすと だれも 連れ歩かない）
+; HandlePartyMenuInput の HandleMenuInput_ ・ PlaceUnfilledArrowMenuCursor の かわり（おされた ボタンを e で かえす）
+FwPartyInput:
+	call $39ec             ; HandleMenuInput_
+	call $3afc             ; PlaceUnfilledArrowMenuCursor
+	ld e, a
+	bit 2, a               ; SELECT
+	jr z, .done
+	ld a, [wMenuItemToSwap]
+	and a
+	jr nz, FwPartyInput    ; ならびかえ の とちゅう
+	ld a, [wPartyMenuType]
+	and a
+	jr nz, FwPartyInput    ; どうぐを つかう など
+	ld a, [wIsInBattle_]
+	and a
+	jr nz, FwPartyInput
+	ld a, [wCurrentMenuItem]
+	ld b, a
+	ld a, [wFollowSlot]
+	cp b
+	ld a, b
+	jr nz, .set
+	ld a, $ff
+.set
+	ld [wFollowSlot], a
+	call FwStar
+	jr FwPartyInput
+.done
+	xor a
+	ld [$d078], a          ; wPartyMenuAnimMonEnabled（元の 処理）
+	ret
+
+; ならびかえ（SwitchPartyMon）で 連れ歩く 番号も 入れかえる
+FwSwap:
+	ld a, [wMenuItemToSwap]
+	dec a
+	ld d, a
+	ld a, [wCurrentMenuItem]
+	ld e, a
+	ld a, [wFollowSlot]
+	cp d
+	jr nz, .notD
+	ld a, e
+	jr .set
+.notD
+	cp e
+	jr nz, .call
+	ld a, d
+.set
+	ld [wFollowSlot], a
+.call
+	ld b, $04
+	ld hl, $610b           ; SwitchPartyMon
+	call $3500
+	jr FwStar
+
+; 手持ちの 画面を かく 所（DrawPartyMenu・RedrawPartyMenu）の あとに ★
+FwDrawParty:
+	ld b, $04
+	ld hl, $6680
+	call $3500
+	jr FwStar
+FwRedrawParty:
+	ld b, $04
+	ld hl, $6691
+	call $3500
+	; fallthrough
+
+; 連れ歩く ポケモンの 行の 「：Ｌ」の 右上に 赤い ★（OAM の 40 枚めを 使う。パレット5 の 色2 が 赤）
+FwStar:
+	ld hl, FwStarGfx
+	ld de, FW_VRAM_STAR
+	ld c, 8
+.gfx
+	di
+	ld a, 1
+	ldh [rVBK_], a
+	ldh a, [$ff40]
+	bit 7, a
+	jr z, .write           ; 画面が 切れて いる
+	ldh a, [$ff44]
+	cp $90
+	jr nc, .write
+.w1
+	ldh a, [$ff41]
+	and 2
+	jr z, .w1
+.w2
+	ldh a, [$ff41]
+	and 2
+	jr nz, .w2
+.write
+	ld a, [hli]
+	ld [de], a
+	inc de
+	ld a, [hli]
+	ld [de], a
+	inc de
+	xor a
+	ldh [rVBK_], a
+	ei
+	dec c
+	jr nz, .gfx
+	ld hl, wShadowOAM + 39 * 4
+	ld a, [wFollowSlot]
+	cp 6
+	jr nc, .hide
+	ld c, a
+	ld a, [wPartyCount]
+	dec a
+	cp c
+	jr c, .hide
+	ld a, c
+	swap a
+	add 16                 ; 名前の 行（2 × 番号 行め）
+	ld [hli], a
+	ld a, 10 * 8 + 8       ; 10 マスめ
+	ld [hli], a
+	ld a, LOW(FW_VRAM_STAR / 16)
+	ld [hli], a
+	ld [hl], $08 | FW_MASK_PAL
+	ret
+.hide
+	ld [hl], $a0
+	ret
+
+FwStarGfx:
+	db $00, $10, $00, $38, $00, $fe, $00, $7c, $00, $38, $00, $6c, $00, $44, $00, $00
 
 ; ---------------------------------------------------------------- 毎フレーム（VBlank、PrepareOAMData の さいご）
 FwFrame:
@@ -527,6 +682,8 @@ FwFrame:
 	ld a, l
 	ldh [hOAMBufOfs], a
 .noDraw
+	ld a, [FW_FACE]
+	ld d, a                ; 向き（色を えらぶ）
 	ld a, [FW_REQ]
 	ld c, a
 	xor a
@@ -601,7 +758,12 @@ FwFrame:
 	ld h, 0
 	add hl, hl
 	add hl, hl
-	ld bc, FwPals
+	ld bc, FwPals          ; 正面（下）：手持ちの アイコンと 同じ 色
+	ld a, d
+	and a
+	jr z, .front
+	ld bc, FwWalkPals      ; 後ろ・横：歩行グラフィック 用の 色
+.front
 	add hl, bc             ; hl = 色1・色2
 	ldh a, [rSVBK_]
 	ld e, a
@@ -665,3 +827,6 @@ FwDexTable:
 	ds (4 - (@ & 3)) & 3, 0   ; 4 バイトの さかいめに
 FwPals:
 	INCBIN "follow/pals.bin"
+; ずかん番号 × 4：後ろ・横 用の 色1・色2（キットの FollowerWalkPals）
+FwWalkPals:
+	INCBIN "follow/walkpals.bin"
