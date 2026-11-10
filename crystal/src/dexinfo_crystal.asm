@@ -554,13 +554,14 @@ DI_EvoFirst:
 	pop hl
 	jp DI_PlaceString
 .trade
-	ld de, .Trade
+	ld de, DI_TradeText              ; src/dexinfo_trade_crystal.asm（251版は dexinfo_trade251_crystal.asm）
 	jp DI_PlaceString
 .Happy db "なつく@"
 .Day   db "ひる@"
 .Nite  db "よる@"
 .Level db "レべル@"
-.Trade db "つうしん@"
+.Trade db "つうしん@"                ; ふつうの 版は ここを 使う（src/dexinfo_trade_crystal.asm の DI_TradeText ＝ $7d55）
+	ASSERT .Trade == $7d55
 
 ; 2行め（もたせる どうぐ・こうげきと ぼうぎょ）：hl ＝ 行の 左
 DI_EvoSecond:

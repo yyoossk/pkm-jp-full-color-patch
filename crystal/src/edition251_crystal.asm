@@ -344,3 +344,24 @@ EdFossil_Text2:
 EdFossil_FullText:
 	db $00, "おや　もう　もてないようだね", $51
 	db "ボックスを　あけて　また　おいで", $57
+
+; ---- しんかの いし・おうじゃのしるし を 買える -------------------------------
+; コガネデパート 4F（ドーピング の 店）に ほのお・みず・かみなり・リーフ・つき・たいようの いし と おうじゃのしるし を 足す。
+; Marts（$05:$64b?）の MART_GOLDENROD_4F の 場所（$05:$64d3）を 新しい 表に。表は Marts と 同じ バンクに 置く。
+SECTION "ed251 mart ptr", ROMX[$64d3], BANK[$05]
+	dw EdMartGoldenrod4F
+SECTION "ed251 mart", ROMX[$7fe0], BANK[$05]
+EdMartGoldenrod4F:
+	db 12
+	db PROTEIN, IRON, CARBOS, CALCIUM, HP_UP
+	db FIRE_STONE, WATER_STONE, THUNDERSTONE, LEAF_STONE, MOON_STONE, SUN_STONE, KINGS_ROCK
+	db -1
+; ねだん（ItemAttributes $01:$69fa、7バイトずつ。さいしょの 2バイト）：つきのいし 0円 → 2100円、おうじゃのしるし 100円 → 2100円（ほかの いしと 同じ）
+SECTION "ed251 price moon", ROMX[$69fa + (MOON_STONE - 1) * 7], BANK[$01]
+	dw 2100
+SECTION "ed251 price kingsrock", ROMX[$69fa + (KINGS_ROCK - 1) * 7], BANK[$01]
+	dw 2100
+
+; ---- ずかんの 進化の ページ（dexinfo）------------------------------------------
+; 251版で のこる「つうしん」は ヤドン（おうじゃのしるし → ヤドキング）だけなので、「つうしん」の 文字は
+; src/dexinfo_trade251_crystal.asm（「レべル37」）に かえて 組む（buildlist251.txt で src/dexinfo_trade_crystal.asm の かわり）。
