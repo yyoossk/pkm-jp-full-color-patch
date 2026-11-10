@@ -102,6 +102,9 @@ SECTION "連れ歩き マップを 読む 所", ROM0[$2b7f]
 SECTION "連れ歩き 人の 絵を 読みなおす 所", ROM0[$3d27]
 	ld b, $37
 	ld hl, FwOnReload
+SECTION "連れ歩き 手持ちから はずす 所", ROM0[$384a]
+	ld hl, FwRemove
+	ld b, $37
 SECTION "連れ歩き 手持ち SELECT も 見る", ROM0[$2d36]
 	db PAD_A | PAD_B | 4
 SECTION "連れ歩き 手持ち ボタン", ROM0[$2d4c]
@@ -236,6 +239,30 @@ FwPartyInput:
 	xor a
 	ld [$d078], a          ; wPartyMenuAnimMonEnabled（元の 処理）
 	ret
+
+; あずける・にがす など（_RemovePokemon）：連れ歩く ポケモンなら 1 匹めに、うしろなら 1 つ まえに
+FwRemove:
+	ld a, [$cf7c]          ; wRemoveMonFromBox
+	and a
+	jr nz, .call
+	ld a, [$cf79]          ; wWhichPokemon
+	ld b, a
+	ld a, [wFollowSlot]
+	cp 6
+	jr nc, .call
+	cp b
+	jr c, .call
+	jr z, .first
+	dec a
+	jr .set
+.first
+	xor a
+.set
+	ld [wFollowSlot], a
+.call
+	ld b, $01
+	ld hl, $7dd2           ; _RemovePokemon
+	jp $3500
 
 ; ならびかえ（SwitchPartyMon）で 連れ歩く 番号も 入れかえる
 FwSwap:
@@ -830,3 +857,334 @@ FwPals:
 ; ずかん番号 × 4：後ろ・横 用の 色1・色2（キットの FollowerWalkPals）
 FwWalkPals:
 	INCBIN "follow/walkpals.bin"
+
+; ---------------------------------------------------------------- 話しかける
+; 外で A：人・看板が 目の前に ない とき（キットの 「話しかけるだけで いあいぎり」 の 前）に、
+;   連れ歩きが 目の前に いれば、こちらを むいて 鳴き、会話文案 の 文を 出す。
+DEF wPlayerFacing     EQU $c109  ; 0 下・4 上・8 左・$C 右
+DEF wPartyMon1        EQU $d12b
+DEF wPartyMonNicks    EQU $d257
+DEF wMapTextPtr       EQU $d2eb
+DEF hTextID           EQU $ff8c
+DEF FW_TEXT           EQU $cd7c  ; 看板の バッファを 借りる（文の 表 1 つ ＋ 文）
+DEF FW_TEXT_ID        EQU $30
+DEF PlayCry_          EQU $2cb8
+DEF DisplayTextID_    EQU $12f9
+
+SECTION "連れ歩き 話しかける 所", ROM0[$00b0]
+	ld hl, FwTalkCheck
+	ld b, $37
+
+SECTION "連れ歩き 話しかける", ROMX[$7000], BANK[$37]
+FwTalkCheck:
+	call FwInFront
+	jr c, FwTalk
+	ld b, $3f
+	ld hl, $4400           ; キットの いあいぎり・なみのり・かいりき
+	jp $3500
+
+; 連れ歩きが 目の前（止まって いて 見えて いる）なら キャリー
+FwInFront:
+	ld a, [wPlayerFacing]
+	ld bc, 16 << 8         ; 下
+	and a
+	jr z, .got
+	ld bc, $f0 << 8        ; 上
+	cp 4
+	jr z, .got
+	ld bc, $00f0           ; 左
+	cp 8
+	jr z, .got
+	ld bc, $0010           ; 右
+.got
+	di
+	ldh a, [rSVBK_]
+	ld e, a
+	ld a, 7
+	ldh [rSVBK_], a
+	ld d, 0
+	ld a, [FW_WANT]
+	and a
+	jr z, .no
+	ld hl, FW_DEX
+	cp [hl]
+	jr nz, .no
+	ld a, [FW_FLAGS]
+	and 3
+	jr nz, .no
+	ld a, [FW_PROG]
+	and a
+	jr nz, .no
+	ld a, [FW_OY]
+	cp b
+	jr nz, .no
+	ld a, [FW_OX]
+	cp c
+	jr nz, .no
+	inc d
+	; こちらを むく
+	ld a, [wPlayerFacing]  ; 0 下→上・4 上→下・8 左→右・$C 右→左
+	rrca
+	rrca
+	xor 1
+	ld [FW_FACE], a
+.no
+	ld a, e
+	ldh [rSVBK_], a
+	ei
+	ld a, d
+	and a
+	ret z
+	scf
+	ret
+
+FwTalk:
+	ld a, [wFollowSlot]
+	ld c, a
+	ld b, 0
+	ld hl, wPartySpecies
+	add hl, bc
+	ld a, [hl]
+	push bc
+	call PlayCry_
+	pop bc
+	; 文を 作る：表（1 つ）→ 文
+	ld hl, FW_TEXT
+	ld a, LOW(FW_TEXT + 2)
+	ld [hli], a
+	ld a, HIGH(FW_TEXT + 2)
+	ld [hli], a
+	ld [hl], 0             ; text
+	inc hl
+	push hl
+	call FwChooseTalk      ; de = 文（1 = なまえ、<DONE> で おわり）
+	pop hl
+.copy
+	ld a, [de]
+	inc de
+	cp 1
+	jr z, .name
+	ld [hli], a
+	cp "<DONE>"
+	jr nz, .copy
+	jr .show
+.name
+	push de
+	ld a, [wFollowSlot]
+	ld e, a
+	add a
+	add e
+	add a                  ; × 6
+	ld e, a
+	ld d, 0
+	push hl
+	ld hl, wPartyMonNicks
+	add hl, de
+	ld d, h
+	ld e, l
+	pop hl
+	ld b, 6
+.nameLoop
+	ld a, [de]
+	cp "@"
+	jr z, .nameDone
+	and a
+	jr z, .nameDone
+	ld [hli], a
+	inc de
+	dec b
+	jr nz, .nameLoop
+.nameDone
+	pop de
+	jr .copy
+.show
+	ld a, FW_TEXT_ID
+	ldh [hTextID], a
+	ld hl, FW_TEXT - (FW_TEXT_ID - 1) * 2
+	call $3e1f             ; 文の 表を 一時的に かえる（元は $FFEC・$FFED に）
+	ld hl, $cf0c
+	set 0, [hl]            ; ROM バンクを かえない
+	call DisplayTextID_
+	ld hl, wMapTextPtr
+	ldh a, [$ffec]
+	ld [hli], a
+	ldh a, [$ffed]
+	ld [hl], a
+	ret
+
+; c = 手持ちの 番号 → de = 文
+FwChooseTalk:
+	ld hl, wPartyMon1
+	ld a, c
+	and a
+	jr z, .mon
+	ld de, PARTYMON_LEN
+.mul
+	add hl, de
+	dec a
+	jr nz, .mul
+.mon
+	push hl
+	ld a, [hl]             ; 内部の 番号 → ずかん番号
+	ld e, a
+	ld d, 0
+	ld hl, FwDexTable - 1
+	add hl, de
+	ld b, [hl]             ; b = ずかん番号
+	pop hl
+	inc hl
+	inc hl
+	inc hl
+	inc hl
+	ld a, [hli]            ; 状態
+	ld c, a
+	ld a, [hli]
+	ld d, a                ; タイプ1
+	ld e, [hl]             ; タイプ2
+	; 1. 状態異常
+	ld a, c
+	and 7
+	ld hl, FwTxtSleep
+	jr nz, .ret
+	bit 3, c
+	ld hl, FwTxtPoison
+	jr nz, .ret
+	bit 4, c
+	ld hl, FwTxtBurn
+	jr nz, .ret
+	bit 5, c
+	ld hl, FwTxtFreeze
+	jr nz, .ret
+	bit 6, c
+	ld hl, FwTxtPara
+	jr nz, .ret
+	; 3. カントー（表を 上から）
+	ld a, [wCurMap_]
+	ld c, a
+	ld hl, FwTalkTable
+.loop
+	ld a, [hli]
+	cp $ff
+	jr z, .normal
+	; 表：種類（ずかん番号、0 = どれでも）・タイプ（$FF = どれでも）・マップ×2・文の 数・文…
+	and a
+	jr z, .anyMon
+	cp b
+	jr nz, .skip4
+.anyMon
+	ld a, [hli]
+	cp $ff
+	jr z, .anyType
+	cp d
+	jr z, .anyType
+	cp e
+	jr nz, .skip3
+.anyType
+	ld a, [hli]
+	cp c
+	jr z, .found
+	ld a, [hli]
+	cp c
+	jr z, .found2
+	jr .skip1
+.skip4
+	inc hl
+.skip3
+	inc hl
+	inc hl
+.skip1
+	ld a, [hli]            ; 文の 数
+	add a
+	add l
+	ld l, a
+	jr nc, .loop
+	inc h
+	jr .loop
+.found
+	inc hl
+.found2
+	ld a, [hli]            ; 文の 数 → ランダムに 1 つ
+	ld c, a
+	ldh a, [$ff04]         ; DIV
+.mod
+	cp c
+	jr c, .pick
+	sub c
+	jr .mod
+.pick
+	add a
+	add l
+	ld l, a
+	jr nc, .ptr
+	inc h
+.ptr
+	ld a, [hli]
+	ld h, [hl]
+	ld l, a
+	jr .ret
+.normal
+	ld hl, FwTxtNormal
+.ret
+	ld d, h
+	ld e, l
+	ret
+
+MACRO fw_talk ; ずかん番号, タイプ, マップ1, マップ2, 文…
+	db \1, \2, \3, \4, _NARG - 4
+	SHIFT 4
+	REPT _NARG
+	dw \1
+	SHIFT
+	ENDR
+ENDM
+DEF T_FLYING  EQU $02
+DEF T_ROCK    EQU $05
+DEF T_GHOST   EQU $08
+DEF T_PSYCHIC EQU $18
+FwTalkTable:
+	fw_talk   1, $ff, $0c, $0c, FwTxtBulba1, FwTxtBulba2
+	fw_talk   4, $ff, $0d, $0d, FwTxtCharm
+	fw_talk  25, $ff, $0d, $53, FwTxtPika1, FwTxtPika2
+	fw_talk  26, $ff, $0d, $53, FwTxtPika1, FwTxtPika2
+	fw_talk   7, $ff, $0e, $0e, FwTxtSquirtle
+	fw_talk  35, $ff, $3b, $3c, FwTxtClef1, FwTxtClef2
+	fw_talk  35, $ff, $3d, $3d, FwTxtClef1, FwTxtClef2
+	fw_talk  36, $ff, $3b, $3c, FwTxtClef1, FwTxtClef2
+	fw_talk  36, $ff, $3d, $3d, FwTxtClef1, FwTxtClef2
+	fw_talk  95, $ff, $52, $e8, FwTxtOnix
+	fw_talk   0, T_ROCK, $52, $e8, FwTxtRock1, FwTxtRock2, FwTxtRock3, FwTxtRock4
+	fw_talk  50, $ff, $c5, $c5, FwTxtDiglett
+	fw_talk  51, $ff, $c5, $c5, FwTxtDiglett
+	fw_talk   0, T_PSYCHIC, $b7, $b7, FwTxtPsychic
+	fw_talk 137, $ff, $06, $06, FwTxtPorygon
+	fw_talk 132, $ff, $1a, $1a, FwTxtDitto
+	fw_talk   0, T_FLYING, $1d, $1d, FwTxtFlying
+	fw_talk   0, T_GHOST, $04, $04, FwTxtGhost
+	db $ff
+
+; 1 = なまえ
+FwTxtSleep:    db 1, "は<LINE>すこし ねむそうだ<DONE>"
+FwTxtPoison:   db 1, "は<LINE>ぐあいが わるそうだ<DONE>"
+FwTxtBurn:     db 1, "は<LINE>すこし いたそうだ<DONE>"
+FwTxtFreeze:   db 1, "は<LINE>こおりづけに なっている！<DONE>"
+FwTxtPara:     db 1, "は<LINE>うごきが にぶく なっている<DONE>"
+FwTxtBulba1:   db 1, "は<LINE>つるを くねくね させた！<DONE>"
+FwTxtBulba2:   db 1, "は<LINE>つるを ぴしっと ならした！<DONE>"
+FwTxtCharm:    db 1, "は<LINE>しっぽの ほのおを もやした！<DONE>"
+FwTxtPika1:    db 1, "は<LINE>たのしく おどった！<DONE>"
+FwTxtPika2:    db 1, "は うれしくて<LINE>おどりだした！<DONE>"
+FwTxtSquirtle: db 1, "は ころんで<LINE>ちょっと くやしそうだ！<DONE>"
+FwTxtClef1:    db 1, "は<LINE>そらを みあげている！<DONE>"
+FwTxtClef2:    db 1, "は<LINE>とつぜん おどりだした！<DONE>"
+FwTxtOnix:     db 1, "は たのしそうに<LINE>じめんに もぐっている！<DONE>"
+FwTxtRock1:    db 1, "は たのしそうに<LINE>ころがっている！<DONE>"
+FwTxtRock2:    db 1, "は<LINE>いわを けずりはじめた！<DONE>"
+FwTxtRock3:    db 1, "は たのしそうに<LINE>いわを ぶつけている！<DONE>"
+FwTxtRock4:    db 1, "は じめんを<LINE>たたいて ならしはじめた！<DONE>"
+FwTxtDiglett:  db 1, "は からだを<LINE>のばして くつろいでいる！<DONE>"
+FwTxtPsychic:  db "<……> <……> <……> <……><PARA>", 1, "は<LINE>だまって うなずいた！<DONE>"
+FwTxtPorygon:  db 1, "は<LINE>なにか つぶやいた<……><DONE>"
+FwTxtDitto:    db "<……>おや？ ", 1, "の<LINE>すがたは<……><PARA>かわらなかった！<DONE>"
+FwTxtFlying:   db 1, "は<LINE>ゆうがに そらを とんでいる！<DONE>"
+FwTxtGhost:    db 1, "は たのしそうに<LINE>ゆらゆら ゆれている<DONE>"
+FwTxtNormal:   db 1, "は<LINE>あなたと いっしょで うれしそうだ！<DONE>"
