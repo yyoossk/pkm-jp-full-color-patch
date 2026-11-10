@@ -15,6 +15,32 @@
 
 INCLUDE "src/crystal_jp.inc"
 
+; a = 今の値、[hl] = (まん中, 前の値) → a = まん中、[hl] = (まん中, 今の値)、hl += 2（b・c を こわす）
+MACRO FPS60_COORD
+	ld c, a
+	inc hl
+	ld b, [hl]
+	ld [hl], c
+	dec hl
+	sub b
+	jr z, .same\@
+	cp FPS60_MAXDIFF + 1
+	jr c, .half\@
+	cp -FPS60_MAXDIFF
+	jr c, .same\@
+.half\@
+	cpl
+	inc a
+	sra a
+	add c
+	jr .st\@
+.same\@
+	ld a, c
+.st\@
+	ld [hli], a
+	inc hl
+ENDM
+
 DEF hVBlankCounter    EQU $ff9b
 DEF rSVBK             EQU $ff70
 DEF wVBlankOccurred   EQU $cfa7
@@ -57,6 +83,17 @@ SECTION "60fps vblank hook", ROM0[VBlank_ClearOccurred]
 	call Fps60_VBlank
 	nop
 
+; a = 表示中の値、[hl] = (まん中, 今) → まん中のままなら今の値を返す（ROM0 の 空き $0063〜）
+SECTION "60fps oneh", ROM0[$0063]
+Fps60_OneH:
+	cp [hl]
+	inc hl
+	jr nz, .keep
+	ld a, [hl]
+.keep
+	inc hl
+	ret
+
 SECTION "60fps vblank", ROM0[$3f90]
 Fps60_VBlank:
 	xor a
@@ -71,49 +108,49 @@ Fps60_VBlank:
 	ret
 
 ; WRAM バンク2 にしてから呼ぶ
+; （VBlank の中で まいかい 40 こ ぶん まわるので、call を つかわず 1 こ ずつ 書いた。人の 多い 所で 重かった）
 .restore
 	ld hl, wFps60Flag
 	ld a, [hl]
 	and a
-	jr z, .done
+	ret z
 	ld [hl], 0
 	inc hl
 	ld c, [hl]          ; OAM の数
 	ld hl, wFps60Buf
 	ldh a, [hSCX]
-	call .one_h
+	call Fps60_OneH
 	ldh [hSCX], a
 	ldh a, [hSCY]
-	call .one_h
+	call Fps60_OneH
 	ldh [hSCY], a
+	ld a, c
+	and a
+	ret z
 	ld de, wShadowOAM
-	inc c
-	jr .next
 .loop
 	ld a, [de]
-	call .one_h
-	ld [de], a
-	inc de
-	ld a, [de]
-	call .one_h
-	ld [de], a
-	inc de
-	inc de
-	inc de
-.next
-	dec c
-	jr nz, .loop
-.done
-	ret
-
-; a = 表示中の値、[hl] = (まん中, 今) → まん中のままなら今の値を返す
-.one_h
 	cp [hl]
 	inc hl
-	jr nz, .keep
+	jr nz, .ky
 	ld a, [hl]
-.keep
+	ld [de], a
+.ky
 	inc hl
+	inc e
+	ld a, [de]
+	cp [hl]
+	inc hl
+	jr nz, .kx
+	ld a, [hl]
+	ld [de], a
+.kx
+	inc hl
+	inc e
+	inc e
+	inc e
+	dec c
+	jr nz, .loop
 	ret
 
 ;---------------------------------------------------------------------
@@ -145,10 +182,10 @@ Fps60_Background:
 
 	ld a, [wFps60Valid]
 	and a
-	jr z, .record_only
+	jp z, .record_only
 	ldh a, [hVBlankCounter]
 	cp b
-	jr nz, .record_only          ; 今の位置がもう表示された → この回は補間しない
+	jp nz, .record_only          ; 今の位置がもう表示された → この回は補間しない
 
 ; 背景
 	ld hl, wFps60Buf
@@ -158,30 +195,32 @@ Fps60_Background:
 	ldh a, [hSCY]
 	call .coord
 	ld e, a
-; OAM（前から、隠れている物が出てくるまで）
+; OAM（前から、隠れている物が出てくるまで）。1 こ ずつ その場で 計算する（call・push を へらした）
 	push de
+	push bc
 	ld de, wShadowOAM
-	ld c, 0
 .loop
 	ld a, [de]
 	cp OAM_HIDDEN_Y
 	jr z, .oam_done
-	call .coord
+	FPS60_COORD
 	ld [de], a
-	inc de
+	inc e
 	ld a, [de]
-	call .coord
+	FPS60_COORD
 	ld [de], a
-	inc de
-	inc de
-	inc de
-	inc c
-	ld a, c
-	cp 40
+	inc e
+	inc e
+	inc e
+	ld a, e
+	cp 40 * 4
 	jr nz, .loop
 .oam_done
-	ld a, c
+	ld a, e
+	srl a
+	srl a
 	ld [wFps60Count], a
+	pop bc
 	pop de
 ; 背景もまん中にして「もどす」印をつける（その間に VBlank があったらやめる）
 	di

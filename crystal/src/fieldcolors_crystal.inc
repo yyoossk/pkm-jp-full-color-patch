@@ -2,7 +2,10 @@
 ; tools/fieldcolors_find.py（パッチを入れる前の ROM）で出した値 ＋ 空きの場所
 DEF FC_OBJ_BANK            EQU $01
 DEF FC_INIT_HOOK           EQU $5a38
-DEF FC_ATTR_HOOK           EQU $5aaf
+DEF FC_ATTR_HOOK           EQU $5aaf    ; （FC_END_HOOK が ある ときは 使わない）
+DEF FC_END_HOOK            EQU $5abb    ; InitSprite の さいごの ld a, c / ldh [hUsedSpriteIndex], a（79 e0 bd）
+DEF FC_hUsedSpriteIndex    EQU $ffbd
+DEF FC_wShadowOAM          EQU $c400
 DEF FC_hCurSpriteOAMFlags  EQU $ffc2
 DEF FC_FREE                EQU $7f00    ; バンク$01 の空き 50バイト（$7ea0〜$7eb2 は わざの上書き防止）
 DEF FC_BALLGFX_BANK        EQU $31
