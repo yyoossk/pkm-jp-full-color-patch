@@ -76,7 +76,8 @@ DEF wFwBallT EQU $D026            ; ボールから出るアニメののこり�
 DEF BALL_TIME EQU 12
 DEF wFwJump EQU $D038             ; 主人公が段差をとんでいる
 DEF wFwHop EQU $D039              ; 1 = 次に追いつくとき段差をとぶ
-DEF wFwHopping EQU $D03A          ; 1 = とんでいるところ
+DEF wFwHopping EQU $D03A          ; 1 = とんでいるところ、2 = 追いつくだけ
+DEF wFwLandWait EQU $D03B         ; なみのりからおりたとき 1歩待つ
 DEF BALL_TILE EQU 48              ; ボールの絵（VRAM1 タイル 48〜59：開いた・半分・とじた）
 DEF wFwPals EQU $D028             ; 8: 正面の色1・色2、後ろ・横の色1・色2
 DEF wFwBuf EQU $D100              ; 絵 384 ＋ 下じき 384（VBlank で VRAM1 $8000 へ）
@@ -200,8 +201,9 @@ FwTick:
 	ld a, c
 	and a
 	jr z, .walking
+	ld a, c
+	ld [wFwRide], a               ; 1 自転車・2 なみのり
 	ld a, 1
-	ld [wFwRide], a
 	ld [wFwBallNext], a
 	call FwReset
 	call FwSaveScroll
@@ -210,6 +212,10 @@ FwTick:
 	ld a, [wFwRide]
 	and a
 	jr z, .notOff
+	cp 2
+	jr nz, .offBike
+	ld [wFwLandWait], a           ; なみのりからおりた：水のマスでは出ない
+.offBike
 	xor a
 	ld [wFwRide], a
 	call FwReset
@@ -419,6 +425,13 @@ FwMove:
 	ld a, [wFwShown]
 	and a
 	jr nz, .notStart
+	ld a, [wFwLandWait]           ; なみのりからおりた1歩め（いたのは水のマス）
+	and a
+	jr z, .appear
+	xor a
+	ld [wFwLandWait], a
+	jr .notStart
+.appear
 	ld a, 1
 	ld [wFwShown], a
 	xor a
