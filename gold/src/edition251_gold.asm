@@ -2,6 +2,7 @@
 ;  ・つうしん こうかんで しんかする ポケモンは Lv37 で しんかする
 ;     （ヤドンだけは Lv37 で ヤドラン。おうじゃのしるしを もたせて Lv37 なら ヤドキング）
 ;  ・ウツギ はかせの けんきゅうじょで 3びき とも もらえる（えらんだ 1ぴき だけ きのみ を もつ。ライバルは 今までどおり）
+;     （まえの 版の セーブデータで すでに 1ぴき もらって いる ときは、ウツギ はかせに はなしかけると のこりの 2ひきを くれる）
 ;  ・殿堂入りの あと：
 ;     アルフの いせきの けんきゅうじょで オムナイトと カブトを もらえる（Lv30）
 ;     シロガネやまの いちばん おく（レッドの へや）に ミュウツー（Lv70）
@@ -99,18 +100,21 @@ ENDM
 SECTION "ed251 starters", ROMX[$4000], BANK[ED_BANK]
 ED_GotCyndaquil:
 	givepoke CYNDAQUIL, 5, BERRY
+	callasm Ed_SetElmAll
 	ed_rest 5, 6
 	ed_give TOTODILE
 	ed_give CHIKORITA
 	end
 ED_GotTotodile:
 	givepoke TOTODILE, 5, BERRY
+	callasm Ed_SetElmAll
 	ed_rest 4, 6
 	ed_give CYNDAQUIL
 	ed_give CHIKORITA
 	end
 ED_GotChikorita:
 	givepoke CHIKORITA, 5, BERRY
+	callasm Ed_SetElmAll
 	ed_rest 4, 5
 	ed_give CYNDAQUIL
 	ed_give TOTODILE
@@ -357,3 +361,130 @@ SECTION "ed251 price moon", ROMX[$6b93 + (MOON_STONE - 1) * 7], BANK[$01]
 	dw 2100
 SECTION "ed251 price kingsrock", ROMX[$6b93 + (KINGS_ROCK - 1) * 7], BANK[$01]
 	dw 2100
+
+; ---- まえの セーブデータ：ウツギ はかせが のこりの 2ひきを くれる ----------------
+; EVENT_GOT_A_POKEMON_FROM_ELM（$1a）の あと、えらんで いない（EVENT_GOT_〜_FROM_ELM $1b・$1c・$1d が ない）で
+; まだ もらって いない（wEdFlags ビット 4 ヒノアラシ・5 ワニノコ・6 チコリータ）ポケモンを くれる。
+; 新しく はじめた ときは けんきゅうじょで 3びき もらった とき ビット 4〜6 を ぜんぶ たてる。
+; ウツギ はかせ（ElmsLab の 1人め）の スクリプトの 場所（$13:$74ab。元は $64f9）を $13:$7ffa の farsjump EdElmScript に。
+DEF ED_ELM0 EQU 4
+SECTION "ed251 elm ptr", ROMX[$74ab], BANK[$13]
+	dw $7ffa
+SECTION "ed251 elm stub", ROMX[$7ffa], BANK[$13]
+	farsjump EdElmScript
+
+SECTION "ed251 elm", ROMX[$7800], BANK[ED_BANK]
+Ed_SetElmAll:
+	ld a, [wEdFlags]
+	or %01110000
+	ld [wEdFlags], a
+	ret
+
+; c = 0 ヒノアラシ・1 ワニノコ・2 チコリータ → wScriptVar = 1（くれる）
+Ed_ElmNeed:
+	xor a
+	ld [ED_wScriptVar], a
+	ld a, [ED_wEventFlags + $1a / 8]
+	bit $1a % 8, a
+	ret z
+	push bc
+	ld a, c
+	add $1b % 8
+	ld c, a
+	call Ed_Mask
+	ld a, [ED_wEventFlags + $1b / 8]
+	and b
+	pop bc
+	ret nz
+	ld a, c
+	add ED_ELM0
+	ld c, a
+	call Ed_Mask
+	ld a, [wEdFlags]
+	and b
+	ret nz
+	ld a, 1
+	ld [ED_wScriptVar], a
+	ret
+
+Ed_ElmNeedAny:
+	ld c, 0
+	call Ed_ElmNeed
+	ld a, [ED_wScriptVar]
+	and a
+	ret nz
+	ld c, 1
+	call Ed_ElmNeed
+	ld a, [ED_wScriptVar]
+	and a
+	ret nz
+	ld c, 2
+	jp Ed_ElmNeed
+
+MACRO ed_elm_give ; 番号, ポケモン
+	callasm .need\1
+	iffalse .skip\1
+	getmonname STRING_BUFFER_3, \2
+	db farwritetext_command, ED_GOT_TEXT_BANK
+	dw ED_GOT_TEXT
+	playsound SFX_CAUGHT_MON
+	waitsfx
+	promptbutton
+	givepoke \2, 5
+	ifequal 2, .full
+	callasm .set\1
+.skip\1
+ENDM
+
+EdElmScript:
+	callasm Ed_ElmNeedAny
+	iffalse .normal
+	faceplayer
+	opentext
+	writetext EdElm_Text
+	promptbutton
+	ed_elm_give 0, CYNDAQUIL
+	ed_elm_give 1, TOTODILE
+	ed_elm_give 2, CHIKORITA
+	writetext EdElm_Text2
+	waitbutton
+	closetext
+	end
+.full
+	writetext EdElm_FullText
+	waitbutton
+	closetext
+	end
+.normal
+	db farsjump_command, $13          ; 元の ウツギ はかせの スクリプト
+	dw $64f9
+.need0
+	ld c, 0
+	jp Ed_ElmNeed
+.need1
+	ld c, 1
+	jp Ed_ElmNeed
+.need2
+	ld c, 2
+	jp Ed_ElmNeed
+.set0
+	ld c, ED_ELM0
+	jp Ed_Set
+.set1
+	ld c, ED_ELM0 + 1
+	jp Ed_Set
+.set2
+	ld c, ED_ELM0 + 2
+	jp Ed_Set
+
+EdElm_Text:
+	db $00, "ウツギ『やあ　", $52, "くん！", $51
+	db "じつは　のこりの　ポケモンも", $4f
+	db "きみに　つれていって　ほしいんだ！", $57
+EdElm_Text2:
+	db $00, "ウツギ『みんな　だいじに", $4f
+	db "そだてて　あげてね！", $57
+EdElm_FullText:
+	db $00, "ウツギ『おや　もう　もてない", $4f
+	db "みたいだね", $51
+	db "ボックスを　あけて　また　おいで", $57

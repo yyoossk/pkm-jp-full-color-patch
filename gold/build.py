@@ -63,7 +63,7 @@ FILES=[
 FILES251=[{'src/wild_gold.asm':'src/wild251_gold.asm','src/masterball.asm':'src/masterball251.asm',
            'src/dexinfo_gold.asm':'src/dexinfo251_gold.asm'}.get(f,f) for f in FILES]+['src/edition251_gold.asm']
 EXPECT={'kin.gbc':0xD4AF6B5B,'kin60.gbc':0xF22C69C6,   # Ver.1.3.3
-        'kin251.gbc':0x42EEF643,'kin251_60.gbc':0x40D3C6D4}   # 251ひき そろう版（まだ リリースして いない）
+        'kin251.gbc':0x85DAB0A5,'kin251_60.gbc':0xD82A9A12}   # 251ひき そろう版（まだ リリースして いない）
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)
