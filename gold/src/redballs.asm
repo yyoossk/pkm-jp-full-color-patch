@@ -23,6 +23,8 @@
 ; ROM ごとにちがう所（金 日本版）
 ;---------------------------------------------------------------------
 IF !DEF(RB_HUD_ATTR)
+DEF RB_STATUSCOLOR       EQU 1
+DEF RB_DEXINFO           EQU 1        ; ずかんの SELECT（src/dexinfo_gold.asm）の つなぎを dex load1 に 置く        ; 状態異常の 色（src/statuscolor_gold.asm）を 入れて いる
 DEF RB_BALLGFX_BANK      EQU $0b      ; LoadBallIconGFX の .gfx（手持ちの数のボール 4タイル、そのままの 2bpp）
 DEF RB_BALLGFX           EQU $5255
 DEF RB_HUD_ATTR          EQU $5236    ; LoadTrainerHudOAM の ld a, PAL_BATTLE_OB_YELLOW / ld [hli], a（3バイト）
@@ -99,6 +101,17 @@ RedBalls_HudAttr:
 ;---------------------------------------------------------------------
 ; 2. つかまえた印の絵（0 = 白、2 = 赤、3 = 黒。パレット5）
 SECTION "redballs caught gfx", ROMX[RB_CAUGHT_GFX], BANK[RB_CAUGHT_BANK]
+IF DEF(RB_STATUSCOLOR)
+	; 黒を 色1 に（色3 は 相手の 状態異常の 色。src/statuscolor_crystal.asm）
+	db %00000000, %00000000
+	db %01111000, %00000000
+	db %10000100, %01011000
+	db %10000100, %01111000
+	db %11111100, %00000000
+	db %10000100, %00000000
+	db %01111000, %00000000
+	db %00000000, %00000000
+ELSE
 	db %00000000, %00000000
 	db %01111000, %01111000
 	db %10000100, %11011100
@@ -107,6 +120,7 @@ SECTION "redballs caught gfx", ROMX[RB_CAUGHT_GFX], BANK[RB_CAUGHT_BANK]
 	db %10000100, %10000100
 	db %01111000, %01111000
 	db %00000000, %00000000
+ENDC
 
 SECTION "redballs battle pal hook", ROMX[RB_BATTLEPAL_HOOK], BANK[RB_BATTLEPAL_BANK]
 	ld a, RB_BANK
@@ -118,11 +132,24 @@ SECTION "redballs battle pal hook", ROMX[RB_BATTLEPAL_HOOK], BANK[RB_BATTLEPAL_B
 ;---------------------------------------------------------------------
 ; 3. ずかん
 SECTION "redballs dex load1", ROMX[RB_DEX_LOAD1], BANK[RB_DEX_BANK]
+IF DEF(RB_DEXINFO)
+	; のこりの 6バイトに ずかんの SELECT（src/dexinfo_gold.asm）の farcall を いっしょに 置く（バンク$10 は 空きが ない）
+	ld hl, RedBalls_DexLoadRequest
+RedBalls_DexFar:
+	ld a, RB_BANK
+	rst $08
+	ret
+RedBalls_DexInfoSelect::             ; ＋7：DexInfo_Select の つなぎ（バンク RB_BANK）を farcall
+	ld hl, DexInfo_SelectTramp
+	jr RedBalls_DexFar
+	ds 1, 0
+ELSE
 	ld a, RB_BANK
 	ld hl, RedBalls_DexLoadRequest
 	rst $08
 	ret
 	ds 13 - 7, 0
+ENDC
 
 SECTION "redballs dex load2", ROMX[RB_DEX_LOAD2], BANK[RB_DEX_BANK]
 	ld a, RB_BANK
@@ -157,10 +184,19 @@ IF RB_PALS_WRAMBANK
 ENDC
 	ld a, RB_BG_PAL
 	ld [RB_wAttrmap + 1 * 20 + 1], a   ; hlcoord 1, 1
+IF DEF(RB_STATUSCOLOR)
+	ld a, BANK(StatusColor_BattleLayout)
+	ld hl, StatusColor_BattleLayout
+	rst $08
+ENDC
 	ret
 
 RedBalls_BallPal:
+IF DEF(RB_STATUSCOLOR)
+	dw $7fff, $0000, $109f, $0000   ; 白・黒・赤・（色3 は 相手の 状態異常）
+ELSE
 	dw $7fff, $7fff, $109f, $0000   ; 白・白・赤・黒（赤は ピカチュウ版・投げるボールと同じ）
+ENDC
 
 ; 3. ずかんの絵を読む（画面を消しているとき）
 RedBalls_DexLoadLCDOff:
@@ -194,3 +230,12 @@ RedBalls_DexTile:
 	db %00000001, %00000001
 	db %10000011, %10000011
 	db %11000111, %11000111
+
+IF DEF(RB_DEXINFO)
+SECTION "redballs dexinfo tramp", ROMX[$7e80], BANK[RB_BANK]
+DexInfo_SelectTramp:
+	ld a, BANK(DexInfo_Select)
+	ld hl, DexInfo_Select
+	rst $08
+	ret
+ENDC

@@ -1,6 +1,6 @@
 ; ポケットモンスター 金・銀（日本版）追加機能（クリスタル追加機能キットから移植）
 ;  1. Bボタンダッシュ（ランニングシューズ。なみのりも速く）
-;  2. メニューに「パソコン」
+;  2. メニューに「パソコン」（ならび：ずかん・ポケモン・リュック・ポケギア・パソコン・主人公・レポート・せってい）
 ;  3. 手持ちのポケモンを選ぶと「なまえ」（ニックネーム変更）
 ;  4. 手持ちのポケモンを選ぶと「わすれる」（ひでんわざも忘れられる）
 ;  ※ ひでんマシンを全ポケモンに… は build.py で基本データを書きかえる
@@ -35,8 +35,14 @@ SECTION "Run surf", ROMX[DoPlayerMovement_surf], BANK[BANK_PLAYERMOVE]
 SECTION "StartMenu items ptr", ROMX[StartMenu_MenuDataItemsPtr], BANK[BANK_STARTMENU]
 	dw StartMenuItemsNew
 
-SECTION "StartMenu exit/pc", ROMX[StartMenu_ExitAppend], BANK[BANK_STARTMENU]
-	call StartMenu_ExitOrPC   ; 5バイト（ld a,6 / call .AppendMenuList）
+; ならび：ずかん・ポケモン・リュック・ポケギア・パソコン・主人公の名前・レポート・せってい（「とじる」は 出さない。B／START で とじる）
+;   むしとり大会中は パソコンを 出さず、さいごに「とじる」
+SECTION "StartMenu pc/status", ROMX[StartMenu_StatusAppend], BANK[BANK_STARTMENU]
+	call StartMenu_PCAndStatus ; 5バイト（ld a, STARTMENUITEM_STATUS / call .AppendMenuList）
+	nop
+	nop
+SECTION "StartMenu exit", ROMX[StartMenu_ExitAppend], BANK[BANK_STARTMENU]
+	call StartMenu_ExitInContest ; 5バイト（ld a, STARTMENUITEM_EXIT / call .AppendMenuList）
 	nop
 	nop
 
@@ -125,13 +131,11 @@ RunOrWalkStep:
 	ret
 
 ; --- スタートメニュー（バンク4から呼ばれる）
-StartMenu_ExitOrPC:
+StartMenu_ExitInContest:
 	ld hl, wStatusFlags2
 	bit STATUSFLAGS2_BUG_CONTEST_TIMER_F, [hl]
+	ret z                     ; ふだんは「とじる」を 出さない
 	ld a, STARTMENUITEM_EXIT
-	jr nz, .ok
-	ld a, STARTMENUITEM_PC
-.ok
 	jp StartMenu_AppendMenuList
 
 StartMenu_PC:
@@ -449,3 +453,13 @@ ForgotMoveText:
 	db 1
 	dw wStringBuffer2
 	db 0, "を<LINE>きれいに　わすれた！<PROMPT>"
+
+; 使われて いない SetUnusedTwoDayTimer（$04:$5882、16バイト）に 置く（バンク4 の おわりの 空きは 使いきった）
+SECTION "StartMenu pc/status body", ROMX[$5882], BANK[BANK_STARTMENU]
+StartMenu_PCAndStatus:
+	ld hl, wStatusFlags2
+	bit STATUSFLAGS2_BUG_CONTEST_TIMER_F, [hl]
+	ld a, STARTMENUITEM_PC
+	call z, StartMenu_AppendMenuList ; むしとり大会中は パソコンを 出さない
+	ld a, STARTMENUITEM_STATUS
+	jp StartMenu_AppendMenuList

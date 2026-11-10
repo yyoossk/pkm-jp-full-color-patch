@@ -48,14 +48,18 @@ FILES=[
     'src/mapsign.asm',
     'src/hpower.asm',
     'src/dvview.asm',
-    'src/enemyhp.asm',
+    'src/enemyhp_gold.asm',
     'src/partyitem.asm',
     'src/fishbite.asm',
     'src/moveacc.asm',
     'src/legendrevive.asm',
     'src/contestpc.asm',
-    'src/monmenu_fix.asm']
-EXPECT={'kin.gbc':0xB87442D9,'kin60.gbc':0x7C3EB7B8}   # Ver.1.2.1 ＋ 場所の名前の札をクリスタルと同じに（まだリリースしていない）
+    'src/monmenu_fix.asm',
+    'src/follow_gold.asm',
+    'src/prizetm_gold.asm',
+    'src/statuscolor_gold.asm',
+    'src/dexinfo_gold.asm']
+EXPECT={'kin.gbc':0x6756A590,'kin60.gbc':0x2BB1A520}   # Ver.1.2.1 ＋ 場所の名前の札・連れ歩き・クリスタル追加機能キットの 51〜57（まだリリースしていない）
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)

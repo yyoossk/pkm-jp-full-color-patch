@@ -18,6 +18,7 @@
 
 INCLUDE "src/charmap_jp.inc"
 
+DEF PS_FOLLOW_MARK EQU 1             ; 連れ歩き（follow_gold.asm）を 入れて いる
 IF !DEF(PS_HOOK)
 DEF PS_HOOK            EQU $40be      ; バンク$14 PlacePartyNicknames .end の ld de, .CancelString / call PlaceString / ret
 DEF PS_HOOK_BANK       EQU $14
@@ -87,6 +88,12 @@ PartyShiny:
 	ld a, b
 	cp 6
 	jr c, .slot
+IF DEF(PS_FOLLOW_MARK)
+	; 連れ歩く ポケモンの ★（follow_gold.asm）
+	ld a, BANK(Fw_PartyMark)
+	ld hl, Fw_PartyMark
+	rst $08
+ENDC
 	ret
 
 ; b ばんめ が 色ちがい なら キャリー（b は かえない）

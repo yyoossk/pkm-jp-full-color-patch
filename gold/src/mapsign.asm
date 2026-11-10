@@ -32,6 +32,8 @@
 ; 銀・クリスタルに 入れるとき：銀は 下の DEF を 銀の 値に する（作りは 金と 同じ）。クリスタルには もともと ある。
 
 INCLUDE "src/charmap_jp.inc"
+DEF MS_FOLLOW EQU 1                 ; 連れ歩き（follow_gold.asm）を 入れて いる
+DEF MS_SAFARI_HUD EQU 1             ; サファリの HUD（src/safari/safari.asm の SafariHUD）を 入れて いる
 
 IF !DEF(MS_SETUP_ENTRY)
 DEF MS_SETUP_ENTRY     EQU $5501      ; バンク$05 MapSetupCommands の LoadWildMonData の 行（db バンク / dw アドレス）
@@ -114,9 +116,19 @@ MapSign_Frame:
 	ld a, MS_OW_BANK
 	ld hl, MS_CheckObjectEnteringVisibleRange
 	rst $08
+IF DEF(MS_FOLLOW)
+	; 連れ歩き（follow_gold.asm）：まいフレーム
+	ld a, BANK(Fw_Update)
+	ld hl, Fw_Update
+	rst $08
+ENDC
 	ld a, [wMSState]
 	and $7f
+IF DEF(MS_SAFARI_HUD)
+	jr z, .hud                        ; 札が 出て いない：サファリの HUD（src/safari/safari.asm）
+ELSE
 	ret z
+ENDC
 	dec a
 	jr z, .first                      ; 1：ループの 1回め（クリスタルの タイマー 60。まだ 出さない）
 	dec a
@@ -138,6 +150,22 @@ MapSign_Frame:
 	jr c, MapSign_Hide
 	ld [wMSTimer], a
 	ret
+
+IF DEF(MS_SAFARI_HUD)
+.hud
+	; サファリゲーム中か、HUD を 出して いる（hWY ＝ $80）とき だけ 呼ぶ（60fps版で 重く ならない ように）
+	ld a, [$d565]                     ; wStatusFlags2
+	bit 1, a                          ; STATUSFLAGS2_SAFARI_GAME_F
+	jr nz, .hud_call
+	ldh a, [MS_hWY]
+	cp $80
+	ret nz
+.hud_call
+	ld a, BANK(SafariHUD)
+	ld hl, SafariHUD
+	rst $08
+	ret
+ENDC
 
 .first
 	ld a, [wMSState]

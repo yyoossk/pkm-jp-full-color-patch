@@ -2052,3 +2052,254 @@ SafariOffice_MapEvents:
 
 SafariOfficeManScript:
 	jumptextfaceplayer SafariText_OfficeMan
+
+;---------------------------------------------------------------------
+; 歩いて いる あいだも 画面の いちばん 下に のこりの 歩数と ボール（ピカチュウ版フルカラーと 同じ。クリスタル追加機能キットの 53）
+;   「あと 498ほ  ボール 30こ」（ボ の ゛ は 上の 行）。サファリゲーム中で サファリの 中（入口は ちがう）の とき だけ。
+; 金には PlaceMapNameSign が ない ので、場所の名前の札（src/mapsign.asm）の MapSign_Frame（フィールドで 毎フレーム）から、
+; 札が 出て いない とき に 呼ぶ（MS_SAFARI_HUD）。
+;   ・ウィンドウを 128（下の 2行）に 出し、ウィンドウの 1・2行め（$9c00〜・$9c20〜）に 文字を かく。
+;   ・hWY が 128 で ない（地名の 札・メニュー・会話の あと）ときは 2行 ぜんぶ かきなおす。数字は 毎フレーム かく。
+;   ・VRAM には STAT の モード 0・1 の ときに 1バイトずつ かく。
+;   ・色は BG の 8本目（文字の 色）を 白・黒に（wBGPals1・2 の 8本目が ちがえば 書いて hCGBPalUpdate。金は WRAM0）。
+;   ・サファリの 外では、HUD を 出して いた（hWY ＝ 128）ときだけ ウィンドウを かくす。
+DEF SH_hWX          EQU $ffd3
+DEF SH_hWY          EQU $ffd4
+DEF SH_hCGBPalUpdate EQU $ffe7
+DEF SH_wBGPals1_7   EQU $c238
+DEF SH_wBGPals2_7   EQU $c2b8
+DEF SH_WY           EQU $80
+DEF SH_ROW0         EQU $9c00
+DEF SH_ROW1         EQU $9c20
+DEF SH_ATTR         EQU $8f        ; 8本目の 色 ＋ VRAM バンク1 の タイル ＋ BG を 上に
+DEF SH_FONT         EQU $42f2      ; 文字 $80〜$ff（1bpp。mapsign.asm の MS_FONT）
+DEF SH_FONT_BANK    EQU $3e
+DEF SH_GetFarByte   EQU $30e4
+
+SECTION "safari hud", ROMX[$7d40], BANK[SAFARI_SCRIPT_BANK]
+SafariHUD::
+	ld a, [wStatusFlags2]
+	bit STATUSFLAGS2_SAFARI_GAME_F, a
+	jr z, .off
+	call SafariInZone
+	jr nc, .off
+	call .Pal
+	ldh a, [$ff4f]                   ; rVBK
+	push af
+	ldh a, [SH_hWY]
+	cp SH_WY
+	call nz, .Full
+	call .Digits
+	pop af
+	ldh [$ff4f], a
+	ld a, 7
+	ldh [SH_hWX], a
+	ld a, SH_WY
+	jr .set
+.off
+	ldh a, [SH_hWY]
+	cp SH_WY
+	ret nz
+	ld a, $90
+.set
+	ldh [$ff4a], a                   ; rWY
+	ldh [SH_hWY], a
+	ret
+
+.Pal
+	ld hl, SH_wBGPals2_7
+	ld de, .Colors
+	ld b, 8
+.cmp
+	ld a, [de]
+	cp [hl]
+	jr nz, .write
+	inc de
+	inc hl
+	dec b
+	jr nz, .cmp
+	ret
+.write
+	ld hl, SH_wBGPals1_7
+	call .CopyPal
+	ld hl, SH_wBGPals2_7
+	call .CopyPal
+	ld a, 1
+	ldh [SH_hCGBPalUpdate], a
+	ret
+.CopyPal
+	ld de, .Colors
+	ld b, 8
+.copy
+	ld a, [de]
+	inc de
+	ld [hli], a
+	dec b
+	jr nz, .copy
+	ret
+.Colors
+	dw $7fff, $7fff, $35ad, $0000     ; 白・白・はい色・黒
+
+.Full
+	; 文字の 絵を VRAM の バンク1 の 同じ 番号に 写す（金は バンク0 の $80〜 が 人の 歩きの 絵と かさなる。
+	; 場所の名前の札（mapsign.asm）と 同じ やりかた。色の 表の ビット3 で バンク1 から 出す）
+	ld a, 1
+	ldh [$ff4f], a
+	ld de, .Glyphs
+.glyph
+	ld a, [de]
+	inc de
+	and a
+	jr z, .glyphs_done
+	push de
+	sub $80
+	ld l, a
+	ld h, 0
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	ld de, SH_FONT
+	add hl, de
+	ld d, h
+	ld e, l                           ; de ＝ フォント（1bpp）
+	add hl, hl
+	ld bc, $8800 - SH_FONT * 2
+	add hl, bc                        ; hl ＝ $8800 ＋（文字 − $80）× 16
+	ld c, 8
+.grow
+	push hl
+	ld h, d
+	ld l, e
+	ld a, SH_FONT_BANK
+	call SH_GetFarByte
+	pop hl
+	inc de
+	push af
+	call .Put
+	pop af
+	call .Put
+	dec c
+	jr nz, .grow
+	pop de
+	jr .glyph
+.glyphs_done
+	xor a
+	ldh [$ff4f], a
+	ld hl, SH_ROW0
+	ld de, .Row0
+	call .Put20
+	ld hl, SH_ROW1
+	ld de, .Row1
+	call .Put20
+	ld a, 1
+	ldh [$ff4f], a
+	ld hl, SH_ROW0
+	call .Attr20
+	ld hl, SH_ROW1
+.Attr20
+	ld b, 20
+.attr_loop
+	ld a, SH_ATTR
+	call .Put
+	dec b
+	jr nz, .attr_loop
+	ret
+.Put20
+	ld b, 20
+.put_loop
+	ld a, [de]
+	inc de
+	call .Put
+	dec b
+	jr nz, .put_loop
+	ret
+
+.Digits
+	xor a
+	ldh [$ff4f], a
+	ld a, [wSafariTimeRemaining]
+	ld h, a
+	ld a, [wSafariTimeRemaining + 1]
+	ld l, a
+	ld c, 0
+.hundreds
+	ld a, l
+	sub 100
+	ld e, a
+	ld a, h
+	sbc 0
+	jr c, .hundreds_done
+	ld h, a
+	ld l, e
+	inc c
+	jr .hundreds
+.hundreds_done
+	ld a, l
+	call .Split                      ; d ＝ 10の くらい、e ＝ 1の くらい
+	ld hl, SH_ROW1 + 4
+	ld a, c
+	and a
+	ld a, $7f
+	jr z, .h_blank
+	ld a, c
+	add $f6
+.h_blank
+	call .Put
+	ld a, c
+	or d
+	ld a, $7f
+	jr z, .t_blank
+	ld a, d
+	add $f6
+.t_blank
+	call .Put
+	ld a, e
+	add $f6
+	call .Put
+	ld a, [wSafariBallsRemaining]
+	call .Split
+	ld hl, SH_ROW1 + 14
+	ld a, d
+	and a
+	ld a, $7f
+	jr z, .b_blank
+	ld a, d
+	add $f6
+.b_blank
+	call .Put
+	ld a, e
+	add $f6
+	; fallthrough
+
+.Put                                 ; [hl+] ＝ a（Hブランク・Vブランク の ときに かく）
+	push bc
+	ld c, a
+	di
+.wait
+	ldh a, [$ff41]                   ; rSTAT
+	and %10                          ; モード 0（Hブランク）か 1（Vブランク）まで まつ
+	jr nz, .wait
+	ld [hl], c
+	ei
+	inc hl
+	pop bc
+	ret
+
+.Split                               ; a（0〜99）→ d ＝ 10の くらい、e ＝ 1の くらい
+	ld d, 0
+.split_loop
+	sub 10
+	jr c, .split_done
+	inc d
+	jr .split_loop
+.split_done
+	add 10
+	ld e, a
+	ret
+
+.Glyphs ; あ・と・ほ・ホ・゛・ー・ル・こ・0〜9
+	db $b1, $c4, $ce, $9c, $e5, $e3, $a6, $ba, $f6, $f7, $f8, $f9, $fa, $fb, $fc, $fd, $fe, $ff, 0
+.Row0 ; ボ の ゛
+	db $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $e5, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $7f
+.Row1 ; 「 あと nnnほ  ボール nnこ   」
+	db $7f, $b1, $c4, $7f, $7f, $7f, $7f, $ce, $7f, $7f, $9c, $e3, $a6, $7f, $7f, $7f, $ba, $7f, $7f, $7f
