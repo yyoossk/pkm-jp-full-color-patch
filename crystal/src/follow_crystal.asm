@@ -1249,11 +1249,30 @@ Fw_Desired:
 
 ; 連れ歩きを 置く 番号（a）。人の 数＋1。15人 いれば、かくれて いる 人の 番号を 借りる（後ろから）。なければ carry
 Fw_FreeSlot:
+	; 人の 数＋1 から、だれも 使って いない（絵が 0。前の 連れ歩き $e2 も よい）番号を さがす。
+	; マップの callback が 人を 足して いる ことが ある（殿堂入りの あとの 伝説の 鳥は 人の 数＋1 に 書かれる。
+	; そこに 連れ歩きを 書いて いて、鳥が 出なく なって いた）
 	ld a, [wCurMapObjectEventCount]
 	inc a
+.free
 	cp 16
-	ccf
-	ret nc
+	jr nc, .borrow
+	push af
+	call FW_GetMapObject
+	inc bc                            ; MAPOBJ_SPRITE
+	ld a, [bc]
+	and a
+	jr z, .found
+	cp FW_SPRITE
+	jr z, .found
+	pop af
+	inc a
+	jr .free
+.found
+	pop af
+	and a
+	ret
+.borrow
 	ld a, 15
 .loop
 	push af

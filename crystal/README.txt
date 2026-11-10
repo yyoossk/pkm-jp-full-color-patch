@@ -497,6 +497,8 @@
          - はなれて 見える：マップを 読んだ あと 最初の フレームで 主人公が 先に 歩きだし、主人公が 止まる まで 連れ歩きが
            1マス 後ろで 止まった まま（止まった ときに おきなおして 一瞬 きえた）。LoadMapObjects の
            farcall InitializeVisibleSprites（$05:$557e）の あと（Fw_AfterObjects）で、つながりなら その 場で StartFollow。
+         - 殿堂入りの あとの 伝説の 鳥（44）が 出ない：鳥は マップの callback で 人の 数＋1 の 番号に 書かれ、そこに
+           連れ歩きを 上がき して いた。Fw_FreeSlot は 人の 数＋1 から 絵が 0（か 前の 連れ歩き $e2）の 番号を さがす。
          - 上へ 歩くと 一瞬 正面：連れ歩きの マップオブジェクトを STANDING_DOWN で 書いて いた。主人公の 向き
            （OBJECT_DIRECTION）に あわせて STANDING_DOWN・UP・LEFT・RIGHT に。
          - 歩く ときの 重さ：Fw_FindSlot は まず 人の 数＋1 の 番号を 見る（1番から さがして いた）、先頭が かわったか は
