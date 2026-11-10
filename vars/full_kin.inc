@@ -11,3 +11,8 @@ DEF HAS_FOLLOW EQU 1           ; 連れ歩き（金銀グラフィックの完�
 DEF HandleMenuInput_ EQU $3A68
 DEF PlaceUnfilledArrowMenuCursor EQU $3B78
 DEF RemovePokemonStub EQU $38C5
+DEF DisplayTextID EQU $289D
+DEF FwTalkHookAddr EQU $3F88
+DEF PrintText EQU $3BD5
+DEF YesNoChoice EQU $35AB
+DEF GiveItem EQU $3DBC

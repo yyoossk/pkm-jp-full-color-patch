@@ -8,6 +8,8 @@
 ;   ★ WRAM バンク7 にしているあいだの call / push / pop は、同じバンクのあいだに対にする
 ;     （割りこみは SVBK を元にもどすので、そのまま使える）。WRAM バンク1 の値は rd1 で読む。
 
+INCLUDE "charmap.inc"
+
 IF HAS_FOLLOW
 
 DEF FOLLOW_BANK EQU $35
@@ -30,7 +32,7 @@ DEF wFollowSel EQU $C20F          ; 連れ歩く手持ちの番号（0〜5、$FF
 DEF wPlayerFacing EQU $C109       ; 主人公の向き（0 下・4 上・8 左・$C 右）
 DEF wPartyCount EQU $D123
 DEF wPartySpecies EQU $D124
-DEF wPartyMon1HP EQU $D12B
+DEF wPartyMon1HP EQU $D12C
 DEF PARTYMON_LEN EQU 44
 DEF wCurMap EQU $D2DD
 DEF wYCoord EQU $D2E0
@@ -126,6 +128,8 @@ FollowerTick::
 	ret
 
 FwTick:
+	xor a
+	ld [wFwDrawn], a
 	ld a, [wFwMark]
 	cp $F0
 	jr nz, .init
@@ -244,6 +248,8 @@ FwWant:
 	xor a                         ; いない番号なら先頭
 	ld b, a
 .ok
+	ld a, b
+	ld [wFwSel], a
 	ld hl, wPartySpecies
 	ld a, b
 	add l
@@ -623,6 +629,9 @@ FwDraw:
 	add 72
 	ld [wFwT_X], a
 	call FwPut4
+	ld a, 1
+	ld [wFwDrawn], a
+	call FwPutEmote
 	; 白い下じき（OAM に空きがあり、パレット5 の色1 が白のとき）
 	ld a, [wFwT_Lim]
 	ld b, a
@@ -654,7 +663,74 @@ FwDraw:
 	and %11100000
 	or FW_MASK_PAL | %00001000
 	ld [wFwT_Attr], a
-	jr FwPut4
+	jp FwPut4
+
+; 気持ちのアイコン：OAM のはじめに入れる（主人公より手前に出すため、ほかを4枚うしろへずらす）
+FwPutEmote:
+	ld a, [wFwEmote]
+	and a
+	ret z
+	ld a, [wFwT_Lim]
+	ld b, a
+	ldh a, [hOAMBufferOffset]
+	add 16
+	cp b
+	jr z, .fit
+	ret nc
+.fit
+	ldh [hOAMBufferOffset], a
+	; うしろからずらす
+	sub 16
+	ld c, a                       ; ずらすバイト数
+	ld h, HIGH(wShadowOAM)
+	ld l, a
+	dec l                         ; もとの最後
+	ld d, h
+	add 16 - 1
+	ld e, a                       ; 新しい最後
+	ld a, c
+	and a
+	jr z, .put
+.move
+	ld a, [hld]
+	ld [de], a
+	dec e
+	dec c
+	jr nz, .move
+.put
+	ld hl, wShadowOAM
+	ld a, [wFwT_Y]
+	sub 16
+	ld b, a
+	ld a, [wFwT_X]
+	ld c, a
+	ld d, EMOTE_TILE
+	ld e, FW_MASK_PAL | %00001000
+	call .row
+	ld a, b
+	add 8
+	ld b, a
+.row
+	ld a, b
+	ld [hli], a
+	ld a, c
+	ld [hli], a
+	ld a, d
+	ld [hli], a
+	inc d
+	ld a, e
+	ld [hli], a
+	ld a, b
+	ld [hli], a
+	ld a, c
+	add 8
+	ld [hli], a
+	ld a, d
+	ld [hli], a
+	inc d
+	ld a, e
+	ld [hli], a
+	ret
 
 ; ボールから出る（とじた → 半分 → 開いた。4フレームずつ）
 FwDrawBall:
@@ -1231,5 +1307,393 @@ FwRemoveMon:
 	ld hl, $7D85
 	jp Bankswitch
 
+; --- 話しかける -------------------------------------------------------------------
+;   A ボタンで前を調べる所（$00:$3F85 の call IsSpriteOrSignInFrontOfPlayer のあとの farcall $0A:$7800）を
+;   ここにする。元の処理のあと、人・看板などがなく（hSpriteIndexOrTextID = 0）、連れ歩きが前にいれば、
+;   ふりむいて鳴き、気持ちのアイコンを出して会話（会話文案.md）。テキストは DisplayTextID に
+;   テキストの表をかえて出す（wTextPredefFlag の bit0 でマップのバンクにしない）。
+DEF hSpriteIndexOrTextID EQU $FF8C
+DEF hRandomAdd EQU $FFD3
+DEF wTextPredefFlag EQU $CF0C
+DEF wMapTextPtr EQU $D2EB
+DEF wPartyMon1Status EQU $D12B + 4
+DEF wPartyMonNicks EQU $D257
+DEF PlayCry EQU $13EA
+DEF FW_TEXT_ID EQU $81             ; 表の n 番目 = $81 + n（(ID−1)×2 の下8ビットが 2n になる）
+DEF NUGGET EQU $31
+DEF EMOTE_TILE EQU 61
+DEF wFwEmote EQU $D027             ; WRAM7：気持ちのアイコン（0 = なし、1〜7）
+DEF wFwDrawn EQU $D036             ; WRAM7：このフレームに連れ歩きをかいた
+DEF wFwSel EQU $D037               ; WRAM7：FwWant の手持ちの番号
+
+SECTION "連れ歩き 話しかける 入口", ROM0[FwTalkHookAddr]
+	ld b, BANK(FwTalkCheck)
+	ld hl, FwTalkCheck
+
+SECTION "連れ歩き 話しかける", ROMX[$7400], BANK[FOLLOW_BANK]
+FwTalkCheck:
+	ld b, $0A
+	ld hl, $7800
+	call Bankswitch
+	ldh a, [hSpriteIndexOrTextID]
+	and a
+	ret nz
+	ld a, W7
+	ldh [rSVBK], a
+	call FwFront
+	ld a, 0
+	ldh [rSVBK], a
+	ret nc
+	call FwTalk
+	xor a
+	ldh [hSpriteIndexOrTextID], a
+	ret
+
+; WRAM7 で：連れ歩きが主人公のとなりで止まっていて見えていれば carry、c = 連れ歩きのいる向き（主人公から見て）
+;   初代はその場でふりむくのがむずかしいので、前でなくても となりにいれば主人公がそちらを向いて話す
+FwFront:
+	ld a, [wFwDrawn]
+	and a
+	ret z
+	ld a, [wFwBallT]
+	and a
+	ret nz
+	ld hl, wFwOX
+	ld a, [wFwTX]
+	cp [hl]
+	ret nz
+	ld b, [hl]                    ; OX
+	inc hl
+	ld a, [wFwTY]
+	cp [hl]
+	ret nz
+	ld e, [hl]                    ; OY
+	ld d, b
+	ld c, $00                     ; 下
+	ld a, d
+	and a
+	jr nz, .side
+	ld a, e
+	cp 16
+	jr z, .ok
+	ld c, $04                     ; 上
+	cp -16 & $FF
+	jr z, .ok
+	and a
+	ret
+.side
+	ld a, e
+	and a
+	ret nz
+	ld c, $08                     ; 左
+	ld a, d
+	cp -16 & $FF
+	jr z, .ok
+	ld c, $0C                     ; 右
+	cp 16
+	jr z, .ok
+	and a
+	ret
+.ok
+	push bc
+	call FwWant
+	pop bc
+	ld a, e
+	and a
+	ret z
+	ld a, d
+	and a
+	ret nz
+	scf
+	ret
+
+FwTalk:
+	; 主人公が連れ歩きのほうを向く
+	ld a, c
+	ld [wPlayerFacing], a
+	; 連れ歩きがふりむく
+	xor $04
+	ld b, a
+	ld a, W7
+	ldh [rSVBK], a
+	ld a, b
+	ld [wFwDir], a
+	ld a, [wFwSel]
+	ld b, a
+	xor a
+	ldh [rSVBK], a
+	ld a, b
+	ld [wWhichPokemon], a
+	ld c, 4
+	call DelayFrames
+	; 鳴く
+	ld a, [wWhichPokemon]
+	ld hl, wPartySpecies
+	call FwAddA
+	ld a, [hl]
+	ld [wFwTalkSpecies], a
+	call PlayCry
+	; 名前
+	ld a, [wWhichPokemon]
+	ld hl, wPartyMonNicks
+	ld bc, 6
+	call FwAddTimes
+	ld de, wNameBuffer
+	ld bc, 6
+	call CopyData8
+	; 会話をえらぶ → a = 文の番号
+	call FwPickText
+	ld [wFwTalkText], a
+	; 気持ちのアイコン
+	ld hl, FwTalkEmotes
+	call FwAddA
+	ld a, [hl]
+	call FwShowEmote
+	; テキスト
+	ld hl, wMapTextPtr
+	ld a, [hli]
+	ld e, a
+	ld a, [hl]
+	ld d, a
+	push de
+	ld a, HIGH(FwTalkTexts)
+	ld [hld], a
+	ld [hl], LOW(FwTalkTexts)
+	ld hl, wTextPredefFlag
+	set 0, [hl]
+	ld a, [wFwTalkText]
+	add FW_TEXT_ID
+	ldh [hSpriteIndexOrTextID], a
+	call DisplayTextID
+	pop de
+	ld hl, wMapTextPtr
+	ld a, e
+	ld [hli], a
+	ld [hl], d
+	ret
+
+DEF wFwTalkSpecies EQU $CD68 + 8   ; wNameBuffer のうしろ（話しかけている間だけ）
+DEF wFwTalkText EQU $CD68 + 9
+DEF wFwTalkTypes EQU $CD68 + 12
+
+FwAddA:
+	add l
+	ld l, a
+	ret nc
+	inc h
+	ret
+
+FwAddTimes: ; hl += a × bc
+	and a
+	ret z
+.l
+	add hl, bc
+	dec a
+	jr nz, .l
+	ret
+
+; 気持ちのアイコン a（0〜6）を 約40フレーム出す
+FwShowEmote:
+	push af
+	; 絵（VRAM1 タイル 61〜64）
+	ld l, a
+	ld h, 0
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	add hl, hl                    ; × 64
+	ld bc, FwEmoteGfx
+	add hl, bc
+	ld b, h
+	ld c, l
+	di
+	ldh a, [rVBK]
+	ld e, a
+	ld a, 1
+	ldh [rVBK], a
+	ld hl, $8000 + EMOTE_TILE * 16
+	ld d, 64
+.tile
+	ldh a, [rSTAT]
+	and 2
+	jr nz, .tile
+	ld a, [bc]
+	ld [hli], a
+	inc bc
+	dec d
+	jr nz, .tile
+	ld a, e
+	ldh [rVBK], a
+	ei
+	pop af
+	inc a
+	call .set
+	ld c, 40
+	call DelayFrames
+	xor a
+	call .set
+	ld c, 2
+	jp DelayFrames
+.set
+	ld b, a
+	ld a, W7
+	ldh [rSVBK], a
+	ld a, b
+	ld [wFwEmote], a
+	xor a
+	ldh [rSVBK], a
+	ret
+
+; 会話をえらぶ（a = 文の番号）
+FwPickText:
+	; 1. 状態異常
+	ld a, [wWhichPokemon]
+	ld hl, wPartyMon1Status
+	ld bc, PARTYMON_LEN
+	call FwAddTimes
+	ld a, [hl]
+	ld b, a
+	and %111
+	ld a, FWT_SLEEP
+	ret nz
+	bit 3, b
+	ld a, FWT_POISON
+	ret nz
+	bit 4, b
+	ld a, FWT_BURN
+	ret nz
+	bit 5, b
+	ld a, FWT_FREEZE
+	ret nz
+	bit 6, b
+	ld a, FWT_PARALYZE
+	ret nz
+	; 2. カントー（種類・タイプと場所）
+	call FwGetTypes
+	ld hl, FwTalkRules
+.rule
+	ld a, [hli]
+	cp $FF
+	jr z, .normal
+	ld b, a                       ; 0 種類・1 タイプ
+	ld c, 0                       ; あてはまったら 1
+.val
+	ld a, [hli]
+	cp $FF
+	jr z, .maps
+	ld e, a
+	ld a, b
+	and a
+	jr nz, .type
+	ld a, [wFwTalkSpecies]
+	cp e
+	jr nz, .val
+	ld c, 1
+	jr .val
+.type
+	ld a, [wFwTalkTypes]
+	cp e
+	jr z, .tyOk
+	ld a, [wFwTalkTypes + 1]
+	cp e
+	jr nz, .val
+.tyOk
+	ld c, 1
+	jr .val
+.maps
+	ld a, [wCurMap]
+	ld e, a
+.map
+	ld a, [hli]
+	cp $FF
+	jr z, .next
+	cp e
+	jr nz, .map
+	ld a, c
+	and a
+	jr z, .map
+	; あてはまった：文の数 [hl]、はじめ [hl+1] からランダム
+.skip
+	ld a, [hli]
+	cp $FF
+	jr nz, .skip
+	ld a, [hli]
+	ld b, a
+	ld c, [hl]
+	ldh a, [hRandomAdd]
+.mod
+	cp b
+	jr c, .modd
+	sub b
+	jr .mod
+.modd
+	add c
+	ret
+.next
+	inc hl
+	inc hl
+	jr .rule
+.normal
+	; 4. ふつう（たまに どうぐを見つける）
+	ldh a, [hRandomAdd]
+	and 31
+	ld a, FWT_FOUND
+	ret z
+	ld a, FWT_NORMAL
+	ret
+
+; wFwTalkTypes に タイプ2つ（種族値の表：ずかん番号−1 × 28 ＋ 6。ミュウはバンク1）
+FwGetTypes:
+	ld a, [wFwTalkSpecies]
+	dec a
+	ld hl, POKEDEX_ORDER
+	call FwAddA
+	ld de, wFwTalkTypes
+	ld bc, 1
+	ld a, $10
+	call FarCopyData
+	ld a, [wFwTalkTypes]
+	cp 151
+	jr z, .mew
+	dec a
+	ld hl, $43DE + 6
+	ld bc, 28
+	call FwAddTimes
+	ld a, $0E
+	jr .copy
+.mew
+	ld hl, $4112 + 6
+	ld a, $01
+.copy
+	ld de, wFwTalkTypes
+	ld bc, 2
+	jp FarCopyData
+
+; どうぐを見つけた（テキストの中の TX_ASM から）
+FwFoundAsm:
+	ld hl, FwText_FoundMsg
+	call PrintText
+	call YesNoChoice
+	ld a, [wCurrentMenuItem]
+	and a
+	jr nz, .end
+	ld b, NUGGET
+	ld c, 1
+	call GiveItem
+	jr nc, .end
+	ld hl, FwText_Got
+	call PrintText
+.end
+	ld hl, .at
+	ret
+.at
+	db "@"
+
+FwEmoteGfx:
+	INCBIN "kit/follow/emotes.2bpp"
+
+INCLUDE "follow_talk.inc"
 
 ENDC
