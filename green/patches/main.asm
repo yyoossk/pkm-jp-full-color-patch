@@ -6,7 +6,10 @@
 ;   版の 番号は ED_0〜ED_11（tools/build.py の EDITIONS の じゅん）で、IF DEF(ED_4) などで 分けられる。
 ; ・処理の 名前と 番地は ../disasm/ の 逆アセンブル（と ../disasm/include/home_names.inc）を 見る。
 
-INCLUDE "charmap.asm"   ; 字の 番号（pokegold の 日本語の charmap と 同じ。緑で 「ベ」は 「べ」）
+INCLUDE "charmap.asm"
+IF DEF(ED_0) || DEF(ED_4) || DEF(ED_8) || DEF(ED_10)
+DEF FOLLOW EQU 1        ; 連れ歩きを 入れる 版（金銀グラフィックの 追加機能の 版）
+ENDC   ; 字の 番号（pokegold の 日本語の charmap と 同じ。緑で 「ベ」は 「べ」）
 
 ; ===== 直し：Ver.1.8.1 =====
 IF !DEF(ED_2) && !DEF(ED_3) && !DEF(ED_6) && !DEF(ED_7)   ; カラー化のみの 版には 当てない
@@ -289,6 +292,9 @@ KitSignGlyph:
 ; VBlank：看板の 出入りと、看板に かかる スプライトを かくす。そのあと 元の 「使わない OAM を 消す」
 ;   hWY = $70 … 上へ 2ドット、hWY = $90 … 下へ 2ドット、それ 以外 … すぐ やめる
 KitOAMSignHide:
+IF DEF(FOLLOW)
+	call FwFrame          ; 連れ歩きを OAM に 足す（看板の 下に かくす 前に）
+ENDC
 	ldh a, [rSVBK_]
 	ld e, a
 	ld a, 7
@@ -533,5 +539,10 @@ KitBattleAttrVLine:
 
 ; ５．ずかんの キット（タイプ・進化・種族値）
 INCLUDE "dex_types.asm"
+
+IF DEF(FOLLOW)
+; ６．連れ歩き（全ポケモン）
+INCLUDE "follow.asm"
+ENDC
 
 ENDC
