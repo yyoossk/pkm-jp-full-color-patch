@@ -679,8 +679,9 @@ FwDraw:
 	jr nz, .stand
 	set 5, e
 .stand
+	; 横の絵（キットの絵）は右を向いているので、左へ行くときに左右反転する
 	ld a, [wFwDir]
-	cp $0C
+	cp $08
 	jr nz, .noFlip
 	ld a, e
 	xor %00100000

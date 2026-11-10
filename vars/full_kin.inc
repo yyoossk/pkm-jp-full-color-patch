@@ -16,3 +16,6 @@ DEF FwTalkHookAddr EQU $3F88
 DEF PrintText EQU $3BD5
 DEF YesNoChoice EQU $35AB
 DEF GiveItem EQU $3DBC
+DEF HAS_MOVE_RELEARN EQU 1     ; わざを思い出させてくれる人がいる
+DEF ListMenuGetNameAddr EQU $2CAE ; リストメニューで A：「ld a, 1 / ld [$D094], a / call GetName」
+DEF GetName EQU $3711

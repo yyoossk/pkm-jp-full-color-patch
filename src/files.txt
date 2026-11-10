@@ -7,3 +7,4 @@ src/place_sign_crystal.asm
 src/enemy_hud_frame.asm
 src/dex_types.asm
 src/follow.asm
+src/relearn_fix.asm
