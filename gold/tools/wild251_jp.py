@@ -35,6 +35,7 @@ for l in open(sys.argv[3].replace('かえる枠_金.txt', 'wild251_gold.txt'), e
 SWAP = {'PHANPY': 'TEDDIURSA', 'TEDDIURSA': 'PHANPY', 'DONPHAN': 'URSARING', 'URSARING': 'DONPHAN'}
 TIMES = {'朝': 0, '昼': 1, '夜': 2}
 bad = 0
+ok = 0
 for l in open(sys.argv[3], encoding='utf-8'):
     p = l.split()
     if len(p) < 7: continue
@@ -54,8 +55,9 @@ for l in open(sys.argv[3], encoding='utf-8'):
     i = TIMES[t] * 7 + int(slot.replace('わくめ', '')) - 1
     off = 5 + 2 * i
     tb = T[mp][1]
-    if tb[off + 1] != MON[old]:
+    if tb[off + 1] != MON[old] or tb[off] != int(oldlv[2:]):
         print('ちがう', mp, t, slot, 'ROM は', tb[off], [k for k, x in MON.items() if x == tb[off + 1]], 'キットは', old, oldlv); bad += 1
+    ok += 1
     tb[off] = int(newlv[2:]); tb[off + 1] = MON[new]
 out = ['; 251ひき そろう版の 出現表（src/wild_gold.asm の 殿堂入りの 前の 書きかえ ＋ キットの かえる枠_金.txt。tools/wild251_jp.py で 作った）', '']
 for mp in order:
@@ -63,4 +65,4 @@ for mp in order:
     out.append('SECTION "wild %s", ROMX[$%04x], BANK[$%02x]' % (mp, a % 0x4000 + 0x4000, a // 0x4000))
     out.append('\tdb ' + ', '.join('$%02x' % x for x in tb))
 open(sys.argv[5], 'w', encoding='utf-8').write('\n'.join(out) + '\n')
-print('maps', len(order), 'ちがう', bad)
+print('maps', len(order), 'わく', ok, 'ちがう', bad)
