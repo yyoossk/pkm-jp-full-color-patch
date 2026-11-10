@@ -388,7 +388,7 @@ FwStarOam:
 	swap a
 	add 16                 ; 名前の 行（2 × 番号 行め）
 	ld [hli], a
-	ld a, 10 * 8 + 8       ; 10 マスめ
+	ld a, 7 * 8 + 8        ; 7 マスめ（じょうたいの 字「ねむり」「こおり」「ひんし」の すぐ 左。8〜10 マスめに かさならない）
 	ld [hli], a
 	ld a, LOW(FW_VRAM_STAR / 16)
 	ld [hli], a
