@@ -8,3 +8,6 @@ DEF JoypadLowSensitivity EQU $37D7
 DEF GetItemName EQU $2F85
 DEF PrintNumber EQU $3BEB
 DEF HAS_FOLLOW EQU 1           ; 連れ歩き（金銀グラフィックの完全版・151匹そろう版）
+DEF HandleMenuInput_ EQU $3A68
+DEF PlaceUnfilledArrowMenuCursor EQU $3B78
+DEF RemovePokemonStub EQU $38C5

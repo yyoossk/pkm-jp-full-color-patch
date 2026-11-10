@@ -3,3 +3,6 @@ DEF Bankswitch EQU $351D
 DEF HAS_KIT_HUD EQU 0           ; カラー化のみ：HUD にキットの呼び出しはない
 DEF HAS_PLACE_SIGN EQU 0        ; カラー化のみ：場所の名前の看板はない
 DEF HAS_FOLLOW EQU 0           ; 連れ歩き（金銀グラフィックの完全版・151匹そろう版）
+DEF HandleMenuInput_ EQU $3A68
+DEF PlaceUnfilledArrowMenuCursor EQU $3B78
+DEF RemovePokemonStub EQU $38C5

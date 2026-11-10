@@ -980,4 +980,256 @@ FollowerVBlank::
 	ldh [rSVBK], a
 	ret
 
+; --- 手持ちの画面：SELECT で連れ歩くポケモンをえらぶ（赤い ★） -------------------------
+;   HandlePartyMenuInput（$00:$1474）の「call HandleMenuInput_ / call PlaceUnfilledArrowMenuCursor /
+;   ld b, a / xor a」を、ここをよぶ形にする。SELECT ならえらんでもう一度まつ。ほかのキーなら
+;   b = キーで $1489 にもどる。★は OAM の 40枚目（VRAM1 タイル 60・パレット6。パレットはぬけるときにもどす）。
+DEF wMenuWatchedKeysInit EQU $1467 ; PartyMenuInit の「ld a, A_BUTTON | B_BUTTON」
+DEF wCurrentMenuItem EQU $CC26
+DEF wMenuItemToSwap EQU $CC35
+DEF wPartyMenuAnimMonEnabled EQU $D078
+DEF wWhichPokemon EQU $CF79
+DEF wRemoveMonFromBox EQU $CF7C
+DEF STAR_TILE EQU 60
+DEF STAR_OAM EQU wShadowOAM + 39 * 4
+DEF rSTAT EQU $FF41
+DEF wFwSavedPal EQU $D040         ; WRAM7：手持ちの画面に入るときのパレット6
+DEF SFX_SELECT EQU $90
+
+SECTION "連れ歩き 手持ちの SELECT を見る", ROM0[$1467]
+	ld a, PAD_A | PAD_B | 4
+
+SECTION "連れ歩き 手持ちの入力", ROM0[$147E]
+	ld b, BANK(FwPartyInput)
+	ld hl, FwPartyInput
+	call Bankswitch
+
+SECTION "連れ歩き 手持ちの入れかえ", ROM0[$14E4]
+	ld b, BANK(FwPartySwap)
+	ld hl, FwPartySwap
+	call Bankswitch
+
+SECTION "連れ歩き 手持ちからのぞく", ROM0[RemovePokemonStub]
+	ld hl, FwRemoveMon
+	ld b, BANK(FwRemoveMon)
+	jp Bankswitch
+
+SECTION "連れ歩き 手持ち", ROMX[$7000], BANK[FOLLOW_BANK]
+FwPartyInput:
+	call FwStarStart
+.loop
+	call FwStarPut
+	call HandleMenuInput_
+	call PlaceUnfilledArrowMenuCursor
+	ld b, a
+	bit 2, b                      ; SELECT
+	jr z, .out
+	ld a, [wMenuItemToSwap]
+	and a
+	jr nz, .loop                  ; 入れかえの相手をえらんでいるとき
+	ld a, [wPartyCount]
+	and a
+	jr z, .loop
+	ld a, [wCurrentMenuItem]
+	ld c, a
+	ld a, [wFollowSel]
+	cp c
+	ld a, c
+	jr nz, .set
+	ld a, $FF                     ; もう一度で だれも連れ歩かない
+.set
+	ld [wFollowSel], a
+	ld a, SFX_SELECT
+	call PlaySound
+	jr .loop
+.out
+	push bc
+	call FwStarEnd
+	pop bc
+	xor a
+	ld [wPartyMenuAnimMonEnabled], a
+	pop hl                        ; Bankswitch のもどり先
+	pop af                        ; もとのバンク
+	pop hl                        ; $1486
+	ld hl, $1489
+	push hl
+	jp Bankswitch + $10           ; ldh [hLoadedROMBank], a / ld [$2000], a / ret
+
+; ★の絵と色
+FwStarStart:
+	; 絵（VRAM1 タイル 60）
+	di
+	ldh a, [rVBK]
+	ld e, a
+	ld a, 1
+	ldh [rVBK], a
+	ld hl, $8000 + STAR_TILE * 16
+	ld bc, FwStarGfx
+	ld d, 16
+.tile
+	ldh a, [rSTAT]
+	and 2
+	jr nz, .tile
+	ld a, [bc]
+	ld [hli], a
+	inc bc
+	dec d
+	jr nz, .tile
+	ld a, e
+	ldh [rVBK], a
+	ei
+	; 色（パレット6 をとっておいて赤に）
+	; W2 → W7 へ 8バイト（バンクを1バイトずつかえる）
+	ld hl, W2_ObjPals + FW_PAL * 8
+	ld c, 8
+	ld de, wFwSavedPal
+.save
+	ld a, 2
+	ldh [rSVBK], a
+	ld a, [hli]
+	ld b, a
+	ld a, W7
+	ldh [rSVBK], a
+	ld a, b
+	ld [de], a
+	inc de
+	dec c
+	jr nz, .save
+	xor a
+	ldh [rSVBK], a
+	ld hl, FwStarPal
+	jp FwPutPal6
+
+; hl = 8バイトをパレット6（もとの色・今の色）に書いて送る。WRAM バンクは 0 にしてもどる
+FwPutPal6:
+	xor a
+	ldh [rSVBK], a
+	ld de, W2_ObjPals + FW_PAL * 8
+	push hl
+	call .copy
+	pop hl
+	ld de, W2_ObjPalsNow + FW_PAL * 8
+	call .copy
+	ld a, 2
+	ldh [rSVBK], a
+	ld a, 1
+	ld [W2_ObjPalSend], a
+	xor a
+	ldh [rSVBK], a
+	ret
+.copy
+	ld c, 8
+.c1
+	ld a, W7                      ; hl は ROM か WRAM7
+	ldh [rSVBK], a
+	ld a, [hli]
+	ld b, a
+	ld a, 2
+	ldh [rSVBK], a
+	ld a, b
+	ld [de], a
+	inc de
+	dec c
+	jr nz, .c1
+	xor a
+	ldh [rSVBK], a
+	ret
+
+FwStarEnd:
+	ld a, $A0
+	ld [STAR_OAM], a
+	ld hl, wFwSavedPal
+	jp FwPutPal6
+
+FwStarPut:
+	ld a, [wFollowSel]
+	ld c, a
+	ld a, [wPartyCount]
+	ld b, a
+	ld a, c
+	cp b
+	ld a, $A0
+	jr nc, .y
+	ld a, c
+	swap a                        ; × 16
+	add 16
+.y
+	ld hl, STAR_OAM
+	ld [hli], a
+	ld a, 9 * 8 + 8
+	ld [hli], a
+	ld a, STAR_TILE
+	ld [hli], a
+	ld [hl], FW_PAL | %00001000
+	ret
+
+FwStarPal:
+	dw $7FFF, 31 | 2 << 5 | 2 << 10, 16 | 0 << 5 | 0 << 10, 0
+FwStarGfx: ; ★（色1・ふちは色2）
+	db %00010000, %00010000
+	db %00010000, %00111000
+	db %01111100, %11111110
+	db %00111000, %01111100
+	db %00111000, %01111100
+	db %01101100, %11111110
+	db %01000100, %11000110
+	db %00000000, %00000000
+
+; 入れかえ（$04:$67EB）のまわり：2つの番号を見て、えらんだポケモンの番号も入れかえる
+FwPartySwap:
+	ld a, [wMenuItemToSwap]
+	and a
+	jr z, .call                   ; 1つ目をえらんだだけ
+	dec a
+	ld d, a
+	ld a, [wCurrentMenuItem]
+	ld e, a
+	push de
+	call .call
+	pop de
+	ld a, d
+	cp e
+	ret z
+	ld a, [wFollowSel]
+	cp d
+	jr nz, .notD
+	ld a, e
+	ld [wFollowSel], a
+	ret
+.notD
+	cp e
+	ret nz
+	ld a, d
+	ld [wFollowSel], a
+	ret
+.call
+	ld b, $04
+	ld hl, $67EB
+	jp Bankswitch
+
+; 手持ちからのぞく（あずける・にがす など）：えらんだポケモンより前がぬけたら番号を1つへらす
+FwRemoveMon:
+	ld a, [wRemoveMonFromBox]
+	and a
+	jr nz, .call
+	ld a, [wWhichPokemon]
+	ld c, a
+	ld a, [wFollowSel]
+	cp 6
+	jr nc, .call
+	cp c
+	jr c, .call
+	jr nz, .dec
+	xor a                         ; 連れ歩いていたポケモン：先頭にする
+	jr .set
+.dec
+	dec a
+.set
+	ld [wFollowSel], a
+.call
+	ld b, $01
+	ld hl, $7D85
+	jp Bankswitch
+
+
 ENDC

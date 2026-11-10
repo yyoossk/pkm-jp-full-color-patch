@@ -91,3 +91,5 @@ MACRO next ; 文字列の次の行
 	db "<NEXT>", \#
 ENDM
 DEF PlaceString EQU $1993
+
+DEF PlaySound EQU $2345      ; a = 音の番号（どの版も同じ）
