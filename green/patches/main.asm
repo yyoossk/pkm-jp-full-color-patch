@@ -555,6 +555,42 @@ KitBattleAttrVLine:
 ; ５．ずかんの キット（タイプ・進化・種族値）
 INCLUDE "dex_types.asm"
 
+; ７．わざの 思い出し（クチバの ファンクラブ）で 「きりさく」などを えらぶと、こわれて 止まる 直し
+;   思い出しは DisplayListMenuID（リストの ID 1 ＝ わざの リスト）を 使う。リストを かく ときは わざの 名前
+;   （GetMoveName：バンク4）で かくが、えらんだ ときの GetName は いつも どうぐの 名前の バンク（1）を 使う。
+;   わざの 名前の 表（$4000）を バンク1 で 数えて しまい、$50 の ない 20バイトを 写すと、そのあとの
+;   CopyToStringBuffer（$374e）が おわらずに WRAM を 上がきして 止まる（「きりさく」$A3 で おきる）。
+;   リストの ID が 1 の ときは バンク4 に する（ほかの リストは 今まで どおり 1）。
+SECTION "リスト えらんだ 名前の バンク", ROM0[$16f5]
+KitListChosenName:
+	ld a, [$cf7b]        ; wListMenuID
+	cp 3                 ; どうぐの リスト：数を とる
+	jr nz, .notItem
+	inc hl
+	ld a, [hl]
+	ld [$cf7e], a        ; wMaxItemQuantity
+.notItem
+	call $3707           ; GetItemPrice（hl を こわすので 数を とった あと）
+	ld a, [$cf78]        ; wcf91
+	ld [$d092], a        ; wd0b5
+	call KitListNameBank
+	ld [$d094], a        ; wPredefBank
+	call $3693           ; GetName
+	nop
+	; $1714：jr（元の まま）
+SECTION "リスト 名前の バンク", ROM0[$1eee]   ; もとは nop が 13 こ（とおる 所なので jr で とばす）
+KitListNameBankSkip:
+	jr KitListNameBankSkip.skip
+KitListNameBank:
+	ld a, [$cf7b]
+	dec a
+	ld a, $01            ; どうぐの 名前
+	ret nz
+	ld a, $04            ; わざの 名前
+	ret
+	nop
+KitListNameBankSkip.skip
+
 IF DEF(FOLLOW)
 ; ６．連れ歩き（全ポケモン）
 INCLUDE "follow.asm"

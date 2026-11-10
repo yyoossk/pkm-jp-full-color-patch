@@ -774,7 +774,7 @@ FwFrame:
 	add a
 	ld d, a                ; タイルの はじめ
 	ld a, [FW_FACE]
-	cp 2                   ; 横の 絵は 右向き → 左は はんてん
+	cp 3                   ; 横の 絵は 左向き → 右は はんてん
 	ld a, 0
 	jr nz, .noFlip
 	inc a
