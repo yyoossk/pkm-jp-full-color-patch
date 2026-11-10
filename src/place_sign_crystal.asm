@@ -179,18 +179,23 @@ SignFrameGfx:
 
 ; VBlank の中の空き（rst $10 のあとの nop）から呼ぶ
 SECTION "看板 VBlank の呼び出し", ROM0[$1FE7]
+IF HAS_FOLLOW
 	ld b, BANK(VBlankHooks)
 	ld hl, VBlankHooks
+ELSE
+	ld b, BANK(SignVBlank)
+	ld hl, SignVBlank
+ENDC
 	call Bankswitch
 
-FreeBank13
-VBlankHooks:
 IF HAS_FOLLOW
+FreeBank13
+VBlankHooks:                      ; 連れ歩きの VBlank（絵を VRAM へ）のあとに看板
 	ld b, BANK(FollowerVBlank)
 	ld hl, FollowerVBlank
 	call Bankswitch
-ENDC
 	jp SignVBlank
+ENDC
 
 ; ★ WRAM バンクを VBlank に入った時のバンク以外にしているあいだは、
 ;   スタックが $DFxx にあるので call / push / pop を使わない。

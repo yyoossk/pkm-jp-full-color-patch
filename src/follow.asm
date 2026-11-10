@@ -74,6 +74,9 @@ DEF wFwGapNow EQU $D024           ; このフレームは 間があいたあと�
 DEF wFwBallNext EQU $D025         ; 1 = 次に出るときはボールから
 DEF wFwBallT EQU $D026            ; ボールから出るアニメののこり（0 = なし）
 DEF BALL_TIME EQU 12
+DEF wFwJump EQU $D038             ; 主人公が段差をとんでいる
+DEF wFwHop EQU $D039              ; 1 = 次に追いつくとき段差をとぶ
+DEF wFwHopping EQU $D03A          ; 1 = とんでいるところ
 DEF BALL_TILE EQU 48              ; ボールの絵（VRAM1 タイル 48〜59：開いた・半分・とじた）
 DEF wFwPals EQU $D028             ; 8: 正面の色1・色2、後ろ・横の色1・色2
 DEF wFwBuf EQU $D100              ; 絵 384 ＋ 下じき 384（VBlank で VRAM1 $8000 へ）
@@ -282,6 +285,9 @@ FwWant:
 ; 場所を主人公にそろえて、かくす（1歩あるくと出てくる）
 FwReset:
 	xor a
+	ld [wFwJump], a
+	ld [wFwHop], a
+	ld [wFwHopping], a
 	ld [wFwOX], a
 	ld [wFwOY], a
 	ld [wFwTX], a
@@ -386,7 +392,23 @@ FwMove:
 	ld a, [wFwSCY]
 	or b
 	and $0F
-	jr nz, .notStart
+	jp nz, .notStart
+	; 段差：とびはじめはいつもどおり、とんでいるあいだのマスでは行く先をかえない
+	;（連れ歩きは主人公がとんだ所で待ち、主人公が次に歩くと 2マスを とんで追いつく）
+	rd1 c, wMovementFlags
+	bit 6, c
+	jr z, .noJump
+	ld a, [wFwJump]
+	and a
+	jp nz, .notStart
+	ld a, 1
+	ld [wFwJump], a
+	ld [wFwHop], a
+	jr .stepStart
+.noJump
+	xor a
+	ld [wFwJump], a
+.stepStart
 	ld a, [wFwTX]
 	ld [wFwOX], a
 	ld a, [wFwTY]
@@ -442,6 +464,35 @@ FwMove:
 .ay
 	add c
 	ld c, a
+	; 行く先が 1マスより遠ければ 着くまで 2倍の速さ（段差のあと）。段差なら とぶ
+	ld a, [wFwHopping]
+	and a
+	jr nz, .fast
+	ld a, [wFwTX]
+	ld hl, wFwOX
+	sub [hl]
+	add 16
+	cp 33
+	jr nc, .far
+	ld a, [wFwTY]
+	inc hl
+	sub [hl]
+	add 16
+	cp 33
+	jr c, .near
+.far
+	ld a, [wFwHop]
+	and a
+	ld a, 2                       ; 2 = 追いつくだけ
+	jr z, .setHop
+	xor a
+	ld [wFwHop], a
+	inc a                         ; 1 = とぶ
+.setHop
+	ld [wFwHopping], a
+.fast
+	sla c
+.near
 	ld b, 0                       ; うごいたら 1
 	; 横
 	ld hl, wFwOX
@@ -522,6 +573,8 @@ FwMove:
 	ld a, [wFwTY]
 	cp b
 	jr nz, .save
+	xor a
+	ld [wFwHopping], a
 	ld a, d
 	or e
 	jr nz, .save
@@ -544,12 +597,12 @@ DEF wFwT_Lim EQU $D035
 FwDraw:
 	; はなれすぎていたら かかない（念のため）
 	ld a, [wFwOX]
-	add 16
-	cp 33
+	add 32
+	cp 65
 	ret nc
 	ld a, [wFwOY]
-	add 16
-	cp 33
+	add 32
+	cp 65
 	ret nc
 	; OAM の空き（段差・つりのときは最後の4枚を使わない）
 	rd1 c, wMovementFlags
@@ -622,8 +675,10 @@ FwDraw:
 	call FwGrass                  ; d = $80 / 0
 	ld a, d
 	ld [wFwT_Pri], a
+	call FwHopY                   ; b = とんでいる高さ
 	ld a, [wFwOY]
 	add 76
+	sub b
 	ld [wFwT_Y], a
 	ld a, [wFwOX]
 	add 72
@@ -664,6 +719,47 @@ FwDraw:
 	or FW_MASK_PAL | %00001000
 	ld [wFwT_Attr], a
 	jp FwPut4
+
+; b = 段差をとんでいる高さ（のこりの きょり r から、(32−r)×r / 32）
+FwHopY:
+	ld b, 0
+	ld a, [wFwHopping]
+	cp 1
+	ret nz
+	ld hl, wFwOX
+	ld a, [wFwTX]
+	sub [hl]
+	jr nc, .x
+	cpl
+	inc a
+.x
+	ld c, a
+	inc hl
+	ld a, [wFwTY]
+	sub [hl]
+	jr nc, .y
+	cpl
+	inc a
+.y
+	or c                          ; どちらかは 0
+	jr nz, .air
+	xor a
+	ld [wFwHopping], a
+	ret
+.air
+	cp 32
+	ret nc
+	srl a
+	ld hl, FwHopTable
+	add l
+	ld l, a
+	jr nc, .nc
+	inc h
+.nc
+	ld b, [hl]
+	ret
+FwHopTable: ; r/2 = 0〜15
+	db 0, 2, 3, 5, 6, 6, 7, 7, 8, 7, 7, 6, 6, 5, 3, 2
 
 ; 気持ちのアイコン：OAM のはじめに入れる（主人公より手前に出すため、ほかを4枚うしろへずらす）
 FwPutEmote:
