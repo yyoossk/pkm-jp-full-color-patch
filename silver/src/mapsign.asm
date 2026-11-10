@@ -147,7 +147,21 @@ ENDC
 	jr z, MapSign_Hide
 	jr c, MapSign_Hide
 	ld [wMSTimer], a
-	ret
+	; 札を 出した あとで 画面の 色が まとめて 書きなおされる（マップに 入った ときの フェードの さいご など）と
+	; パレット7 が もとの 白に もどって 札が 白く なる → パレット7 の 色0 の 上の バイトを 見て、ちがえば 書きなおす
+	di
+.kp_wait
+	ldh a, [rSTAT_]
+	and 2
+	jr nz, .kp_wait
+	ld a, 7 * 8 + 1
+	ldh [rBCPS_], a
+	ldh a, [rBCPD_]
+	ei
+	cp HIGH(31 | 31 << 5 | 16 << 10)
+	ret z
+	ld hl, .CrystalPal
+	jp MapSign_SetPal7
 
 .first
 	ld a, [wMSState]
