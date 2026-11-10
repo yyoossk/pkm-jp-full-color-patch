@@ -403,6 +403,13 @@ StatusColor_PartyGlyph:
 	; 手持ちの 画面：ますの 色が バンク1（StatusColor_Party が まひ・ねむり に した）なら 色1 の 文字に
 	ld hl, SC_wAttrmap - SC_wTilemap
 	add hl, bc
+	; 状態異常の 文字は ★（色ちがい $5e・連れ歩き $5f）の ますに かさなる ことが ある。
+	; StatusColor_Party は ★の ますの 色を のこすので、文字の 3ます を 1ます目と 同じ 色に そろえる
+	; （ねむり の「む」が バンク0 の 別の 文字に なって いた）
+	ld a, [hli]
+	ld [hli], a
+	ld [hld], a
+	dec hl
 	bit 3, [hl]
 	ret z
 	push bc

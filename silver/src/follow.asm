@@ -1524,6 +1524,12 @@ Fw_PartyMark::
 	ld a, b
 	cp c
 	jr nz, .clear
+	ld a, [hl]                        ; 状態異常の 文字（「ねむり」の「む」など）が ある ますには 書かない
+	cp $7f
+	jr z, .mark
+	cp FW_MARK_TILE2
+	jr nz, .next
+.mark
 	ld [hl], FW_MARK_TILE2
 	ld a, [de]
 	and %11111000
