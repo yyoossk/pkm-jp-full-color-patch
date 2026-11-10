@@ -1056,6 +1056,7 @@ DEF FW_TEXT           EQU $cd7c  ; 看板の バッファを 借りる（文の 
 DEF FW_TEXT_ID        EQU $30
 DEF PlayCry_          EQU $2cb8
 DEF DisplayTextID_    EQU $12f9
+DEF wAutoTextBoxDrawingControl EQU $cf07 ; bit 0 = 1：DisplayTextIDInit（01:7104）が 窓の 枠を かかない
 
 SECTION "連れ歩き 話しかける 所", ROM0[$00b0]
 	ld hl, FwTalkCheck
@@ -1225,9 +1226,17 @@ FwTalk:
 	ldh [hTextID], a
 	ld hl, FW_TEXT - (FW_TEXT_ID - 1) * 2
 	call $3e1f             ; 文の 表を 一時的に かえる（元は $FFEC・$FFED に）
+	; オーキド博士の 研究所などは マップの スクリプトが「窓の 枠を かかない」（$CF07 の bit 0）に して いるので、
+	; 会話の 間だけ 0 に して、あとで 元に もどす（$CF07 を 読むのは DisplayTextIDInit だけ）
+	ld a, [wAutoTextBoxDrawingControl]
+	push af
+	res 0, a
+	ld [wAutoTextBoxDrawingControl], a
 	ld hl, $cf0c
 	set 0, [hl]            ; ROM バンクを かえない
 	call DisplayTextID_
+	pop af
+	ld [wAutoTextBoxDrawingControl], a
 	ld hl, wMapTextPtr
 	ldh a, [$ffec]
 	ld [hli], a

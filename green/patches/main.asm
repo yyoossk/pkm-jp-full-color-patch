@@ -244,7 +244,14 @@ KitSignStart:
 	jp $4733             ; キットの ウインドウ書き
 
 ; 名前の 字形を VRAMバンク1 に 「地＝色1・字＝色3」で 読みこむ（キットの 37:477f の かわり）
+;   字形は 字と 同じ 番号（$8800〜）では なく、看板の バッファの 何番め（0〜79）を タイルの 番号に して
+;   VRAMバンク1 の $9000〜$94FF（フィールドでは あいて いる）に おき、b を その 番号に かえて もどる
+;   （呼ぶ 所は push hl / push bc / push de の あとで call する ので、sp + 6 が バッファの 次の 字）
 KitSignGlyph:
+	ld hl, sp + 6
+	ld a, [hl]
+	sub LOW(wSignBuf) + 1
+	push af               ; タイルの 番号
 	push bc
 	ld a, b
 	sub $80
@@ -253,16 +260,20 @@ KitSignGlyph:
 	add hl, hl
 	add hl, hl
 	add hl, hl
-	push hl
 	ld bc, $4b19
 	add hl, bc
 	ld de, $cee4
 	ld bc, 8
 	ld a, $04
 	call $028c           ; FarCopyData
-	pop hl
+	ld hl, sp + 3        ; push af の a
+	ld l, [hl]
+	ld h, 0
 	add hl, hl
-	ld bc, $8800
+	add hl, hl
+	add hl, hl
+	add hl, hl
+	ld bc, $9000
 	add hl, bc
 	ld d, h
 	ld e, l
@@ -287,6 +298,8 @@ KitSignGlyph:
 	dec c
 	jr nz, .row
 	pop bc
+	pop af
+	ld b, a              ; 窓に 書く タイルの 番号
 	ret
 
 ; VBlank：看板の 出入りと、看板に かかる スプライトを かくす。そのあと 元の 「使わない OAM を 消す」
