@@ -1693,6 +1693,15 @@ Fw_FixOAM::
 	ldh a, [hUsedSpriteIndex]
 	and a
 	ret z
+	cp $a0
+	jr c, .search
+	; OAM が もう いっぱい（人が 多い 所）：したじきは おけないので OAM の 中は さがさない。
+	; 向きの 色だけ 連れ歩きの オブジェクトの 向きで 見る（クリスタルの Fw_Underlay と 同じ）
+	call Fw_FindSlot
+	ret c
+	call Fw_FaceClass
+	jp Fw_FaceCheck
+.search
 	add 3
 	ld c, a                           ; おわり ＋ 3（属性の 場所で くらべる）
 	ld hl, wShadowOAM + 3

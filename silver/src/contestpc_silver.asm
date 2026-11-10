@@ -23,6 +23,10 @@ DEF CP_wNamedObjectIndex EQU $d143
 DEF CP_wCurPartySpecies EQU $cffe
 DEF CP_wCurSpecies     EQU $ce54
 DEF CP_wStringBuffer1  EQU $cf87
+DEF CP_wCurBox         EQU $d8af
+DEF CP_sBox            EQU $ad10      ; SRAM バンク1（いまの ボックス）
+DEF CP_BOX_SIZE        EQU $54a
+DEF CP_wStringBuffer2  EQU $cf92      ; 写す 間：[4] ＝ 元の SRAM バンク・[5] ＝ 先の SRAM バンク。文：[0] ＝ ボックスの 数字・[1] ＝ "@"
 DEF CP_SAVE            EQU $d740      ; 使われていない WRAM（wEventFlags の 前の すき間。$d6e5〜$d70c は 場所の 名前の 札、$d7a0〜 は ほかの 機能）
 DEF CP_BANK            EQU $48
 DEF CP_ADDR            EQU $7700
