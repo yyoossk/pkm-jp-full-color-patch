@@ -17,10 +17,10 @@
   通常版：python3 build.py feat.gbc $(cat buildlist.txt)
   60fps版：python3 build.py feat60.gbc src/fps60.asm $(cat buildlist.txt)
 
-できた ROM の CRC32：通常版 711915B6、60fps版 7AC83D54（リリースの パッチを 当てた ものと 同じ）
+できた ROM の CRC32：通常版 21FAAB83、60fps版 1BD65AFC（Ver.1.4.0 の あとの 直し（場所の 札の 点滅）入り。README.txt の さいご の ほう）
 IPS を 作る：python3 mkips.py feat.gbc 通常版.ips base.gbc
 
 ■ 251匹そろう版（別の 版）
   python3 build.py e.gbc $(cat buildlist251.txt)
   python3 build.py e60.gbc src/fps60.asm $(cat buildlist251.txt)
-  （通常版 ADC14540、60fps版 02EFF5FF。ふつうの 版の ROM は かわらない）
+  （通常版 138AB35E、60fps版 B4DC7511。ふつうの 版の ROM は かわらない）

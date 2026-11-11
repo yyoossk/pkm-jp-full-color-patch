@@ -19,6 +19,8 @@
 ;     VRAM の バンク1 の 同じ 番号の 所に フォント（$3e:$42f2。1bpp）から 写す。わくの 14タイルも バンク1 の $60〜$6d（$9600）に 写す。
 ;     4行 ぜんぶの 色の 表を MS_ATTR（パレット7・バンク1・人より 前）に する。
 ;   ・パレット7 は 出して いる 間だけ クリスタルの 色に かえ、けす ときに wBGPals2 の パレット7 に もどす（メニューの わくの 色）。
+;     札が 出た まま となりの マップに 入った ときは wBGPals2 の パレット7 も 札の 色に して（wMSState の ビット6）、
+;     けす ときに wBGPals1 の パレット7 から もどす（マップの セットアップで パレットが 作りなおされても 白く ならない）。
 ;   ・名前は いちど 置いて から、ほんとうの 長さ（「ばん　どうろ」の まとめ文字も のばした 長さ）で まん中に ずらす。
 ;   ・マップに 入る ときの セットアップの コマンド LoadWildMonData（どの 入り方でも さいごの ほうに ある）の 表の 行を
 ;     MapSign_Init に かえる（LoadWildMonData を 呼んで から、ランドマークが かわって いれば 札を 出す）。
@@ -115,7 +117,7 @@ MapSign_Frame:
 	ld hl, MS_CheckObjectEnteringVisibleRange
 	rst $08
 	ld a, [wMSState]
-	and $7f
+	and $3f
 IF DEF(MS_IDLE)
 	; 札が 出て いない とき：ほかの 機能（銀は サファリの 歩数・ボールの 表示）
 	jr nz, .active
@@ -170,7 +172,9 @@ ENDC
 	ret
 
 .show
-	ld a, $80 | 3                     ; ビット7 ＝ パレット7 を かえた
+	ld a, [wMSState]
+	and $40
+	or $80 | 3                        ; ビット7 ＝ パレット7 を かえた（ビット6 は のこす）
 	ld [wMSState], a
 	call MapSign_PutName              ; 名前を わくの 中に
 	ld a, MS_TIME
@@ -219,6 +223,19 @@ MapSign_Hide:
 	ld a, [wMSState]
 	bit 7, a
 	jr z, .no_pal
+	bit 6, a
+	jr z, .restore
+	; ビット6：wBGPals2 の パレット7 も 札の 色に した → wBGPals1 の パレット7（マップの もとの 色）に もどす
+	ld hl, MS_wBGPals2_7 - $80
+	ld de, MS_wBGPals2_7
+	ld b, 8
+.copy
+	ld a, [hli]
+	ld [de], a
+	inc de
+	dec b
+	jr nz, .copy
+.restore
 	ld hl, MS_wBGPals2_7              ; パレット7 を もとに
 	call MapSign_SetPal7
 .no_pal
@@ -232,7 +249,7 @@ MapSign_Hide:
 
 MapSign_Event:
 	ld a, [wMSState]
-	and $7f
+	and $3f
 	ret z
 	ld a, [MS_wScriptRunning]         ; クリスタルの PlayerEvents .ok と 同じ：つながり・その場で むきを かえる いがいは けす
 	cp 4                              ; PLAYEREVENT_CONNECTION
@@ -245,6 +262,26 @@ MapSign_Init:
 	ld a, MS_LoadWildMonData_BANK
 	ld hl, MS_LoadWildMonData
 	rst $08
+	; 札が 出た まま となりの マップに 入った とき：マップの セットアップ（LoadMapPalettes・ApplyMapPalettes）が
+	; wBGPals2 を 作りなおして つぎの VBlank で パレット7 が 白に もどり、新しい 名前が 出る まで 札が 白く 点滅する
+	; → wBGPals2 の パレット7 も 札の 色に して（ビット6）、すぐ パレット7 も 書く。けす ときに wBGPals1 から もどす
+	ld a, [wMSState]
+	bit 7, a
+	jr z, .keep_done
+	or $40
+	ld [wMSState], a
+	ld hl, MapSign_Frame.CrystalPal
+	ld de, MS_wBGPals2_7
+	ld b, 8
+.keep_copy
+	ld a, [hli]
+	ld [de], a
+	inc de
+	dec b
+	jr nz, .keep_copy
+	ld hl, MapSign_Frame.CrystalPal
+	call MapSign_SetPal7
+.keep_done
 	ld a, [MS_wMapGroup]
 	ld b, a
 	ld a, [MS_wMapNumber]
@@ -416,7 +453,7 @@ MapSign_Init:
 
 	; 名前を 入れて 出すのは 歩く ループの 2回め（MapSign_Frame）
 	ld a, [wMSState]
-	and $80
+	and $c0
 	or 1
 	ld [wMSState], a
 	ret
