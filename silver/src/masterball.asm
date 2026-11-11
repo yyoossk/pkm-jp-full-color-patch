@@ -59,6 +59,20 @@ MasterBallGetMart: ; e = 店の 番号 → b = 表の バンク、de = 表
 SECTION "masterball mart", ROMX[MB_ADDR], BANK[MB_BANK]
 MasterBallMart:
 	ld b, MB_GETMART_BANK
+IF DEF(MB_MART_CELADON_3F)
+	; タマムシデパート 3F：メニューで えらんだ わざマシンの 表に（src/tmshop.asm の TmShopMart）
+	ld a, e
+	cp LOW(MB_MART_CELADON_3F)
+	jr nz, .not_tm
+	ld a, d
+	cp HIGH(MB_MART_CELADON_3F)
+	jr nz, .not_tm
+	ld a, BANK(TmShopMart)
+	ld hl, TmShopMart
+	rst $08
+	ret
+.not_tm
+ENDC
 IF DEF(MB_MART251)
 	; 251匹そろう版：コガネデパート 4F（ドーピングの 店）に しんかの いし・おうじゃのしるし を 足した 表に かえる
 	ld a, e
