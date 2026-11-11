@@ -40,6 +40,10 @@ DEF MS_SETUP_ENTRY     EQU $5501      ; バンク$05 MapSetupCommands の LoadWi
 DEF MS_SETUP_BANK      EQU $05
 DEF MS_LoadWildMonData_BANK EQU $0a
 DEF MS_LoadWildMonData EQU $65ef
+; 金：ApplyMapPalettes（$2b）の 行も 札の 色を のこす 処理を 通す
+DEF MS_SETUP_APPLYPALS EQU $554c
+DEF MS_ApplyMapPalettes_BANK EQU $05
+DEF MS_ApplyMapPalettes EQU $55fe
 DEF MS_OW_BANK         EQU $25
 DEF MS_HandleMapObjects EQU $6716    ; farcall HandleNPCStep / farcall _HandlePlayerStep / call _CheckObjectEnteringVisibleRange / ret（16バイト）
 DEF MS_EVENT_CALL      EQU $6792      ; CheckPlayerState の call DoPlayerEvent
@@ -90,6 +94,15 @@ SECTION "mapsign setup", ROMX[MS_SETUP_ENTRY], BANK[MS_SETUP_BANK]
 	db BANK(MapSign_Init)
 	dw MapSign_Init
 
+IF DEF(MS_SETUP_APPLYPALS)
+; つながりの セットアップで ApplyMapPalettes が wBGPals2 を 作りなおして から LoadWildMonData（MapSign_Init）
+; までの 間に VBlank が 入ると、その フレームだけ 札が 白く なった（金で 1フレーム）。
+; 札が 出て いる ときは 割りこみを 止めて ApplyMapPalettes を 呼び、すぐ wBGPals2 の パレット7 を 札の 色に して から 割りこみを もどす
+SECTION "mapsign setup applypals", ROMX[MS_SETUP_APPLYPALS], BANK[MS_SETUP_BANK]
+	db BANK(MapSign_ApplyMapPals)
+	dw MapSign_ApplyMapPals
+ENDC
+
 SECTION "mapsign frame hook", ROMX[MS_HandleMapObjects], BANK[MS_OW_BANK]
 	ld a, BANK(MapSign_Frame)
 	ld hl, MapSign_Frame
@@ -123,7 +136,7 @@ IF DEF(MS_FOLLOW)
 	rst $08
 ENDC
 	ld a, [wMSState]
-	and $7f
+	and $3f                          ; ビット0〜5 ＝ 状態（ビット6・7 は しるし）
 IF DEF(MS_SAFARI_HUD)
 	jr z, .hud                        ; 札が 出て いない：サファリの HUD（src/safari/safari.asm）
 ELSE
@@ -174,14 +187,18 @@ ENDC
 	ret
 
 .show
-	ld a, $80 | 3                     ; ビット7 ＝ パレット7 を かえた
+	ld a, [wMSState]
+	and $40                          ; ビット6（wBGPals2 の パレット7 も 札の 色）は のこす
+	or $80 | 3                        ; ビット7 ＝ パレット7 を かえた
 	ld [wMSState], a
 	call MapSign_PutName              ; 名前を わくの 中に
 	ld a, MS_TIME
 	ld [wMSTimer], a
 	ldh a, [MS_hVBlankCounter]
 	ld [wMSLast], a
-	; パレット7 を クリスタルの 文字の 色に
+	; パレット7 を クリスタルの 文字の 色に。wBGPals2 の パレット7 も 札の 色に して おく（ビット6）。
+	; しないと、札が 出て いる 間に だれかが 色の 書きこみ（hCGBPalUpdate）を たのむと、つぎの VBlank で 白に もどる
+	call MapSign_KeepPals2
 	ld hl, .CrystalPal
 	call MapSign_SetPal7
 	ld a, 7
@@ -228,6 +245,18 @@ MapSign_Hide:
 	ld a, [wMSState]
 	bit 7, a
 	jr z, .no_pal
+	bit 6, a
+	jr z, .restore
+	ld hl, MS_wBGPals2_7 - $80        ; wBGPals1 の パレット7（マップの もとの 色）を wBGPals2 に もどす
+	ld de, MS_wBGPals2_7
+	ld b, 8
+.copy
+	ld a, [hli]
+	ld [de], a
+	inc de
+	dec b
+	jr nz, .copy
+.restore
 .wait_ly
 	ldh a, [$ff44]                    ; rLY：札の 行（112〜143）を かいて いる 間は まつ
 	sub $70
@@ -241,9 +270,47 @@ MapSign_Hide:
 	ld [wMSTimer], a
 	ret
 
+IF DEF(MS_SETUP_APPLYPALS)
+MapSign_ApplyMapPals:
+	ld a, [wMSState]
+	bit 7, a
+	jr z, .plain
+	di                                ; この 間の VBlank で 白い パレット7 が 画面に 出ない ように
+	ld a, MS_ApplyMapPalettes_BANK
+	ld hl, MS_ApplyMapPalettes
+	rst $08
+	call MapSign_KeepPals2
+	ei
+	ret
+.plain
+	ld a, MS_ApplyMapPalettes_BANK
+	ld hl, MS_ApplyMapPalettes
+	rst $08
+	ret
+ENDC
+
+; 札が 出て いれば wBGPals2 の パレット7 を 札の 色に して ビット6 を 立てる（nz）。出て いなければ z
+MapSign_KeepPals2:
+	ld a, [wMSState]
+	bit 7, a
+	ret z
+	or $40
+	ld [wMSState], a
+	ld hl, MapSign_Frame.CrystalPal
+	ld de, MS_wBGPals2_7
+	ld b, 8
+.copy
+	ld a, [hli]
+	ld [de], a
+	inc de
+	dec b
+	jr nz, .copy
+	or 1                              ; nz
+	ret
+
 MapSign_Event:
 	ld a, [wMSState]
-	and $7f
+	and $3f                          ; ビット0〜5 ＝ 状態（ビット6・7 は しるし）
 	ret z
 	ld a, [MS_wScriptRunning]         ; クリスタルの PlayerEvents .ok と 同じ：つながり・その場で むきを かえる いがいは けす
 	cp 4                              ; PLAYEREVENT_CONNECTION
@@ -256,6 +323,14 @@ MapSign_Init:
 	ld a, MS_LoadWildMonData_BANK
 	ld hl, MS_LoadWildMonData
 	rst $08
+	; 札が 出て いる ときは、マップの セットアップ（LoadMapPalettes・ApplyMapPalettes）が 作りなおした
+	; wBGPals2 の パレット7 も 札の 色に する。しないと つぎの VBlank で パレット7 が 白に もどり、
+	; 新しい 名前が 出るまで 札が 白く なる。ビット6 ＝ wBGPals2 も かえた（Hide で もとに もどす）
+	call MapSign_KeepPals2
+	jr z, .keep_done
+	ld hl, MapSign_Frame.CrystalPal
+	call MapSign_SetPal7
+.keep_done
 	ld a, [MS_wMapGroup]
 	ld b, a
 	ld a, [MS_wMapNumber]
@@ -427,7 +502,7 @@ MapSign_Init:
 
 	; 名前を 入れて 出すのは 歩く ループの 2回め（MapSign_Frame）
 	ld a, [wMSState]
-	and $80
+	and $c0
 	or 1
 	ld [wMSState], a
 	ret
@@ -540,5 +615,7 @@ MapSign_VPut:
 ; 札を 出さない 場所（$ff ＝ ゲート・0 ＝ とくべつ・ラジオとう・ちかつうろ・はつでんしょ・シオンの ラジオとう・セキエイこうげん）
 MapSign_Skip: db $ff, $00, $11, $3a, $43, $45, $59, $fe
 
+; 札の 絵は べつの セクション（同じ バンクの 空き）。札の 処理が 大きく なって $5c00 の prizetm texts に とどいたため
+SECTION "mapsign gfx", ROMX[$6f00], BANK[MS_BANK]   ; partyshiny（$6e00〜）の あとの 空き
 MapSign_FrameGFX:
 	INCBIN "gfxdata/map_entry_sign.2bpp"      ; クリスタルの gfx/frames/map_entry_sign.png（14タイル）
