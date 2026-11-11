@@ -143,8 +143,13 @@ def _counts(d,frames):
             for y in range(8):
                 for x in range(8): n[((t[y*2]>>(7-x))&1)|(((t[y*2+1]>>(7-x))&1)<<1)]+=1
     return n
+# 自動の きめ方では 横の 絵の 色が 正面と ちがって 見えた ポケモン（手で きめる。True ＝ 入れかえる）
+#   245 スイクン：横の からだが むらさき に なった → 入れかえない
+#   16 ポッポ：横・後ろの せなかが クリーム色 に なった → 入れかえない
+WALK_SWAP_FIX={245:False,16:False}
 def walk_swap(i):
     """i = 色の 表の 番号（0 = タマゴ、1〜251）。True なら 色1・色2 を 入れかえて あてる"""
+    if i in WALK_SWAP_FIX: return WALK_SWAP_FIX[i]
     gi=251 if i==0 else i-1
     d=open('gfxdata/follow_icon/%03d.2bpp'%gi,'rb').read()
     fa=_counts(d,[0,3]); wa=_counts(d,[1,2,4,5])

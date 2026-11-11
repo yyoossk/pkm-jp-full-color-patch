@@ -14,5 +14,6 @@ DEF MB_EVENT_BYTE   EQU $da65 + $7c / 8   ; EVENT_GOT_MASTER_BALL_FROM_ELM（Pro
 DEF MB_EVENT_BIT    EQU $7c % 8           ; wEventFlags は EventFlagAction（ROM0 $2e41）の ld hl, $da65
 DEF MB_BANK         EQU $76      ; ボックスの 自動切りかえ（$76:$4000〜）の あと
 DEF MB_ADDR         EQU $4200
+DEF MB_MART_CELADON_3F EQU $65e8 ; MartCeladon3F（Marts $64c3 の MART_CELADON_3F〔$19〕の 場所。わざマシンの 店。src/tmshop.asm）
 
 INCLUDE "src/masterball.asm"

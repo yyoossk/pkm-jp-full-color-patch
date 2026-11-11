@@ -34,6 +34,7 @@ DEF MB_EVENT_BYTE   EQU $d7aa + $7c / 8
 DEF MB_EVENT_BIT    EQU $7c % 8
 DEF MB_BANK         EQU $43
 DEF MB_ADDR         EQU $7c00
+DEF MB_MART_CELADON_3F EQU $670f   ; MartCeladon3F（わざマシンの 店。src/tmshop.asm）
 ENDC
 DEF MB_PRICE EQU 10000
 
@@ -61,6 +62,20 @@ MasterBallGetMart: ; e = 店の 番号 → b = 表の バンク、de = 表
 SECTION "masterball mart", ROMX[MB_ADDR], BANK[MB_BANK]
 MasterBallMart:
 	ld b, MB_GETMART_BANK
+IF DEF(MB_MART_CELADON_3F)
+	; タマムシデパート 3F：メニューで えらんだ わざマシンの 表に（src/tmshop.asm の TmShopMart）
+	ld a, e
+	cp LOW(MB_MART_CELADON_3F)
+	jr nz, .not_tm
+	ld a, d
+	cp HIGH(MB_MART_CELADON_3F)
+	jr nz, .not_tm
+	ld a, BANK(TmShopMart)
+	ld hl, TmShopMart
+	rst $08
+	ret
+.not_tm
+ENDC
 	ld a, e
 	cp LOW(MB_MART_INDIGO)
 	ret nz
