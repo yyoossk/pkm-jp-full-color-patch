@@ -12,3 +12,4 @@ DEF PrintText EQU $3BD5
 DEF YesNoChoice EQU $35AB
 DEF GiveItem EQU $3DBC
 DEF HAS_MOVE_RELEARN EQU 0     ; カラー化のみ：わざを思い出させてくれる人はいない
+DEF HAS_TM_MART EQU 0          ; カラー化のみ：わざマシンの店はそのまま

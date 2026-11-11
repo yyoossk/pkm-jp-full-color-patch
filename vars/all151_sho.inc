@@ -19,3 +19,4 @@ DEF GiveItem EQU $3DBD
 DEF HAS_MOVE_RELEARN EQU 1     ; わざを思い出させてくれる人がいる
 DEF ListMenuGetNameAddr EQU $2CAF ; リストメニューで A：「ld a, 1 / ld [$D094], a / call GetName」
 DEF GetName EQU $3712
+DEF HAS_TM_MART EQU 1          ; 殿堂入りのあと、わざマシンの店で一回切りのわざマシンも売る
