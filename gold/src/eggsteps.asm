@@ -3,9 +3,10 @@
 ; ・タマゴの つよさの 画面（「なにが うまれて くるのかな？」など）の 下に「あと　１２３４ほ」と 出す。
 ;   手持ちで あるいた とき、あと 何歩で うまれるか（タマゴが いくつか あって 同じ 歩で うまれる ときは、
 ;   さきに うまれる タマゴの つぎの 回に なるので すこし ずれる）。
-; ・タマゴの のこりの 回数（なつき度の ばしょ。wTempMonHappiness）は 256歩 ごとに 1 へる
-;   （wStepCount が $80 に なった 歩。0 に なった 歩で うまれる）。なので
-;     歩数 ＝ つぎに へる までの 歩数（$80 − wStepCount、0 なら 256）＋（のこりの 回数 − 1）× 256
+; ・タマゴの のこりの 回数（なつき度の ばしょ。wTempMonHappiness）は 128歩 ごとに 1 へる
+;   （src/eggfast.asm。wStepCount が $00 か $80 に なった 歩。0 に なった 歩で うまれる）。なので
+;     歩数 ＝ つぎに へる までの 歩数（$80 − (wStepCount and $7f)）＋（のこりの 回数 − 1）× 128
+;   （元の 256歩 ごとの ときは $80 − wStepCount〔0 なら 256〕＋（のこり − 1）× 256 だった）
 ;
 ; しくみ
 ;   ・EggStatsScreen の「call WaitBGMap / ld a, 1 / ldh [hBGMapMode], a」（7バイト）を 新しい バンクの EggSteps への
@@ -43,18 +44,17 @@ EggSteps:
 	and a
 	jr z, .done
 	dec a
-	ld d, a                           ; de = （のこり − 1）× 256
-	ld e, 0
+	ld e, 0                           ; de = （のこり − 1）× 128（src/eggfast.asm で 128歩 ごとに へる）
+	srl a
+	rr e
+	ld d, a
 	ld a, [ES_wStepCount]
+	and $7f
 	ld b, a
 	ld a, $80
-	sub b                             ; つぎに へる までの 歩数（0 なら 256）
+	sub b                             ; つぎに へる までの 歩数（1〜128）
 	ld l, a
 	ld h, 0
-	and a
-	jr nz, .add
-	inc h
-.add
 	add hl, de
 	ld a, h
 	ld [ES_wBuffer], a
