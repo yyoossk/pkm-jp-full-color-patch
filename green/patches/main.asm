@@ -558,6 +558,9 @@ INCLUDE "dex_types.asm"
 ; ８．殿堂入りの あと、わざマシンの 店で 一回切りの わざマシンも 買える
 INCLUDE "tm_mart.asm"
 
+; ９．STARTボタンの「パソコン」で ボックスを かえた あと、話しかけると 止まる 直し
+INCLUDE "changebox_fix.asm"
+
 ; ７．わざの 思い出し（クチバの ファンクラブ）で 「きりさく」などを えらぶと、こわれて 止まる 直し
 ;   思い出しは DisplayListMenuID（リストの ID 1 ＝ わざの リスト）を 使う。リストを かく ときは わざの 名前
 ;   （GetMoveName：バンク4）で かくが、えらんだ ときの GetName は いつも どうぐの 名前の バンク（1）を 使う。
