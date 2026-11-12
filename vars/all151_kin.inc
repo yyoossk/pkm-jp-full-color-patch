@@ -20,3 +20,9 @@ DEF HAS_MOVE_RELEARN EQU 1     ; わざを思い出させてくれる人がい�
 DEF ListMenuGetNameAddr EQU $2CAF ; リストメニューで A：「ld a, 1 / ld [$D094], a / call GetName」
 DEF GetName EQU $3712
 DEF HAS_TM_MART EQU 1          ; 殿堂入りのあと、わざマシンの店で一回切りのわざマシンも売る
+DEF HAS_CHANGEBOX_FIX EQU 1     ; STARTボタンの「パソコン」でボックスをかえたあとのフリーズの直し
+DEF RestoreMapTextPointer EQU $3E94
+DEF SetMapTextPointer EQU $3E9E
+DEF TextPredefs EQU $3EB1
+DEF ChangeBoxRedrawBank EQU $09  ; ChangeBox の最後に jp していた所
+DEF ChangeBoxRedraw EQU $6FBE
