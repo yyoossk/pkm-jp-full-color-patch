@@ -106,12 +106,15 @@ SECTION "legends \1 attr", ROMX[LG_\1_ATTR + 6], BANK[LG_ATTR_BANK]
 SECTION "legends \1 copy", ROMX[LG_\1_START], BANK[LG_BANK]
 	INCBIN "base.gbc", LG_\1_SRC_BANK * $4000 + LG_\1_START - $4000, LG_\1_END - LG_\1_START
 ENDM
+IF !DEF(LG_NO_BIRDS)              ; LG_NO_BIRDS を DEF すると セレビィ だけ（伝説の 鳥の マップの 写し・鳥を 入れない）
 	legend_copy WI
 	legend_copy RT
 	legend_copy SC
+ENDC
 
 ;---------------------------------------------------------------- 本体
 SECTION "legends", ROMX[LG_ADDR], BANK[LG_BANK]
+IF !DEF(LG_NO_BIRDS)
 LegendWI_MapScripts:
 	def_scene_scripts
 	def_callbacks
@@ -126,6 +129,7 @@ LegendSC_MapScripts:
 	def_scene_scripts
 	def_callbacks
 	callback MAPCALLBACK_OBJECTS, LegendMoltres_Callback
+ENDC
 
 ; callasm：wScriptVar = 1（殿堂入り・まだ 会って いない）。c = ビット
 Legend_Check:
@@ -233,9 +237,11 @@ ENDC
 	jp Legend_Set
 ENDM
 
+IF !DEF(LG_NO_BIRDS)
 	legend_bird Articuno, LEGEND_ARTICUNO, ARTICUNO, LG_WI_SLOT,  LG_WI_X,  LG_WI_Y,  PAL_NPC_BLUE,  LegendArticuno_Script
 	legend_bird Zapdos,   LEGEND_ZAPDOS,   ZAPDOS,   LG_RT_SLOT,  LG_RT_X,  LG_RT_Y,  PAL_NPC_BROWN, LegendZapdos_Script
 	legend_bird Moltres,  LEGEND_MOLTRES,  MOLTRES,  LG_SC_SLOT,  LG_SC_X,  LG_SC_Y,  PAL_NPC_RED,   LegendMoltres_Script
+ENDC
 
 LegendBird_Text:
 	db $00, "ギャーーッ！", $57
