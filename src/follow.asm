@@ -1253,10 +1253,11 @@ FwPartyInput:
 .loop
 	call FwStarPut
 	call HandleMenuInput_
-	call PlaceUnfilledArrowMenuCursor
 	ld b, a
 	bit 2, b                      ; SELECT
 	jr z, .out
+	; SELECT のときは ▷（PlaceUnfilledArrowMenuCursor）をかかない。かくと、カーソルを動かしたあとも
+	; ▷ が残る（PlaceMenuCursor は前の所が ▶ のときしか消さない）
 	ld a, [wMenuItemToSwap]
 	and a
 	jr nz, .loop                  ; 入れかえの相手をえらんでいるとき
@@ -1276,6 +1277,9 @@ FwPartyInput:
 	call PlaySound
 	jr .loop
 .out
+	ld a, b
+	call PlaceUnfilledArrowMenuCursor  ; 元のゲームと同じく、A・B のときは ▷ にする（a はそのまま）
+	ld b, a
 	push bc
 	call FwStarEnd
 	pop bc
