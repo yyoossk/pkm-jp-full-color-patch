@@ -561,6 +561,9 @@ INCLUDE "tm_mart.asm"
 ; ９．STARTボタンの「パソコン」で ボックスを かえた あと、話しかけると 止まる 直し
 INCLUDE "changebox_fix.asm"
 
+; １０．パソコンの どうぐの リストで SELECT の 入れかえが できない 直し
+INCLUDE "pc_item_swap.asm"
+
 ; ７．わざの 思い出し（クチバの ファンクラブ）で 「きりさく」などを えらぶと、こわれて 止まる 直し
 ;   思い出しは DisplayListMenuID（リストの ID 1 ＝ わざの リスト）を 使う。リストを かく ときは わざの 名前
 ;   （GetMoveName：バンク4）で かくが、えらんだ ときの GetName は いつも どうぐの 名前の バンク（1）を 使う。

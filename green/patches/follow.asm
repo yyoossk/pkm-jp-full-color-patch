@@ -242,9 +242,11 @@ FwGetSlot:
 ; ---------------------------------------------------------------- 手持ちの 画面
 ; SELECT で 連れ歩く ポケモンを えらぶ（もう一度 おすと だれも 連れ歩かない）
 ; HandlePartyMenuInput の HandleMenuInput_ ・ PlaceUnfilledArrowMenuCursor の かわり（おされた ボタンを e で かえす）
+;   SELECT の くり返しの 中では ▷（PlaceUnfilledArrowMenuCursor）を かかない。かくと、つぎの HandleMenuInput_ の
+;   PlaceMenuCursor は 前の 所が ▶ の ときしか 消さないので、カーソルを 動かすと ▷ が 残る。
+;   ▷ に するのは A・B で 手持ちの 入力を 終える ときだけ（元の ゲームと 同じ）。
 FwPartyInput:
 	call $39ec             ; HandleMenuInput_
-	call $3afc             ; PlaceUnfilledArrowMenuCursor
 	ld e, a
 	bit 2, a               ; SELECT
 	jr z, .done
@@ -269,6 +271,9 @@ FwPartyInput:
 	call FwStar
 	jr FwPartyInput
 .done
+	ld a, e
+	call $3afc             ; PlaceUnfilledArrowMenuCursor（a は そのまま かえる）
+	ld e, a
 	xor a
 	ld [$d078], a          ; wPartyMenuAnimMonEnabled（元の 処理）
 	ret
