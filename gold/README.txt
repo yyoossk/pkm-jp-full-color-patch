@@ -17,6 +17,12 @@
     ・殿堂入りの あと：アルフの いせきの けんきゅうじょで オムナイト・カブト（Lv30）、シロガネやまの おくに ミュウツー（Lv70）、
       グレンじまに ミュウ（Lv50）。しるしは wEdFlags（$d7a3）。
     ・コガネデパート 4F で しんかの いし 6つ・おうじゃのしるし を 2100円で 売る。
+  （Ver.1.5.0 の あと（まだ リリースして いない）：
+    ・イベントの follow（人が 先頭で 主人公が ついて いく）でも、Bダッシュの とき 連れ歩きの 予定（wFollowMovementQueue）を
+      はやい 歩きに かえる 処理（Fw_FastQueue）が 動きうる 形 だった（クリスタルの キキョウシティの せんせいの バグと 同じ しくみ）。
+      スクリプトの 間（wScriptMode ≠ 0）と 人が 先頭の follow（wObjectFollow_Leader ≠ 0）では なにも しない ように した
+      （src/follow_gold_update.inc）。Fw_NextMove は もとから 連れ歩き（スプライト $e2）の ときだけ 速さを かえて いる。
+    CRC32：通常版 84575E8A・60fps版 DA69765C・251ひき D8DABBEA・251ひき 60fps CEC13AB1）
   （Ver.1.5.0 で 足した・直した もの：
     ・src/tmshop.asm：1回しか もらえない わざマシン 32こを タマムシデパート 3F で 買える（メニューで 3つの 店に わける。
       表は src/masterball.asm の GetMart の フックから TmShopMart）。

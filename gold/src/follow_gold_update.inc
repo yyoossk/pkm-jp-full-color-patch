@@ -573,8 +573,17 @@ Fw_BallSetRange0:
 	ld [hl], 0
 	ret
 
-; Bダッシュ中は、連れ歩きの 歩く 予定の ふつうの 歩き（step $0c〜$0f）を はやい 歩き（big_step $10〜$13）に する
+; Bダッシュ中は、連れ歩きの 歩く 予定の ふつうの 歩き（step $0c〜$0f）を はやい 歩き（big_step $10〜$13）に する。
+; スクリプトの 間（wScriptMode ≠ 0）と、人が 先頭の follow（wObjectFollow_Leader ≠ 0。イベントで 主人公が 人に ついて いく）
+; では なにも しない（wFollowMovementQueue は イベントの follow でも 使う。かえると 主人公の 歩きが 先頭と ずれる。
+; クリスタルの キキョウシティの せんせいの バグと 同じ しくみ）
 Fw_FastQueue:
+	ld a, [wScriptMode]
+	and a
+	ret nz
+	ld a, [wObjectFollow_Leader]
+	and a
+	ret nz
 	ldh a, [hJoyDown]
 	and FW_B_BUTTON
 	ret z
