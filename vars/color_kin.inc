@@ -14,3 +14,4 @@ DEF GiveItem EQU $3DBC
 DEF HAS_MOVE_RELEARN EQU 0     ; カラー化のみ：わざを思い出させてくれる人はいない
 DEF HAS_TM_MART EQU 0          ; カラー化のみ：わざマシンの店はそのまま
 DEF HAS_CHANGEBOX_FIX EQU 0     ; カラー化のみ：STARTボタンの「パソコン」がない
+DEF HAS_PC_ITEM_DESC EQU 0      ; カラー化のみ：パソコンの道具の説明はなし

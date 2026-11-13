@@ -10,3 +10,4 @@ src/follow.asm
 src/relearn_fix.asm
 src/tm_mart.asm
 src/changebox_fix.asm
+src/pc_item_desc.asm

@@ -26,3 +26,5 @@ DEF SetMapTextPointer EQU $3E9E
 DEF TextPredefs EQU $3EB1
 DEF ChangeBoxRedrawBank EQU $09  ; ChangeBox の最後に jp していた所
 DEF ChangeBoxRedraw EQU $6FBE
+DEF HAS_PC_ITEM_DESC EQU 1      ; パソコンの「どうぐを ひきだす」で道具の説明を出す
+DEF HandleMenuInputW EQU $3A65  ; HandleMenuInput（入口）
