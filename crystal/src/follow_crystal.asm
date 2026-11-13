@@ -301,7 +301,16 @@ SECTION "follow action step", ROMX[$445f + 2 * 4], BANK[$01]
 ; はやい 歩き（big_step $10〜$13）を、いまの 主人公の 速さ（Bダッシュ中か）に あわせて から わたす（1歩 おくれで たどるので、
 ; 記録した ときの 速さの ままだと、ダッシュの はじめは 1マス おくれて はなれ、ダッシュを やめた あとは 追いついて かさなって いた）
 SECTION "follow next move ptr", ROMX[$48a0 + 1], BANK[$01]
-	dw F1_NextMove
+	dw F1_NextMoveChk
+SECTION "follow next move check", ROMX[$7e84], BANK[$01]   ; バンク1 の 空き（$7e82〜$7e9f）
+F1_NextMoveChk:
+	; 連れ歩き（スプライト $e2）の とき だけ 速さを あわせる。イベントの follow（キキョウシティの せんせい など、人が 先頭で
+	; 主人公が ついて いく・主人公が 先頭で 人が ついて いく）では 元の まま（せんせいの はやい 歩きを ふつうに して いて、
+	; 主人公が おくれて はなれ、主人公と せんせいの オブジェクトが こわれ、連れ歩きも 出なく なって いた）
+	ld a, [bc]                        ; OBJECT_SPRITE
+	cp FW_SPRITE
+	jp z, F1_NextMove
+	jp $54e6                          ; GetFollowerNextMovementIndex
 SECTION "follow bank1", ROMX[$7f40], BANK[$01]
 F1_NextMove:
 	call $54e6                        ; GetFollowerNextMovementIndex
@@ -1870,6 +1879,12 @@ Fw_BallSetRange0:
 ; はやい 歩き（big_step $10〜$13。自転車・Bダッシュと 同じ 速さ）に する。ふりかえって 主人公と 入れかわった あとや
 ; follow を しなおした あとの 1歩目が ふつうの 速さに なって、走って いる 間 1マス おくれて いた
 Fw_FastQueue:
+	ld a, [wScriptMode]
+	and a
+	ret nz                            ; スクリプトの 間（イベントの follow）は さわらない
+	ld a, [wObjectFollow_Leader]
+	and a
+	ret nz                            ; 人が 先頭の follow では さわらない
 	ldh a, [hJoyDown]
 	and FW_B_BUTTON
 	ret z
