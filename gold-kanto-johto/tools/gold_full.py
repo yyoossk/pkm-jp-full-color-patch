@@ -146,6 +146,8 @@ _ls = []; gold_scenes.apply(g, MOD, VAN, E, set(walks), _ls); print('\n'.join(_l
 # ---- 第13弾：ゆうれい戦
 import gold_ghost
 _lg = []; gold_ghost.apply(g, MOD, E, _lg); print('\n'.join(_lg))
+import gold_sprites
+_lsp = []; gold_sprites.apply(g, E.next_bank, _lsp); E.next_bank += 1; print('\n'.join(_lsp))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
 open('/home/claude/work/out/gold_full.gbc', 'wb').write(g)
 print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.bankmap.items()})
