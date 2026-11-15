@@ -125,24 +125,28 @@ DV_Draw:
 	; こうげき・ぼうぎょ・とくこう・とくぼう・すばやさ（8・10・12・14・16 行め）
 	ld a, b
 	swap a
-	ld hl, DV_COORD + 8 * 20 + 16
+	ld hl, DV_COORD + 8 * 20 + 15
 	call .Put3
 	ld a, b
-	ld hl, DV_COORD + 10 * 20 + 16
+	ld hl, DV_COORD + 10 * 20 + 15
 	call .Put3
 	ld a, c
-	ld hl, DV_COORD + 12 * 20 + 16
+	ld hl, DV_COORD + 12 * 20 + 15
 	call .Put3
 	ld a, c
-	ld hl, DV_COORD + 14 * 20 + 16
+	ld hl, DV_COORD + 14 * 20 + 15
 	call .Put3
 	ld a, c
 	swap a
-	ld hl, DV_COORD + 16 * 20 + 16
+	ld hl, DV_COORD + 16 * 20 + 15
 	; fallthrough
 
-; a の 下 4ビット を hl に 3けた（右よせ）で
+; a の 下 4ビット を hl から 4ます（x 15〜18）を けして、右の 2ます（x 17〜18）に（右よせ）。
+; のうりょくの 数は x 15〜17 に 3けたで 出て いる ので、x 15 から けす（16 から だと 100 より 大きい とき
+; 百の くらいの 数字が のこって いた）
 .Put3
+	ld [hl], $7f
+	inc hl
 	ld [hl], $7f
 	inc hl
 ; a の 下 4ビット を hl に 2けた（右よせ）で

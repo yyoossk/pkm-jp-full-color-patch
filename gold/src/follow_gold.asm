@@ -109,6 +109,7 @@ DEF wFwLoadedFace      EQU $d787     ; 今の 色が 正面用（0）か 後ろ�
 DEF wFwMaskTile        EQU $d788     ; 白い 下じきの タイル（0 ＝ なし）
 DEF wFwPrevMask        EQU $d789     ; つながりの 前の 下じきの タイル
 DEF wFwRet             EQU $d78a     ; farcall の こたえ
+DEF wFwLastColors      EQU $d78d     ; さいごに 使った 色1・色2（4バイト。連れ歩きを やめた あとの ボールに もどる まで 使う）
 ; つながりで 絵を 読みなおす 間 だけ（Fw_Remap）
 DEF FW_O               EQU $d740     ; 前の 並び 24バイト
 DEF FW_USED            EQU $d758     ; 前の 組を 使った 印 12
@@ -657,8 +658,8 @@ Fw_GetLead:
 	ld a, [wFwBall]
 	and a
 	jr z, .mon
-	call Fw_Index
-	ret c
+	; ボールの 絵は 連れ歩く ポケモンが いなくても かえす（手持ちで 連れ歩きを やめた あと、ボールに もどる アニメで
+	; Fw_Index が carry に なり、ボールの 絵が 読まれず アニメが おわらなかった）
 	ld de, 278                        ; ボール
 	ld a, FW_OWN_PAL
 	and a
@@ -747,6 +748,18 @@ Fw_OwnColors:
 	ret
 .mon
 	call Fw_Species
+	jr nc, .have
+	; 連れ歩く ポケモンが いない（手持ちで やめた あと、ボールに もどる まで）：さいごに 使った 色
+	ld hl, wFwLastColors
+	ld a, [hli]
+	ld c, a
+	ld a, [hli]
+	ld b, a
+	ld a, [hli]
+	ld e, a
+	ld d, [hl]
+	ret
+.have
 	cp FW_EGG
 	jr nz, .notegg
 	xor a                             ; タマゴ = 0
@@ -785,6 +798,14 @@ Fw_OwnColors:
 	call .byte
 	ld d, a
 	; 夜・暗い 所でも 暗く しない（Crystal Crunch は 夜に 暗く するが、ユーザーの 希望で しない）
+	ld hl, wFwLastColors
+	ld a, c
+	ld [hli], a
+	ld a, b
+	ld [hli], a
+	ld a, e
+	ld [hli], a
+	ld [hl], d
 	ret
 .byte
 	ld a, FW_POKEPALS_BANK
@@ -983,8 +1004,13 @@ Fw_IndexToGfx:
 Fw_GetSprite:
 	call Fw_GetLead
 	jr nc, .ok
-	ld de, 24                         ; 手持ちが いない とき（ここには 来ない）：ピカチュウ
-	xor a
+	; 連れ歩く ポケモンが いない とき（手持ちで 連れ歩きを やめて メニューを とじた ときなど。オブジェクトは
+	; ボールに もどる まで のこる）：前に 読んだ 絵の まま（前は ピカチュウに して いたので、持って いない ピカチュウが 出た）
+	ld a, [wFwLoaded]
+	ld e, a
+	ld a, [wFwLoaded + 1]
+	ld d, a
+	ld a, [wFwLoadedPal]
 .ok
 	ld c, a
 	ld a, e

@@ -22,7 +22,13 @@
       はやい 歩きに かえる 処理（Fw_FastQueue）が 動きうる 形 だった（クリスタルの キキョウシティの せんせいの バグと 同じ しくみ）。
       スクリプトの 間（wScriptMode ≠ 0）と 人が 先頭の follow（wObjectFollow_Leader ≠ 0）では なにも しない ように した
       （src/follow_gold_update.inc）。Fw_NextMove は もとから 連れ歩き（スプライト $e2）の ときだけ 速さを かえて いる。
-    CRC32：通常版 84575E8A・60fps版 DA69765C・251ひき D8DABBEA・251ひき 60fps CEC13AB1）
+    ・手持ちで 連れ歩きを やめて（SELECT）メニューを とじると、持って いない ピカチュウが 出て、マップが かわるまで のこった。
+      Fw_GetSprite が 連れ歩く ポケモンが いない とき ピカチュウ（24）に して いた → 前に 読んだ 絵の まま に。
+      ボールに もどる アニメで Fw_GetLead が Fw_Index の carry で ボールの 絵を かえさず、アニメが おわらなかった → ボールは いつも かえす。
+      色も 前に 使った 色の まま（wFwLastColors $d78d〜$d790）。（src/follow_gold.asm）
+    ・つよさの 画面の 個体値で、のうりょくが 100 より 大きいと 百の くらいの 数字が のこった（のうりょくは x 15〜17。
+      けすのを x 16 から して いた）→ x 15〜18 を けして x 17〜18 に 出す（src/dvview.asm）。
+    CRC32：通常版 5ED0CE0A・60fps版 0446F4D2・251ひき E4AD16F0・251ひき 60fps AA8665C5）
   （Ver.1.5.0 で 足した・直した もの：
     ・src/tmshop.asm：1回しか もらえない わざマシン 32こを タマムシデパート 3F で 買える（メニューで 3つの 店に わける。
       表は src/masterball.asm の GetMart の フックから TmShopMart）。
