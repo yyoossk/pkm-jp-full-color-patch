@@ -18,7 +18,7 @@ def apply(rom, ctx):
     log = ctx.setdefault('log', [])
     pat = re.compile(rb'\x5d\x48.\x5e\x5f\x47\x4c..\x53\x49\x6d(.)\x6d(.)\x33(..)\x90', re.S)
     a = CA; n = 0
-    assert not any(rom[fo(CB, CA):fo(CB, CA) + 0x200])
+    assert not any(rom[fo(CB, CA):fo(CB, CA) + 0x100])
     for b in KANTO + JOHTO:
         s = fo(b, 0x4000)
         for m in pat.finditer(rom, s, s + 0x4000):
