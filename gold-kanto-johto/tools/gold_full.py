@@ -118,6 +118,8 @@ _la = []; gold_asm.apply(E, MOD, g, _la, cm); gold_safari.apply(g, MOD, E, _la);
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 for k, b in allblobs.items(): E.write(k, b)
 gold_johto.patch_attrs(E, g, None)
+import gold_johto2
+_lj2 = []; gold_johto2.apply(E, g, bytes(open('/home/claude/work/ref/kin_late.gbc', 'rb').read()), MOD, VAN, _lj2); print('\n'.join(_lj2))
 finish_maps(E, MOD, g, cm, gm)
 # ---- トレーナー：読むコード（0E:$5511-$595B）ごと 新しいバンクへ（クリスタル版 第13弾と同じ考え）。手持ちは 第10弾で 入れる
 import re as _re
