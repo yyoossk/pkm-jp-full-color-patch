@@ -61,4 +61,7 @@ def apply(rom, ctx):
     # 第99弾：シゲル（SPRITE_BLUE 7）の フィールドの 絵を 青（PAL_OW_BLUE）に
     o = 0x147B0 + 6 * 6; assert rom[o + 5] == 0; rom[o + 5] = 1
     log.append('ドアの フェード 1フレームずつ（第96弾）・シゲルの 絵の 色（第99弾）')
+    # 第109弾：ポケギアの タウンマップ（カントー）の カーソルの 範囲（TownMap_GetKantoLandmarkLimits $24:$5046）を
+    # 殿堂入りの 前も カントー 全部（マサラタウン $2E〜28ばんどうろ $5D）に（ジョウトの 地名に 入らない）
+    o = fo(0x24, 0x5046); assert rom[o:o + 17] == bytes.fromhex('fa64d5cb772805165d1e2ec9165d1e57c9'); rom[o + 15] = 0x2E
     return rom
