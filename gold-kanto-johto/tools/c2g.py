@@ -34,7 +34,7 @@ MAPALIAS = {}
 # ホームの住所（クリスタル → 金）
 HOMEMAP = {0x26B2: 0x27BF}   # ObjectEvent（jumptextfaceplayer ObjectEventText）
 # RAM（日本版クリスタル → 日本版金）
-RAMMAP = {0xD071: 0xCF87}    # wStringBuffer1
+RAMMAP = {0xD071: 0xCF9D, 0xC2DD: 0xD165}    # wStringBuffer3・wScriptVar（rammap.py で 確かめた）
 
 class Xlat:
     def __init__(s):
