@@ -25,11 +25,27 @@ g[o:o + 17] = bytes.fromhex('8a938b509aa88650929184508f858b5050')
 from consts import all_tables as _at
 _C = _at('pokecrystal'); KL, KE = _C['landmark']['KANTO_LANDMARK'], _C['landmark']['KANTO_LANDMARK_LAST']
 JOHTO_SIDE = {'Route26', 'Route27', 'TohjoFalls', 'Route26HealHouse', 'DayOfWeekSiblingsHouse', 'Route27SandstormHouse'}
-KANTO = [m['name'] for m in maplist(MOD, CMGP, 'pokecrystal') if KL <= MOD[m['hdr'] + 5] <= KE and m['name'] not in JOHTO_SIDE]
-names = sorted(set(KANTO))   # ジョウトは 金のまま（MOD だけの 変更は フェーズごとに 入れる） if len(sys.argv) < 2 else sys.argv[1].split(',')
+E = Emit(g)
+# ---- 第11弾の 土台：新しい タイルセット・グループ 26 の 14〜149 番
+import gold_p11, c2g as _c2g
+_l11 = []
+_p11 = gold_p11.apply(g, MOD, E, _l11)
+# ---- 第15弾の 土台：イベントフラグ $800〜
+import gold_flags
+FB = E.next_bank; E.next_bank += 1
+gold_flags.apply(g, FB, 0x4000, _l11); print('\n'.join(_l11))
 cm = {m['name']: m for m in maplist(MOD, CMGP, 'pokecrystal')}
 gm = {m['name']: m for m in maplist(g, GMGP, 'pokegold')}
-E = Emit(g)
+G26 = []
+for n in range(gold_p11.G26_FIRST, gold_p11.G26_N + 1):
+    nm = 'G26_%03d' % n; G26.append(nm)
+    ch = 0x94000 + 0x4D75 - 0x4000 + 9 * (n - 1)
+    cm[nm] = dict(name=nm, group=26, num=n, hdr=ch, attr=fo(MOD[ch], MOD[ch + 3] | MOD[ch + 4] << 8))
+    gm[nm] = dict(name=nm, group=26, num=n, hdr=_p11['hdr0'] + 9 * (n - gold_p11.G26_FIRST), attr=0)
+    _c2g.CMAP[(26, n)] = nm; _c2g.GMAP[nm] = (26, n)
+KANTO = [m['name'] for m in maplist(MOD, CMGP, 'pokecrystal') if KL <= MOD[m['hdr'] + 5] <= KE and m['name'] not in JOHTO_SIDE]
+KANTO += [nm for nm in G26 if KL <= MOD[cm[nm]['hdr'] + 5] <= KE]
+names = sorted(set(KANTO))   # ジョウトは 金のまま（MOD だけの 変更は フェーズごとに 入れる） if len(sys.argv) < 2 else sys.argv[1].split(',')
 walks = {}
 for nm in names:
     W = Walk(MOD)
@@ -56,9 +72,43 @@ for nm in list(walks):
     if nm not in CHG:
         ms = _misses(*walks[nm], nm)
         if ms: print('金のまま:', nm, ms[0]); del walks[nm]
+# 入れない マップへ つながる マップも 入れない（グループ 26 の 新しい マップは 金に かわりが ない）
+# また、まだ 金に うつしていない asm（callasm など）を 指す マップも 入れない（gold_asm.PORTED に あるものは 入れる）
+import gold_asm
+def _unplaced(W, keys):
+    out = []
+    for k_, b in W.blobs.items():
+        for off, t, sem, name in b['fix']:
+            o_ = fo(b['bank'], b['addr']) + off
+            if t == 'dw' and ('pointer' in sem or sem == 'data'):
+                v = MOD[o_] | MOD[o_ + 1] << 8
+                if v >= 0x4000 and v < 0x8000 and v != 0xFFFF and (b['bank'], v) not in keys: out.append((b['bank'], v))
+            elif t == 'dba':
+                bb, aa = MOD[o_], MOD[o_ + 1] | MOD[o_ + 2] << 8
+                if aa >= 0x4000 and (bb, aa) not in keys: out.append((bb, aa))
+    return out
+while True:
+    keys = set(gold_asm.PORTED)
+    for nm, (W, at) in walks.items(): keys |= set(W.blobs)
+    drop = [(nm, '未移植の asm %02X:%04X' % _unplaced(W, keys)[0]) for nm, (W, at) in walks.items() if _unplaced(W, keys)]
+    for nm, why in drop: print('金のまま（' + why + '）:', nm); del walks[nm]
+    bad = set(G26) - set(walks)
+    drop = []
+    for nm, (W, at) in walks.items():
+        tg = [(wv[3], wv[4]) for wv in at['warps']] + [(at['connections'][i], at['connections'][i + 1]) for i in range(0, len(at['connections']), 12)]
+        for k_, b in W.blobs.items():
+            for off, t, sem, name in b['fix']:
+                if t == 'map_id': o_ = fo(b['bank'], b['addr']) + off; tg.append((MOD[o_], MOD[o_ + 1]))
+        hit = [x for x in tg if _c2g.CMAP.get(x) in bad]
+        if hit: drop.append((nm, _c2g.CMAP.get(hit[0])))
+    if not drop:
+        if not any(_unplaced(W, keys) for W, at in walks.values()): break
+        continue
+    for nm, why in drop: print('金のまま（入れない マップへ つながる）:', nm, why); del walks[nm]
 allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
+_la = []; gold_asm.apply(E, MOD, g, _la); print('\n'.join(_la))
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 for k, b in allblobs.items(): E.write(k, b)
 finish_maps(E, MOD, g, cm, gm)
@@ -86,4 +136,15 @@ print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.ban
 print('読みかえできない:', len(E.X.miss))
 from collections import Counter
 for k, v in Counter(m.split('（')[0] for m in E.X.miss).most_common(): print(v, k)
-print('ポインター:', len(E.homemiss)); print('\n'.join(sorted(set(E.homemiss))[:30]))
+print('ポインター:', len(E.homemiss)); print('\n'.join(sorted(set(E.homemiss))))
+# どのマップの かたまりか（未配置の ポインターを 持つもの）
+_own = {}
+for nm, (W, at) in walks.items():
+    for k in W.blobs: _own.setdefault(k, []).append(nm)
+_um = {}
+for m in E.homemiss:
+    mm = _re.search(r'script ([0-9A-F]{2}):([0-9A-F]{4})', m)
+    if mm:
+        k = (int(mm.group(1), 16), int(mm.group(2), 16))
+        _um.setdefault(m.split('（')[0], set()).update(_own.get(k, ['?']))
+for k, v in sorted(_um.items()): print(k, sorted(v))

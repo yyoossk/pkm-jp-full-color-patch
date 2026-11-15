@@ -52,6 +52,7 @@ class Xlat:
         n = s.ev.get(v)
         if n is None:
             if v in s.gfree: return v     # 名前のない（MOD で使い始めた）フラグは 金でも空いている同じ番号
+            if 0x800 <= v <= 0xA17: return v   # 第15弾の 土台（gold_flags.py）で 金でも 使える
             return s._m('event', v, ctx)
         g = G['event'].get(n)
         return g if g is not None else s._m('event ' + n, v, ctx)
@@ -60,6 +61,7 @@ class Xlat:
         return g if g is not None else s._m('engine %s' % n, v, ctx)
     def sprite(s, v, ctx=''):
         if v >= 0xF0: return v   # SPRITE_VARS など
+        if 0x67 <= v <= 0x7A: return v - 0x67 + 0x60     # クリスタル版の 新しい 人の絵（第11弾で 金に 入れる）
         n = s.sp.get(v); g = G['sprite'].get(n) if n else None
         return g if g is not None else s._m('sprite %s' % n, v, ctx)
     def music(s, v, ctx=''):
@@ -78,6 +80,7 @@ class Xlat:
         # 日本版の トレーナーの種類の番号は 1〜66 が 金と同じ（67 なぞのせいねん は 金にない）
         return v if 1 <= v <= 79 else s._m('trainerclass', v, ctx)
     def tileset(s, v, ctx=''):
+        if 33 <= v <= 53: return v - 33 + 29      # クリスタル版の 新しい タイルセット（第11弾〜）→ 金 29〜
         n = s.ts.get(v); g = G['tileset'].get(n) if n else None
         return g if g is not None else s._m('tileset %s' % n, v, ctx)
     def landmark(s, v, ctx=''):
