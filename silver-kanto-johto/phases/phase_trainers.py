@@ -89,6 +89,16 @@ def apply(rom, ctx):
         assert rom[o:o + 2] == bytes([0x3E, 0x0E]), hex(o); rom[o + 1] = TB
     classes(rom, cmod, P, log)
 
+    # クラス $40（カントーの ライバル）の トレーナーの 名前は wGreensName（第52弾）。GetTrainerName（$E2:$5939）を フック
+    o = fo(TB, 0x5939); assert rom[o:o + 4] == bytes([0x0D, 0xC5, 0x06, 0x00])
+    hk = 0x7EF0; GREENS = 0xD1CD
+    rom[fo(TB, hk):fo(TB, hk) + 16] = bytes([0x79, 0xFE, 0x40, 0x21, GREENS & 0xff, GREENS >> 8, 0xCA, 0x50, 0x59,
+                                             0x0D, 0xC5, 0x06, 0x00, 0xC3, 0x3D, 0x59])
+    rom[o:o + 4] = bytes([0xC3, hk & 0xff, hk >> 8, 0x00])
+    # wGreensName の はじめの 名前「シゲル」（銀は グリーン）
+    import jptext
+    o = 0x5D82; assert rom[o:o + 5] == jptext.enc('グリーン@'); rom[o:o + 5] = jptext.enc('シゲル@@')
+
     # トレーナーの 種類の 名前：クリスタル版の 表（$7C:$49BC、79 クラス。1〜66 は 銀と 同じ 並び、64 は「ライバル」）
     assert rom[0x3562:0x3565] == bytes([0x0B, 0xD6, 0x52])
     rom[0x3562:0x3565] = bytes([0x7C, 0xBC, 0x49])
