@@ -13,7 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gsc, cscript, cmaps, xlat
 from gsc import fo, r16
 
-MOD_LO, MOD_HI = 0x60, 0x7C           # この MOD の バンク（そのまま 写す）
+MOD_LO, MOD_HI = 0x60, 0x7C
+KIT_MAP = {0x8F: 0xE6}                 # クリスタルの 追加機能キットの バンクで カントーが 使う もの（四天王の あとの わざマシン売り）→ 銀の 空き
 EXT_FLAG_BASE = 0x800                  # 銀で 足す イベントフラグ（クリスタルに しか ない もの）
 CR_HOME = {}                           # クリスタルの ホーム（バンク0）の スクリプト → 銀の アドレス（あとで 足す）
 
@@ -23,6 +24,7 @@ def cb(b):
     if b == 0: return 0
     if MOD_LO <= b <= 0x7F: return b
     if b < MOD_LO: return b + 0x80
+    if b in KIT_MAP: return KIT_MAP[b]
     return b                               # $80〜（追加機能キットの バンク）は 銀では 別に 作る
 
 
@@ -52,7 +54,7 @@ class Port:
     # ---------- 写す
     def copy(s, b, a, n):
         """クリスタル b:a から n バイトを 銀へ（$60 より 下の バンクだけ。上は もう 写して ある）"""
-        if b >= MOD_LO: return
+        if b >= MOD_LO and b not in KIT_MAP: return
         src = fo(b, a); dst = fo(cb(b), a)
         for i in range(n):
             if src + i in s.copied: continue
@@ -113,7 +115,7 @@ class Port:
         while stack:
             b, a = stack.pop()
             while True:
-                if b >= 0x80:
+                if b >= 0x80 and b not in KIT_MAP:
                     s.note('kitbank', 'script %02X:%04X' % (b, a)); break
                 if a < 0x4000:
                     s.note('home', 'script %02X:%04X' % (b, a)); break
@@ -201,7 +203,7 @@ class Port:
     # ---------- テキスト
     def text(s, b, a):
         if a < 0x4000: s.note('home', 'text %02X:%04X' % (b, a)); return
-        if b >= 0x80: s.note('kitbank', 'text %02X:%04X' % (b, a)); return
+        if b >= 0x80 and b not in KIT_MAP: s.note('kitbank', 'text %02X:%04X' % (b, a)); return
         while True:
             if (b, a) in s.seen_text: return
             s.seen_text.add((b, a))
