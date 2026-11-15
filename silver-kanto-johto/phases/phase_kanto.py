@@ -203,7 +203,7 @@ def apply(rom, ctx):
     S_OW = 0x147B0; C_OW = 0x14727
     for i in range(1, 0x67):
         ce = bytearray(cmod[C_OW + 6 * (i - 1):C_OW + 6 * i]); oe = corig[C_OW + 6 * (i - 1):C_OW + 6 * i]
-        b, a = ce[3], r16(ce, 0); size = {1: 0xC0, 2: 0xC0, 3: 0x40}.get(ce[4], ce[2])
+        b, a = ce[3], r16(ce, 0); size = {1: 0x180, 2: 0xC0, 3: 0x40}.get(ce[4], ce[2])   # 歩く 絵は 止まり 12 ＋ 歩き 12 タイル
         src = fo(b, a)
         gfx_changed = b < 0x80 and cmod[src:src + size] != corig[src:src + size]
         if bytes(ce) == oe and not gfx_changed: continue
