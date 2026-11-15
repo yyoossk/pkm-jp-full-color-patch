@@ -10,11 +10,14 @@ def tool(n):
     raise FileNotFoundError(n)
 
 
-def overlay(rom, src):
+def overlay(rom, src, inc=(), cwd=None):
+    """inc：INCLUDE を さがす フォルダ。src の {ROM} は 今の ROM（INCBIN 用）"""
     with tempfile.TemporaryDirectory() as d:
-        open(d + '/a.asm', 'w', encoding='utf-8').write(src)
+        open(d + '/a.asm', 'w', encoding='utf-8').write(src.replace('{ROM}', d + '/in.gbc'))
         open(d + '/in.gbc', 'wb').write(rom)
-        subprocess.run([tool('rgbasm'), '-o', d + '/a.o', d + '/a.asm'], check=True)
+        a = [tool('rgbasm')]
+        for i in inc: a += ['-I', i if i.endswith('/') else i + '/']
+        subprocess.run(a + ['-o', d + '/a.o', d + '/a.asm'], check=True, cwd=cwd)
         subprocess.run([tool('rgblink'), '-O', d + '/in.gbc', '-o', d + '/out.gbc', d + '/a.o'], check=True)
         new = open(d + '/out.gbc', 'rb').read()
     assert len(new) == len(rom)
