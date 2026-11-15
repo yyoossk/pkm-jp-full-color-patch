@@ -9,7 +9,7 @@
 import os, sys, pickle
 H = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(H, 'tools'))
-import cmaps, port, asmport
+import cmaps, port, asmport, gsc
 from gsc import fo, r16
 
 REGIONS = [(0x36, 0x5867, 0x5B70), (0x01, 0x6208, 0x6289), (0x22, 0x42AC, 0x4330), (0x22, 0x487D, 0x4BC2)]
@@ -47,8 +47,16 @@ def apply(rom, ctx):
     assert rom[o:o + 4] == bytes([0x06, 0x22, 0x0E, 0x31]); rom[o + 1] = port.cb(0x22)
     un = {k: [x for x in v if x != 'wram D463'] for k, v in TR.unres.items()}; un = {k: v for k, v in un.items() if v}
     assert not un, un
+    # 話の あとで 場所の 札の「前の 場所」（wMSPrev $DEFB）を レッドの いえ（マサラタウン）に：
+    # クリスタル版は 新しい ゲームの はじめに 札を 出さない（_NewGame で wPrevLandmark を 入れる）
+    SM = gsc.Maps(bytes(rom), gsc.PG + '/constants/map_constants.asm')
+    lm = SM.header(SM.id['REDS_HOUSE_2F'])['landmark']
+    W = 0x7FF0; wb = port.cb(0x36)                                               # $B6 の 終わり（空き）
+    code = bytes([0xCD, 0x67, 0x58, 0x3E, lm, 0xEA, 0xFB, 0xDE, 0xC9])
+    assert not any(rom[fo(wb, W):fo(wb, W) + len(code)])
+    rom[fo(wb, W):fo(wb, W) + len(code)] = code
     o = fo(1, S_OAK)
     assert rom[o:o + 6] == bytes([0x3E, 0x24, 0x21, 0x77, 0x46, 0xCF])
-    rom[o:o + 7] = bytes([0x3E, port.cb(0x36), 0x21, 0x67, 0x58, 0xCF, 0xC9])
+    rom[o:o + 7] = bytes([0x3E, wb, 0x21, W & 0xff, W >> 8, 0xCF, 0xC9])
     log.append('オーキドの 話：クリスタル版の もの（$%02X:$5867）を 使う' % port.cb(0x36))
     return rom
