@@ -1,4 +1,4 @@
-ポケットモンスター銀 追加機能パッチ Ver.1.5.1 の ソース
+ポケットモンスター銀 追加機能パッチ Ver.1.5.2 の ソース
 
 中身
   src/・bf/・data/・gfxdata/ … 追加機能の ソース
@@ -17,10 +17,10 @@
   通常版：python3 build.py feat.gbc $(cat buildlist.txt)
   60fps版：python3 build.py feat60.gbc src/fps60.asm $(cat buildlist.txt)
 
-できた ROM の CRC32：通常版 0CF72DE2、60fps版 6D33D782（Ver.1.5.1 の あとの 直し〔連れ歩きを やめた あと・個体値の 画面〕入り。README.txt の さいご）
+できた ROM の CRC32：通常版 0CF72DE2、60fps版 6D33D782（リリースの パッチを 当てた ものと 同じ）
 IPS を 作る：python3 mkips.py feat.gbc 通常版.ips base.gbc
 
 ■ 251匹そろう版（別の 版）
   python3 build.py e.gbc $(cat buildlist251.txt)
   python3 build.py e60.gbc src/fps60.asm $(cat buildlist251.txt)
-  （通常版 2FD751FD、60fps版 40F6D1BC）
+  （通常版 2FD751FD、60fps版 40F6D1BC。リリースの パッチと 同じ）
