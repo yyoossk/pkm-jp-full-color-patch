@@ -76,7 +76,7 @@ class Xlat:
         return g if g is not None else s._m('std %s' % n, v, ctx)
     def tclass(s, v, ctx=''):
         # 日本版の トレーナーの種類の番号は 1〜66 が 金と同じ（67 なぞのせいねん は 金にない）
-        return v if 1 <= v <= 66 else s._m('trainerclass', v, ctx)
+        return v if 1 <= v <= 79 else s._m('trainerclass', v, ctx)
     def tileset(s, v, ctx=''):
         n = s.ts.get(v); g = G['tileset'].get(n) if n else None
         return g if g is not None else s._m('tileset %s' % n, v, ctx)

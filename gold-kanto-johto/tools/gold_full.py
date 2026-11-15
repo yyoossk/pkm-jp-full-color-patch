@@ -62,18 +62,11 @@ for k, b in allblobs.items(): E.place(k, b)
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 for k, b in allblobs.items(): E.write(k, b)
 finish_maps(E, MOD, g, cm, gm)
-# ---- トレーナーの手持ち：読むコード（0E:$5511-$595B）ごと 新しいバンクへ（クリスタル版 第13弾と同じ考え）
-from trainers import merged
+# ---- トレーナー：読むコード（0E:$5511-$595B）ごと 新しいバンクへ（クリスタル版 第13弾と同じ考え）。手持ちは 第10弾で 入れる
 import re as _re
 TB = E.next_bank; E.next_bank += 1
 src = 0x0E * 0x4000 - 0x4000; dst = TB * 0x4000 - 0x4000
 g[dst + 0x5511:dst + 0x595C] = g[src + 0x5511:src + 0x595C]
-L = merged(VAN, MOD, bytes(g[:0x200000]))
-a = 0x595C + 2 * 66; tbl = bytearray(); body = bytearray()
-for cls in L:
-    tbl += (a + len(body)).to_bytes(2, 'little'); body += b''.join(cls)
-assert 0x595C + len(tbl) + len(body) <= 0x8000, 'トレーナーのデータが入らない'
-g[dst + 0x595C:dst + 0x595C + len(tbl)] = tbl; g[dst + a:dst + a + len(body)] = body
 n = 0
 for m in list(_re.finditer(rb'\x21(..)\x3e\x0e\xcf', bytes(g[:0x200000]), _re.S)):
     ad = m.group(1)[0] | m.group(1)[1] << 8
@@ -81,7 +74,12 @@ for m in list(_re.finditer(rb'\x21(..)\x3e\x0e\xcf', bytes(g[:0x200000]), _re.S)
 assert n == 12, n
 for o in (0x2aba9, 0x2abb1, 0x2abbd, 0x2abc7, 0x2abea, 0x2ac04):   # RandomPhoneMon の ld a, BANK(TrainerGroups)
     assert g[o:o + 3] == b'\x3e\x0e\xcd'; g[o + 1] = TB
-print('トレーナー：バンク %02X、%d バイト' % (TB, len(body)))
+# ---- 第10弾：トレーナーの種類 67〜79（名前・絵・色・DV・属性・ジムリーダーの表・手持ち）
+import gold_p10
+NB = E.next_bank; E.next_bank += 1
+_log = []
+gold_p10.apply(g, VAN, MOD, TB, NB, _log)
+print('トレーナー：バンク %02X、第10弾 バンク %02X' % (TB, NB)); print('\n'.join(_log))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
 open('/home/claude/work/out/gold_full.gbc', 'wb').write(g)
 print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.bankmap.items()})
