@@ -134,6 +134,8 @@ NB = E.next_bank; E.next_bank += 1
 _log = []
 gold_p10.apply(g, VAN, MOD, TB, NB, _log)
 print('トレーナー：バンク %02X、第10弾 バンク %02X' % (TB, NB)); print('\n'.join(_log))
+import gold_p52
+_l52 = []; gold_p52.apply(g, MOD, E.next_bank, TB, _l52); E.next_bank += 1; print('\n'.join(_l52))
 # ---- 野生（第12弾〜：カントーの 表は クリスタル版の もの）
 import gold_wild
 import os
