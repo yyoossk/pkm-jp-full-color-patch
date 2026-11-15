@@ -28,3 +28,10 @@ DEF AUTOBOX_SBOXCOUNT   EQU $ad10
 ; ボックス1〜9 の 場所は 金と 同じ（GetBoxCount.BoxBankAddresses $38:$7de0）
 
 INCLUDE "src/autobox.asm"
+
+; ボックスが いっぱいに なった とき の マサキの 電話を ならさない（自動で 次の ボックスに かわるので）。
+; Script_reloadmap の 前（$25:$747a）：ld a, [wBattleResult] / bit BATTLERESULT_BOX_FULL, a / jr z, .done
+;   / ld b, BANK(Script_SpecialBillCall) / ld de, Script_SpecialBillCall / farcall LoadMemScript
+; の jr z（28 0b）を jr（18 0b）に して、いつも とばす。
+SECTION "autobox no bill call", ROMX[$747f], BANK[$25]
+	db $18
