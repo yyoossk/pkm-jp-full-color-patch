@@ -9,12 +9,16 @@ from maps import CMGP, GMGP
 
 SAME = ('OlivineGym MahoganyGym SlowpokeWellB1F TeamRocketBaseB1F SilverCaveRoom3 MoveDeletersHouse AzaleaGym '
         'LakeOfRage VioletGym GoldenrodGym BillsFamilysHouse OlivinePort FastShip1F CianwoodGym NewBarkTown').split()
+# つくりが ちがうが、MOD が 話を 書きかえた マップ（カントーから 来た サトシの はじまり）：MOD の ものを そのまま
+FULL = ['ElmsLab', 'PlayersHouse1F', 'MrPokemonsHouse']
 
 
 def gold_texts(walks, VAN, GV, log):
     cv = {m['name']: m for m in maplist(VAN, CMGP, 'pokecrystal')}
     gv = {m['name']: m for m in maplist(GV, GMGP, 'pokegold')}
     n = 0
+    for nm in FULL:
+        if nm not in walks: log.append('ジョウト：入らなかった %s' % nm)
     for nm in SAME:
         if nm not in walks: log.append('ジョウト：入らなかった %s' % nm); continue
         W, at = walks[nm]
@@ -35,7 +39,7 @@ def patch_attrs(E, g, log):
     keep = []
     for ent in E.pending:
         cname, gm, at, gb, sa, ea, bgb, ba, chdr = ent
-        if cname in SAME:
+        if cname in SAME or cname in FULL:
             o = gm['attr']
             g[o + 6] = gb; g[o + 7] = sa & 255; g[o + 8] = sa >> 8; g[o + 9] = ea & 255; g[o + 10] = ea >> 8
             E.blk.pop(cname, None)

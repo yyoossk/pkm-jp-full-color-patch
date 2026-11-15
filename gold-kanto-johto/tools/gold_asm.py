@@ -36,7 +36,28 @@ AUTO = {
     (0x96, 0x5236): {'size': 0x5268 - 0x5236},   # （ram：金の 通信の 相手の ニックネームの 所 $DE12〜 を 一時的に）          # （おぼえさせる）
     # サファリ（6E:507D など）は 第28弾の サファリの しくみと いっしょに
 }
-PORTED = set(AUTO) | {(cb, x) for (cb, ca), o in AUTO.items() for x in o.get('also', [])}
+# 手で 書きなおす もの：御三家キット（MOD 6E:6E00〜）。もらった しるしは クリスタル版 $D837 の ビット 4〜6 →
+# 金の 追加機能パッチの wStarterFlags（$D7A1 の ビット 4〜6。starters.asm と 同じ）。イベントフラグは 金も 同じ 番号
+def _starter_kit():
+    from gold_safari import A
+    S, EV, SV = 0xD7A1, 0xD7AA + 3, 0xD165
+    a = A(0x4000)
+    a.L('6E00'); a.db(0xFA, S & 255, S >> 8, 0xF6, 0x70, 0xEA, S & 255, S >> 8, 0xC9)
+    a.L('6E09'); a.db(0xAF, 0xEA, SV & 255, SV >> 8, 0xFA, EV & 255, EV >> 8, 0xCB, 0x57, 0xC8, 0xC5, 0x79, 0xC6, 0x03, 0x4F, 0xCD); a.dw('6F60')
+    a.db(0xFA, EV & 255, EV >> 8, 0xA0, 0xC1, 0xC0, 0x79, 0xC6, 0x04, 0x4F, 0xCD); a.dw('6F60')
+    a.db(0xFA, S & 255, S >> 8, 0xA0, 0xC0, 0x3E, 0x01, 0xEA, SV & 255, SV >> 8, 0xC9)
+    a.L('6E33')
+    for c in (0, 1):
+        a.db(0x0E, c, 0xCD); a.dw('6E09'); a.db(0xFA, SV & 255, SV >> 8, 0xA7, 0xC0)
+    a.db(0x0E, 0x02, 0xC3); a.dw('6E09')
+    for lab, c, to in (('6EC9', 0, '6E09'), ('6ECE', 1, '6E09'), ('6ED3', 2, '6E09'), ('6ED8', 4, '6F55'), ('6EDD', 5, '6F55'), ('6EE2', 6, '6F55')):
+        a.L(lab); a.db(0x0E, c, 0xC3); a.dw(to)
+    a.L('6F55'); a.db(0xCD); a.dw('6F60'); a.db(0xFA, S & 255, S >> 8, 0xB0, 0xEA, S & 255, S >> 8, 0xC9)
+    a.L('6F60'); a.db(0x06, 0x01, 0x79, 0xA7, 0xC8, 0xCB, 0x20, 0x3D, 0x20, 0xFB, 0xC9)
+    return a
+HAND = {0x6E: _starter_kit}
+_HANDKEYS = {(0x6E, int(k, 16)) for k in _starter_kit().lab}
+PORTED = set(AUTO) | {(cb, x) for (cb, ca), o in AUTO.items() for x in o.get('also', [])} | _HANDKEYS
 
 def _put(E, g, cb, data):
     gb = E.gbank(cb); a = E.fill[gb]; assert a + len(data) <= 0x8000
@@ -48,6 +69,20 @@ def _nwarps(M, name, cm):
     return len(Walk(M).map(cm[name]['attr'], name)['warps'])
 
 def apply(E, M, g, log, cm):
+    for cb, fn in HAND.items():
+        gb = E.gbank(cb); base = E.fill[gb]; a = fn(); a.base = base
+        a2 = fn.__call__(); a2.base = base
+        from gold_safari import A
+        # 置く 住所で 組みなおす
+        b = A(base); b.b = bytearray(); b.lab = {}; b.fix = []
+        a3 = fn(); a3.base = base
+        code = None
+        a3.lab = {k: v - 0x4000 + base for k, v in a3.lab.items()}
+        code = a3.fin()
+        g[fo(gb, base):fo(gb, base) + len(code)] = code; E.fill[gb] = base + len(code)
+        for k, v in a3.lab.items():
+            E.loc[(cb, int(k, 16))] = (gb, v); asmx.FARMAP[(cb, int(k, 16))] = (gb, v)
+        log.append('手で 書いた asm %02X → %02X:%04X（%d バイト）' % (cb, gb, base, len(code)))
     for (cb, ca), opt in AUTO.items():
         notes = []
         size = opt.get('size') or asmx.extent(M, cb, ca)

@@ -49,7 +49,7 @@ for n in range(gold_p11.G26_FIRST, gold_p11.G26_N + 1):
 KANTO = [m['name'] for m in maplist(MOD, CMGP, 'pokecrystal') if KL <= MOD[m['hdr'] + 5] <= KE and m['name'] not in JOHTO_SIDE]
 KANTO += [nm for nm in G26 if KL <= MOD[cm[nm]['hdr'] + 5] <= KE]
 import gold_johto
-names = sorted(set(KANTO) | set(gold_johto.SAME))   # ジョウトは 金のまま（MOD だけの 変更は フェーズごとに 入れる） if len(sys.argv) < 2 else sys.argv[1].split(',')
+names = sorted(set(KANTO) | set(gold_johto.SAME) | set(gold_johto.FULL))   # ジョウトは 金のまま（MOD だけの 変更は フェーズごとに 入れる） if len(sys.argv) < 2 else sys.argv[1].split(',')
 walks = {}
 for nm in names:
     W = Walk(MOD)

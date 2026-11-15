@@ -39,6 +39,8 @@ def rebuild(E, g, GV, gm, nm, mods, M, MB, log):
     for k in ('obj', 'bg', 'coord', 'scene', 'callback'):
         for i, (b, a) in mods.get(k, {}).items():
             trees[(k, i)] = mod_tree(M, b, a, stop=mods.get('back', {}))
+    for i, (t_, (b, a)) in enumerate(mods.get('add_cb', [])):
+        trees[('addcb', i)] = mod_tree(M, b, a, stop=mods.get('back', {}))
     for i, ob in enumerate(mods.get('add_obj', [])):
         trees[('add', i)] = mod_tree(M, MB, w(ob, 9), 'trainer' if (ob[7] & 0xF) == 2 else 'script')
     for T in trees.values():
@@ -88,9 +90,10 @@ def rebuild(E, g, GV, gm, nm, mods, M, MB, log):
     sh = bytearray([len(at['scenes'])])
     for i, p in enumerate(at['scenes']):
         p = mptr(('scene', i)) if ('scene', i) in trees else rel(p); sh += p.to_bytes(2, 'little') + b'\0\0'
-    sh.append(len(at['callbacks']))
+    sh.append(len(at['callbacks']) + len(mods.get('add_cb', [])))
     for i, (t, p) in enumerate(at['callbacks']):
         p = mptr(('callback', i)) if ('callback', i) in trees else rel(p); sh += bytes([t]) + p.to_bytes(2, 'little')
+    for i, (t, ba) in enumerate(mods.get('add_cb', [])): sh += bytes([t]) + mptr(('addcb', i)).to_bytes(2, 'little')
     # イベント
     ev = bytearray(at['ev0']); ev.append(len(at['warps']))
     for wv in at['warps']: ev += wv
@@ -106,7 +109,7 @@ def rebuild(E, g, GV, gm, nm, mods, M, MB, log):
         ob = bytearray(ob); p = mptr(('obj', i)) if ('obj', i) in trees else rel(w(ob, 9)); ob[9:11] = p.to_bytes(2, 'little'); ev += ob
     for i, ob in enumerate(add):
         ob = bytearray(ob); X = E.X
-        ob[0] = X.sprite(ob[0], nm); ob[9:11] = mptr(('add', i)).to_bytes(2, 'little')
+        ob[0] = X.sprite(ob[0], nm); ob[9:11] = (mptr(('add', i)) if (ob[7] & 0xF) != 1 else 0).to_bytes(2, 'little')
         ob[11:13] = X.event(w(ob, 11), nm).to_bytes(2, 'little'); ev += ob
     sa = E.fill[NB]; E.fill[NB] += len(sh); g[fo(NB, sa):fo(NB, sa) + len(sh)] = sh
     ea = E.fill[NB]; E.fill[NB] += len(ev); g[fo(NB, ea):fo(NB, ea) + len(ev)] = ev

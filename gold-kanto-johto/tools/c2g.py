@@ -42,8 +42,10 @@ EV_POOL = sorted((set(range(0x800)) - set(v for n, v in G['event'].items() if n.
 EV_EXTRA = {}
 
 # 金に ない もの の かわり
-ENGINE_ALIAS = {'ENGINE_PLAYER_IS_FEMALE': 'ENGINE_UNUSED_STATUSFLAGS2_3'}   # 金に 女の子は いない（いつも 立たない フラグ）
-SPRITE_ALIAS = {'SPRITE_KRIS': 'SPRITE_CHRIS'}                            # 上の フラグが 立たないので 出ない
+ENGINE_ALIAS = {'ENGINE_PLAYER_IS_FEMALE': 'ENGINE_UNUSED_STATUSFLAGS2_3', 'ENGINE_MOBILE_SYSTEM': 'ENGINE_UNUSED_STATUSFLAGS2_3'}   # 金に 女の子は いない（いつも 立たない フラグ）
+SPRITE_ALIAS = {'SPRITE_KRIS': 'SPRITE_CHRIS'}
+SFX_ALIAS = {'SFX_GLASS_TING': 'SFX_SHINE', 'SFX_GLASS_TING_2': 'SFX_SHINE'}            # 金に ない 音
+SPECIAL_ALIAS = {'StubbedTrainerRankings_Healings': 'UnusedCheckUnusedTwoDayTimer'}   # なにも しない（金に ない）                            # 上の フラグが 立たないので 出ない
 class Xlat:
     def __init__(s):
         s.miss = []
@@ -86,10 +88,10 @@ class Xlat:
         n = s.mu.get(v); g = G['music'].get(n) if n else None
         return g if g is not None else s._m('music %s' % n, v, ctx)
     def sfx(s, v, ctx=''):
-        n = s.sf.get(v); g = G['sfx'].get(n) if n else None
+        n = s.sf.get(v); n = SFX_ALIAS.get(n, n); g = G['sfx'].get(n) if n else None
         return g if g is not None else s._m('sfx %s' % n, v, ctx)
     def special(s, v, ctx=''):
-        n = s.spc.get(v); g = G['special'].get(n) if n else None
+        n = s.spc.get(v); n = SPECIAL_ALIAS.get(n, n); g = G['special'].get(n) if n else None
         return g if g is not None else s._m('special %s' % n, v, ctx)
     def std(s, v, ctx=''):
         n = s.stdn.get(v); g = G['std'].get(n) if n else None

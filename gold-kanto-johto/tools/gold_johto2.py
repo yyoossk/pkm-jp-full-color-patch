@@ -18,6 +18,32 @@ TEXT = [
 ]
 # 再戦を 足す 人：(マップ, MOD の 人の 番号, 金の 人の 番号)
 GRAFT = [('EcruteakGym', 0, 0), ('BlackthornGym1F', 0, 0)]
+# MOD の スクリプトに いれかえる 看板・人：(マップ, 種類, MOD の 番号, 金の 番号)
+# （ウバメの ほこらの セレビィ（殿堂入りの あと Lv70）は 第64弾 金の 追加機能パッチの 伝説キットで）
+SWAP = [('FastShipCabins_SW_SSW_NW', 'bg', 0, 0), ('FastShipCabins_SW_SSW_NW', 'bg', 1, 1),   # ワカバタウンに とうちゃく
+        ('FastShipCabins_SE_SSE_CaptainsCabin', 'obj', 3, 3)]
+# MOD の 人・マップの よびだしを 足す：(マップ, MOD の 人の 番号の 一覧, MOD の よびだしの 番号の 一覧)
+ADD = [('RadioTower2F', [11, 12], [0])]                                      # ムサシと コジロウ
+
+
+# 金の マップの 中で その場で かえる もの（大きさ 同じ）：ロケット団アジト B2F の マルマイン → フォレトス（ジョウトは 第2世代だけ）
+INPLACE = [('TeamRocketBaseB2F', 'loadwildmon', 101, 205, 'マルマイン', 'フォレトス')]
+
+
+def inplace(g, GV, gm, log):
+    for nm, cmd, old, new, t0, t1 in INPLACE:
+        W = gr.gw.Walk(GV); W.map(gm[nm]['attr'], nm); W.run(); n = m = 0
+        op = gr.gw.OP[cmd]
+        for k, bl in W.blobs.items():
+            o = cwalk.fo(bl['bank'], bl['addr'])
+            if bl['kind'] == 'script':
+                for off, t, sem, name in bl['fix']:
+                    if name == cmd and sem == 'pokemon' and GV[o + off] == old and GV[o + off - 1] == op:
+                        g[o + off] = new; n += 1
+            if bl['kind'] == 'text':
+                d = bytes(g[o:o + len(bl['data'])]); a, b = jpchar.encode(t0), jpchar.encode(t1)
+                if a in d: g[o:o + len(d)] = d.replace(a, b); m += 1
+        log.append('%s：%s %d・セリフ %d' % (nm, cmd, n, m))
 
 
 def _ins(R, b, a, spec, n=24):
@@ -59,7 +85,8 @@ def apply(E, g, GV, M, V, log):
     cm = {m['name']: m for m in maplist(M, CMGP, 'pokecrystal')}
     cv = {m['name']: m for m in maplist(V, CMGP, 'pokecrystal')}
     gm = {m['name']: m for m in maplist(GV, GMGP, 'pokegold')}
-    names = sorted(set([t[0] for t in TEXT] + [x[0] for x in GRAFT]))
+    inplace(g, GV, gm, log)
+    names = sorted(set([t[0] for t in TEXT] + [x[0] for x in GRAFT] + [x[0] for x in SWAP] + [x[0] for x in ADD]))
     for nm in names:
         mods = {'text': {}, 'obj': {}, 'back': {}}
         gat = gr.gw.Walk(GV); at = gat.map(gm[nm]['attr'], nm); gat.run()
@@ -80,4 +107,12 @@ def apply(E, g, GV, M, V, log):
             rb, ra = M[o + 3], w(M, o + 4)
             mods['obj'][gi] = (mat['scbank'], mp)
             mods['back'].update(auto_back(M, V, GV, rb, ra, vat['scbank'], vp, at['scbank'], gp, gr.gw.SPEC))
+        for m_, kind, mi, gi in SWAP:
+            if m_ != nm: continue
+            if kind == 'bg': mods.setdefault('bg', {})[gi] = (mat['scbank'], w(mat['bgs'][mi], 3))
+            else: mods['obj'][gi] = (mat['scbank'], w(mat['objs'][mi], 9))
+        for m_, objs, cbs in ADD:
+            if m_ != nm: continue
+            mods['add_obj'] = [mat['objs'][i] for i in objs]
+            mods['add_cb'] = [(mat['callbacks'][i][0], (mat['scbank'], mat['callbacks'][i][1])) for i in cbs]
         gr.rebuild(E, g, GV, gm[nm], nm, mods, M, mat['scbank'], log)
