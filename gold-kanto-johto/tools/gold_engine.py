@@ -293,6 +293,36 @@ def p_catch_dude(g, M, log):
     log.append('つかまえかたの おじいさん（トキワ）：08:%04X' % B)
 
 
+def p60_treemons(g, M, log):
+    """第60弾：ずつきの 木・いわくだきの 岩の ポケモン（MOD の 表＝ジョウトは 第2世代だけ）。
+       クリスタル版の 8つの 組（2E:42C8 の 表・42DA〜43C5）と 木／岩の マップの 表を 金 2E の あきへ。"""
+    import c2g
+    X = c2g.Xlat()
+    G0 = 0x7E80; base = fo(0x2E, G0); assert not any(g[base:base + 0x180])
+    sets = M[fo(0x2E, 0x42DA):fo(0x2E, 0x43C5)]
+    tab = [M[fo(0x2E, 0x42C8) + 2 * k] | M[fo(0x2E, 0x42C8) + 2 * k + 1] << 8 for k in range(8)]
+    out = bytearray(); TAB = G0; SETS = G0 + 16
+    for p in tab: q = SETS + (p - 0x42DA); out += bytes([q & 255, q >> 8])
+    out += sets
+    def maps(a):
+        o = fo(0x2E, a); r = bytearray(); n = 0
+        while M[o] != 0xFF:
+            gg = X.mapid((M[o], M[o + 1]), 'treemon')
+            if gg != (M[o], M[o + 1]) or c2g.CMAP.get((M[o], M[o + 1])) in c2g.GMAP:
+                r += bytes([gg[0], gg[1], M[o + 2]]); n += 1
+            o += 3
+        return r + b'\xff', n
+    TM = G0 + len(out); tm, n1 = maps(0x423E); out += tm
+    RM = G0 + len(out); rm, n2 = maps(0x42A5); out += rm
+    assert len(out) <= 0x180, len(out)
+    g[base:base + len(out)] = out
+    for site, old, new in ((0x637F, 0x63E6, TM), (0x63A8, 0x644D, RM), (0x6464, 0x6470, TAB)):
+        o = fo(0x2E, site); assert g[o:o + 3] == bytes([0x21, old & 255, old >> 8]), hex(site)
+        g[o + 1] = new & 255; g[o + 2] = new >> 8
+    o = fo(0x2E, 0x645A); assert g[o:o + 2] == b'\xfe\x04'; g[o + 1] = 0x08
+    log.append('第60弾 木・岩の ポケモン：2E:%04X〜%04X（木 %d・岩 %d マップ）' % (G0, G0 + len(out), n1, n2))
+
+
 def apply(g, log, M=None, TB=None):
     if TB is not None: p55_koga(g, TB, log)
     p75_copyobject(g, log)
@@ -310,3 +340,4 @@ def apply(g, log, M=None, TB=None):
     if M is not None: p66_jj_colors(g, M, log)
     if M is not None: p21_seafoam_surf(g, M, log)
     if M is not None: p_catch_dude(g, M, log)
+    if M is not None: p60_treemons(g, M, log)
