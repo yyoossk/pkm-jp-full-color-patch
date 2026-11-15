@@ -28,6 +28,7 @@ from consts import all_tables as _at
 _C = _at('pokecrystal'); KL, KE = _C['landmark']['KANTO_LANDMARK'], _C['landmark']['KANTO_LANDMARK_LAST']
 JOHTO_SIDE = {'Route26', 'Route27', 'TohjoFalls', 'Route26HealHouse', 'DayOfWeekSiblingsHouse', 'Route27SandstormHouse'}
 E = Emit(g)
+import gold_specials; gold_specials.register()
 # ---- 第11弾の 土台：新しい タイルセット・グループ 26 の 14〜149 番
 import gold_p11, gold_safari, c2g as _c2g
 _l11 = []
@@ -111,7 +112,7 @@ while True:
 allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
-_la = []; gold_asm.apply(E, MOD, g, _la, cm); gold_safari.apply(g, MOD, E, _la); print('\n'.join(_la))
+_la = []; gold_asm.apply(E, MOD, g, _la, cm); gold_safari.apply(g, MOD, E, _la); gold_specials.apply(g, MOD, E.next_bank, _la); E.next_bank += 1; print('\n'.join(_la))
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 for k, b in allblobs.items(): E.write(k, b)
 finish_maps(E, MOD, g, cm, gm)

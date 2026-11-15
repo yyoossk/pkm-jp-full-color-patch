@@ -259,3 +259,14 @@
     （29番道路 → ヨシノ で 歩く 早さは 前と 同じ。18番道路 → セキチクで 人の絵が 正しく 出る）
   ・セキチクの 池の ラプラス（$9C）は クリスタル版でも 人と 鳥の 絵が 交互に 出る（クリスタル版の バグ）。金も 正しく 出ない。
   ・つぎ：第65弾（サファリの 表示）か、のこりの マップ（タマムシの ポケセン1F・ものまねむすめの家2F・レッドの家2F）。
+
+■ のこりの 3 マップ（これで カントーの マップは みな 入った：マップ 292、MISSLIST なし）
+  ・タマムシの ポケセン1F：special BeastsCheck・MonCheck（ミナキ）。tools/gold_specials.py：
+    クリスタル 12:66D0〜681B（CheckOwnMonAnywhere ほか）を 新しい バンク（今は AE）の 同じ 住所へ。
+    金の 使われない special の 番号を 使う：BeastsCheck → 111（UnusedDummySpecial）、MonCheck → 44（UnusedMemoryGame）。
+    SpecialsPointers（03:4239）の その番号を 書きかえ。c2g の G['special'] にも 名前を 足す（register）。
+    たしかめた：MonCheck（手持ちの ミュウツー）=1、ミュウ=0、BeastsCheck=0。
+  ・ものまねむすめの家2F：ENGINE_PLAYER_IS_FEMALE → 金の ENGINE_UNUSED_STATUSFLAGS2_3（いつも 立たない）、
+    SPRITE_KRIS → SPRITE_CHRIS（c2g の ENGINE_ALIAS・SPRITE_ALIAS）。
+  ・レッドの家2F：パソコンの あとの warp NONE（0,0）を そのまま（c2g mapid）。
+  ・3つとも クリスタル版と 並べて 同じ。

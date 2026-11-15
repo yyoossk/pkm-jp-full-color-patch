@@ -41,6 +41,9 @@ EV_POOL = sorted((set(range(0x800)) - set(v for n, v in G['event'].items() if n.
                  & set(v for n, v in C['event'].items() if n.startswith('EVENT_')))
 EV_EXTRA = {}
 
+# 金に ない もの の かわり
+ENGINE_ALIAS = {'ENGINE_PLAYER_IS_FEMALE': 'ENGINE_UNUSED_STATUSFLAGS2_3'}   # 金に 女の子は いない（いつも 立たない フラグ）
+SPRITE_ALIAS = {'SPRITE_KRIS': 'SPRITE_CHRIS'}                            # 上の フラグが 立たないので 出ない
 class Xlat:
     def __init__(s):
         s.miss = []
@@ -71,13 +74,13 @@ class Xlat:
                 g = EV_POOL.pop(0); EV_EXTRA[n] = g
         return g
     def engine(s, v, ctx=''):
-        n = s.en.get(v); g = G['engine'].get(n) if n else None
+        n = s.en.get(v); n = ENGINE_ALIAS.get(n, n); g = G['engine'].get(n) if n else None
         return g if g is not None else s._m('engine %s' % n, v, ctx)
     def sprite(s, v, ctx=''):
         if v >= 0xF0: return v   # SPRITE_VARS など
         if 0x67 <= v <= 0x7A: return v - 0x67 + 0x60     # クリスタル版の 新しい 人の絵（第11弾で 金に 入れる）
         if v == 0x3F: return 0x74                         # クリスタル版の サカキ（第13弾）
-        n = s.sp.get(v); g = G['sprite'].get(n) if n else None
+        n = s.sp.get(v); n = SPRITE_ALIAS.get(n, n); g = G['sprite'].get(n) if n else None
         return g if g is not None else s._m('sprite %s' % n, v, ctx)
     def music(s, v, ctx=''):
         n = s.mu.get(v); g = G['music'].get(n) if n else None
@@ -102,6 +105,7 @@ class Xlat:
         n = s.lm.get(v); g = G['landmark'].get(n) if n else None
         return g if g is not None else s._m('landmark %s' % n, v, ctx)
     def mapid(s, gn, ctx=''):
+        if tuple(gn) == (0, 0): return (0, 0)          # warp NONE（パソコンから 通信 など）
         n = CMAP.get(gn); n = MAPALIAS.get(n, n)
         g = GMAP.get(n)
         if g is None: s._m('map %s' % n, gn, ctx); return gn
