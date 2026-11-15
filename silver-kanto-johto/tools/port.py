@@ -211,7 +211,9 @@ class Port:
             s.s[ao + 3] = cb(at['blocks_bank']); s.s[ao + 6] = cb(at['scripts_bank'])
             p = ao + 12
             for cn in at['conns']:
-                g, m = s.x_map(cn['group'], cn['map']); s.s[p] = g; s.s[p + 1] = m; p += 12
+                g, m = s.x_map(cn['group'], cn['map']); s.s[p] = g; s.s[p + 1] = m
+                s.put16(p + 4, cn['dst'] - 0x100); s.put16(p + 10, cn['window'] - 0x100)   # wOverworldMap：クリスタル $C800 → 銀 $C700
+                p += 12
         s.copy(at['blocks_bank'], at['blocks'], at['width'] * at['height'])
         sb = at['scripts_bank']
         sc, cbs, so, se = cmaps.map_scripts(c, sb, at['scripts'])
