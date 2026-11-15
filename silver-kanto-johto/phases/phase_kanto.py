@@ -258,7 +258,7 @@ def apply(rom, ctx):
     assert rom[0x15286:0x1528A] == bytes([24, 7, 3, 3])
     rom[0x15286:0x1528A] = bytes(list(SM.id['REDS_HOUSE_2F']) + [3, 3])
 
-    ctx['kanto_trainers'] = P.trainers
+    ctx['kanto_trainers'] = P.trainers; ctx['amap'] = amap
     for kind, v in sorted(P.todo.items()):
         log.append('TODO %s %d: %s' % (kind, len(v), ' / '.join(sorted(v)[:12])))
     json.dump({k: sorted(v) for k, v in P.todo.items()}, open(os.path.join(ctx['B'], 'kanto_todo.json'), 'w'),
