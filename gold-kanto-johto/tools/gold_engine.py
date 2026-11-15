@@ -250,6 +250,36 @@ def p66_jj_colors(g, M, log):
     log.append('第66弾 ムサシとコジロウの 色：02:5435 → 02:%04X（%d バイト）' % (B, len(code)))
 
 
+def p21_seafoam_surf(g, M, log):
+    """第21弾：ふたごじま B4F（26:$43）の (7,11) は 岩 2つ（フラグ $883・$884）が 落ちるまで なみのり できない。
+       MOD 03:495E／4A3D → 7FBC／7FCE。金：03:49E6／4AB2 の call CheckDirection（$4A81）→ ホーム $3F10〜"""
+    from gold_safari import A
+    T = 0x7FD8; to = fo(3, T); assert not any(g[to:to + 0x28])
+    t1 = M[fo(3, 0x7F7E):fo(3, 0x7F8E)]; t2 = M[fo(0x63, 0x611A):fo(0x63, 0x612A)]
+    assert t1[-1] == 0x58 and t2[-1] == 0x57
+    SC = T + len(t1) + len(t2)
+    g[to:to + len(t1)] = t1; g[to + len(t1):to + len(t1) + len(t2)] = t2
+    g[fo(3, SC):fo(3, SC) + 3] = bytes([0x52, (T + len(t1)) & 255, (T + len(t1)) >> 8])   # jumptext
+    H = 0x3F10; assert not any(g[H:H + 0x60])
+    a = A(H)
+    a.L('chk'); a.db(0xFA, 0xC6, 0xD9, 0xFE, 0x1A); a.jr(0x20, 'no')
+    a.db(0xFA, 0xC7, 0xD9, 0xFE, 0x43); a.jr(0x20, 'no')
+    a.db(0xFA, 0xC9, 0xD9, 0xFE, 0x07); a.jr(0x20, 'no')
+    a.db(0xFA, 0xC8, 0xD9, 0xFE, 0x0B); a.jr(0x20, 'no')
+    a.db(0xFA, 0x1D, 0xD7, 0xCB, 0x5F); a.jr(0x28, 'yes')
+    a.db(0xCB, 0x67); a.jr(0x28, 'yes')
+    a.L('no'); a.db(0xA7, 0xC9)
+    a.L('yes'); a.db(0x37, 0xC9)
+    a.L('menu'); a.db(0xCD, 0x81, 0x4A, 0xD8, 0xCD); a.dw('chk'); a.db(0xD0, 0xE1, 0x21, T & 255, T >> 8, 0xCD, 0x86, 0x1B, 0x3E, 0x80, 0xC9)
+    a.L('ow'); a.db(0xCD, 0x81, 0x4A, 0xD8, 0xCD); a.dw('chk'); a.db(0xD0, 0xE1, 0x3E, 0x03, 0x21, SC & 255, SC >> 8, 0xCD, 0xF5, 0x26, 0x37, 0xC9)
+    code = a.fin(); assert len(code) <= 0x60
+    g[H:H + len(code)] = code
+    for site, lab in ((0x49E6, 'menu'), (0x4AB2, 'ow')):
+        o = fo(3, site); assert g[o:o + 3] == bytes.fromhex('cd814a'), hex(site)
+        g[o + 1] = a.lab[lab] & 255; g[o + 2] = a.lab[lab] >> 8
+    log.append('第21弾 ふたごじま B4F の なみのり：ホーム %04X〜%04X、03:%04X〜' % (H, H + len(code), T))
+
+
 def apply(g, log, M=None, TB=None):
     if TB is not None: p55_koga(g, TB, log)
     p75_copyobject(g, log)
@@ -265,3 +295,4 @@ def apply(g, log, M=None, TB=None):
     p01_continue_boulder(g, log)
     if M is not None: p_items(g, M, log)
     if M is not None: p66_jj_colors(g, M, log)
+    if M is not None: p21_seafoam_surf(g, M, log)
