@@ -4,7 +4,8 @@
     1. ROM を 4MB に（MBC30）
     2. この MOD の バンクを 写す・MOD が 日本版クリスタルの 空きに 置いた データを b+$80 へ
     3. カントーの マップ（グループ26 に 足した 137 マップも）を 写して、銀の マップの 表に 入れる
-    4. タイルセットの 表を のばす（$E1:$4000。銀 0〜28、MOD 37〜53）
+    4. タイルセットの 表を のばす（$E1:$4000。銀 0〜28、MOD 33〜53。33〜36 は MOD が クリスタルの 遺跡の 部屋の 番号を
+       赤の タワー・ロケット団アジト・ゲームコーナー などに 使って いる）
     5. イベントフラグ $800〜 を 使えるように（第15弾）
 """
 import os, sys, json
@@ -92,7 +93,7 @@ def apply(rom, ctx):
     ts_old = 0x1562B
     tab = bytearray(15 * 65)
     tab[0:15 * 29] = rom[ts_old:ts_old + 15 * 29]
-    for i in range(29, 37): tab[15 * i:15 * i + 15] = tab[15:30]
+    for i in range(29, 33): tab[15 * i:15 * i + 15] = tab[15:30]
     corig_ts = 0x4D405 - 15                                  # 日本版クリスタルの 表（$13:$53F6、0 から）
     canim = {}; cpal = {}
     for n, ci in T.c_ts.items():
@@ -101,7 +102,7 @@ def apply(rom, ctx):
             canim[r16(corig, co + 9)] = r16(rom, go + 9); cpal[r16(corig, co + 13)] = r16(rom, go + 13)
     ctab = 0x6A * 0x4000
     kanto_pal = r16(rom, ts_old + 15 * T.g_ts['TILESET_KANTO'] + 13)
-    for i in range(37, 54):
+    for i in range(33, 54):
         e = bytearray(cmod[ctab + 15 * i:ctab + 15 * i + 15])
         for f in (0, 3, 6): e[f] = port.cb(e[f])
         a = r16(e, 9); w16(e, 9, canim.get(a, canim.get(0x42E7, a)))
@@ -113,7 +114,7 @@ def apply(rom, ctx):
     rom[0x2DB9:0x2DBB] = bytes([0x00, 0x40]); rom[0x2DCB] = TS_BANK
 
     def x_ts(v):
-        if v >= 37: return v
+        if v >= 33: return v
         return P.x_named(T.c_ts, T.g_ts, v, 'tileset')
 
     # ---- 3. マップ

@@ -28,14 +28,14 @@ def apply(rom, ctx):
                 OBJPART & 0xff, OBJPART >> 8])
     rom[fo(2, FREE2):fo(2, FREE2) + len(hk)] = hk
     rom[LMP:LMP + 3] = bytes([0xCD, FREE2 & 0xff, FREE2 >> 8])
-    # タイルごとの 色の 表（palmap）：タイルセット 37〜 は $93（クリスタルの $13）から GetFarByte で 読む
+    # タイルごとの 色の 表（palmap）：タイルセット 33〜 は $93（クリスタルの $13）から GetFarByte で 読む
     GETFARBYTE = 0x30E4
     a = FREE2 + len(hk)
     def put(code):
         nonlocal a
         o = fo(2, a); assert not any(rom[o:o + len(code)]); rom[o:o + len(code)] = code; r = a; a += len(code); return r
     def rd(tail):
-        return bytes([0xFA, 0x74, 0xD0, 0xFE, 37, 0x38, 0x06 + len(tail), 0x3E, 0x93, 0xCD, GETFARBYTE & 0xff, GETFARBYTE >> 8]) + \
+        return bytes([0xFA, 0x74, 0xD0, 0xFE, 33, 0x38, 0x06 + len(tail), 0x3E, 0x93, 0xCD, GETFARBYTE & 0xff, GETFARBYTE >> 8]) + \
             tail + bytes([0xC9, 0x7E]) + tail + bytes([0xC9])
     r1 = put(rd(bytes([0xE6, 0x0F]))); r2 = put(rd(bytes([0xCB, 0x37, 0xE6, 0x0F])))
     n = 0
