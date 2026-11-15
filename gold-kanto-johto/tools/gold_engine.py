@@ -223,6 +223,33 @@ def p_items(g, M, log):
     log.append('どうぐの 属性：01・90・97')
 
 
+def p66_jj_colors(g, M, log):
+    """第66弾：ムサシとコジロウ（トレーナーの 種類 $48）の 戦いの 絵の 色（MOD 02:4E74 → 9C:4400）。
+       金の _CGB_FinishBattleScreenLayout（02:5435 call ApplyAttrmap）→ 02:7E30"""
+    from gold_safari import A
+    o = fo(2, 0x5435); assert g[o:o + 4] == bytes.fromhex('cdcb5ac9')
+    B = 0x7E30; assert not any(g[fo(2, B):fo(2, B) + 0x80])
+    a = A(B)
+    a.db(0xFA, 0x08, 0xD1, 0xFE, 0x02); a.jr(0x20, 'done')
+    a.db(0xFA, 0xDF, 0xD0, 0xA7); a.jr(0x20, 'done')
+    a.db(0xFA, 0x0A, 0xD1, 0xFE, 0x48); a.jr(0x20, 'done')
+    a.db(0x21, 0xD9, 0xCC, 0x06, 0x04, 0xFA, 0xAD, 0xC3, 0xFE, 0x07); a.jr(0x28, 'c7')
+    a.db(0x21, 0xDB, 0xCC, 0x05)
+    a.L('c7'); a.db(0x0E, 0x07)
+    a.L('row'); a.db(0xE5, 0xC5, 0x3E, 0x05, 0x22, 0x22, 0x22, 0x3E, 0x01)
+    a.L('l'); a.db(0x22, 0x05); a.jr(0x20, 'l')
+    a.db(0xC1, 0xE1, 0x11, 0x14, 0x00, 0x19, 0x0D); a.jr(0x20, 'row')
+    a.db(0x21); a.dw('pals'); a.db(0x11, 0x28, 0xC2, 0x01, 0x08, 0x00, 0xCD, 0xD6, 0x30)
+    a.db(0x21); a.dw('pals2'); a.db(0x11, 0x08, 0xC2, 0x01, 0x08, 0x00, 0xCD, 0xD6, 0x30)
+    a.L('done'); a.db(0xC3, 0xCB, 0x5A)
+    po = fo(0x9C, 0x4462)
+    a.L('pals'); a.b += M[po:po + 8]; a.L('pals2'); a.b += M[po + 8:po + 16]
+    code = a.fin(); assert len(code) <= 0x80
+    g[fo(2, B):fo(2, B) + len(code)] = code
+    g[o:o + 3] = bytes([0xC3, B & 255, B >> 8])
+    log.append('第66弾 ムサシとコジロウの 色：02:5435 → 02:%04X（%d バイト）' % (B, len(code)))
+
+
 def apply(g, log, M=None, TB=None):
     if TB is not None: p55_koga(g, TB, log)
     p75_copyobject(g, log)
@@ -237,3 +264,4 @@ def apply(g, log, M=None, TB=None):
     p57_trade_evo(g, log)
     p01_continue_boulder(g, log)
     if M is not None: p_items(g, M, log)
+    if M is not None: p66_jj_colors(g, M, log)
