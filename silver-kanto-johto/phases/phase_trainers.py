@@ -131,6 +131,10 @@ def classes(rom, cmod, P, log):
     assert not any(rom[fo(9, 0x7FF2):fo(9, 0x8000)]); rom[fo(9, 0x7FF2):fo(9, 0x8000)] = tr
     rom[o:o + 10] = bytes([0xC3, 0xF2, 0x7F]) + bytes(7)
     # 色（4 バイト）：67〜79 は バンク2 の 空きへ。0x9B75 "ld bc,$74C3 ; add hl,bc ; ret" を 分ける
+    # 0〜66：クリスタル版で 銀と ちがう 色（主人公＝レッドの 色、レッドは もとの 主人公の 色）を 銀の 表へ
+    for i in range(N0):
+        cp = cmod[fo(2, 0x77E3) + 4 * i:fo(2, 0x77E3) + 4 * i + 4]; so = fo(2, 0x74C3) + 4 * i
+        if rom[so:so + 4] != cp: rom[so:so + 4] = cp; log.append('トレーナーの 色 %d を クリスタル版の ものに' % i)
     pal = bytes(cmod[fo(2, 0x77E3) + 4 * N0:fo(2, 0x77E3) + 4 * N])
     a = 0x7F63
     while any(rom[fo(2, a):fo(2, a) + 4]): a += 1
