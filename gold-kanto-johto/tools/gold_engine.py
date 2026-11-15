@@ -49,6 +49,55 @@ def p69_ledges(g, log):
     g[o + 1] = h & 0xFF; g[o + 2] = h >> 8
     log.append('第69弾 段差：04:4176 → 04:%04X（%d バイト）' % (h, len(b)))
 
-def apply(g, log):
+def p27_cut(g, M, log):
+    """第27弾：赤の タイルセット（クリスタル 40 → 金 36）でも いあいぎり（赤の 木 $3C/$3F/$3D と、草など は タイルセット 3 と 同じ）。
+       金の CutTreeBlockPointers（03:48F5、ld hl は 03:487D）を 03 の うしろへ 移して 36 を 足す"""
+    o = fo(0x03, 0x487D); assert g[o:o + 3] == bytes([0x21, 0xF5, 0x48])
+    t = fo(0x03, 0x48F5); old = []
+    while g[t] != 0xFF: old.append((g[t], g[t + 1] | g[t + 2] << 8)); t += 3
+    ml = fo(0x03, 0x4881); lst = b''
+    while M[ml] != 0xFF: lst += M[ml:ml + 3]; ml += 3
+    lst += b'\xff'
+    s_ = g[0x03 * 0x4000:0x04 * 0x4000]; i = len(s_)
+    while s_[i - 1] in (0, 0xFF): i -= 1
+    base = 0x4000 + i + 2; tab = base; la = tab + 3 * (len(old) + 1) + 1
+    data = b''.join(bytes([ts, p & 0xFF, p >> 8]) for ts, p in old) + bytes([36, la & 0xFF, la >> 8, 0xFF]) + lst
+    assert base + len(data) <= 0x8000
+    g[fo(0x03, base):fo(0x03, base) + len(data)] = data
+    g[o + 1] = tab & 0xFF; g[o + 2] = tab >> 8
+    log.append('第27弾 いあいぎり：表 03:%04X（タイルセット 36 を 足す）' % tab)
+
+def p32_spawns(g, M, log):
+    """赤の 町の 飛ぶ所・負けた ときに もどる 所（SpawnPoints。クリスタル版 05:5346 → 金 05:5286、番号は 同じ）と、
+       第32弾：もどる 所が ない ときは マサラ（スポーン 2）。クリスタル 04:63E8 → 金 04:6795（04:7FC0 へ）"""
+    import sys; sys.path.insert(0, '/home/claude/work/scripts')
+    import c2g
+    cm = fo(0x05, 0x5346); gm = fo(0x05, 0x5286); n = 0
+    for i in range(14):                 # カントー（0〜13）だけ。ジョウトは 金の 町の まま
+        c = M[cm + 4 * i:cm + 4 * i + 4]
+        nm = c2g.CMAP.get((c[0], c[1])); nm = c2g.MAPALIAS.get(nm, nm)
+        if nm not in c2g.GMAP or nm in ('RedsHouse2F',): continue
+        gg, gn = c2g.GMAP[nm]; new = bytes([gg, gn, c[2], c[3]])
+        if bytes(g[gm + 4 * i:gm + 4 * i + 4]) != new: g[gm + 4 * i:gm + 4 * i + 4] = new; n += 1
+    o = fo(0x04, 0x6795); assert bytes(g[o:o + 8]) == bytes.fromhex('793801afea20cfc9')
+    h = 0x7FC0; assert not any(g[fo(0x04, h):fo(0x04, h) + 10])
+    g[fo(0x04, h):fo(0x04, h) + 9] = bytes.fromhex('793802' '3e02' 'ea20cf' 'c9')
+    g[o:o + 3] = bytes([0xC3, h & 0xFF, h >> 8])
+    log.append('スポーン：%d こ 赤の 位置に、負けた ときの もどる 所 04:%04X' % (n, h))
+
+def pokepic_color(g, log):
+    """pokepic の 窓の ポケモンを 色つきに（クリスタル版 02:7F9D と 同じ。金 _CGB_Pokepic 02:5966 → 02:7C30）"""
+    o = fo(0x02, 0x5966); assert bytes(g[o:o + 5]) == bytes.fromhex('3e00cd875a')
+    h = 0x7C30; assert not any(g[fo(0x02, h):fo(0x02, h) + 0x22])   # 02:7C28〜7C5F（金の 追加機能パッチは 7C60〜）
+    code = bytes.fromhex('e5c5' 'fafecf' 'cd7a5b' 'e5' '1138c2' 'cd715a' 'e1' '11b8c2' 'cd715a'
+                         '3e01e0e7' 'c1e1' '3e07' 'c3875a')
+    g[fo(0x02, h):fo(0x02, h) + len(code)] = code
+    g[o:o + 5] = bytes([0xCD, h & 0xFF, h >> 8, 0, 0])
+    log.append('pokepic の 色：02:%04X（%d バイト）' % (h, len(code)))
+
+def apply(g, log, M=None):
+    pokepic_color(g, log)
+    if M is not None: p32_spawns(g, M, log)
+    if M is not None: p27_cut(g, M, log)
     p69_ledges(g, log)
     p54_winloss(g, log)

@@ -15,5 +15,5 @@ for by in range(at['h']):
         for bx in range(at['w']):
             b=blk[by*at['w']+bx]; c=M[fo(cb,ca)+4*b:fo(cb,ca)+4*b+4]
             for sx in (0,1):
-                v=c[sub*2+sx]; s+= '~' if v==0x29 else '.' if v==0 else '"' if v==0x18 else '#' if v==0x07 else '%X'%(v&15)
+                v=c[sub*2+sx]; s+= 'L' if v&0xF0==0xA0 else '~' if v==0x29 else '.' if v==0 else '"' if v==0x18 else '#' if v==0x07 else '%X'%(v&15)
         print('%2d %s'%(by*2+sub,s))
