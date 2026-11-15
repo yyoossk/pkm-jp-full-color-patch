@@ -1,8 +1,8 @@
 """クチバジムの マチスの 前の 扉（第108弾の 銀版。赤と 同じ 2まいの 扉）：
    なぞを 解く 前、ブロック (2,2) は クリスタル版の キット（第75弾）で「壁」（銀の タイルセット 13 の ブロック $20）に して いた。
    赤の 扉（赤フルカラーの ジムの タイル $20 $21 / $30 $31）を 入れる：
-   ・クチバジム だけの タイルセット 29（あき。タイルセット 13 の 写し）を 作る：クチバジムで 使わない タイル $0E $0F $22 $23
-     （色は 床と 同じ パレット 1）に 赤の 扉、ブロック $40（上が 扉で 通れない、下は 床）を 足す。データは $EE。
+   ・クチバジム だけの タイルセット 29（あき。タイルセット 13 の 写し）を 作る：クチバジムで 使わない タイル $16 $17 $26 $27
+     （パレットマップで パレット 0＝灰色。銀は VRAM バンク1 の タイルを 使わない ので バンク1 の 印は いらない）に 赤の 扉、ブロック $40（上が 扉で 通れない、下は 床）を 足す。データは $EE。
    ・第75弾の callback（$63:$7330 changeblock 4,4,$20）を $40 に。開くと 床（$01、前と 同じ）。"""
 import os, sys
 H = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,7 +13,7 @@ from gsc import fo, r16
 AKAFC = os.environ.get('AKAFC', '/home/claude/in/aka/akafc.gbc')
 RED_GYM_GFX = 0x68050
 SRC_TS, NEW_TS, DB = 13, 29, 0xEE
-NEW_TILES = [0x0E, 0x0F, 0x22, 0x23]
+NEW_TILES = [0x16, 0x17, 0x26, 0x27]         # パレット 0（灰色）の タイル
 RED_DOOR = [0x20, 0x21, 0x30, 0x31]
 FLOOR, WALL, DOOR = 0x01, 0x20, 0x40
 CALLBACK = (0x63, 0x7330)
@@ -62,6 +62,8 @@ def apply(rom, ctx):
     ao = fo(rom[h], r16(rom, h + 3)); bp = fo(rom[ao + 3], r16(rom, ao + 4)); blocks = set(rom[bp:bp + rom[ao + 1] * rom[ao + 2]])
     blocks |= {FLOOR, WALL}
     used = set(); [used.update(meta[16 * b:16 * b + 16]) for b in blocks]
+    pm = rom[fo(2, r16(rom, e + 13)):fo(2, r16(rom, e + 13)) + 48]                        # 色の 表（バンク 2）
+    assert all((pm[t // 2] >> (4 * (t % 2))) & 15 == 0 for t in NEW_TILES)
     assert not used & set(NEW_TILES), [hex(t) for t in used & set(NEW_TILES)]
     F = open(AKAFC, 'rb').read()
     for t, rt in zip(NEW_TILES, RED_DOOR): gfx[16 * t:16 * t + 16] = F[RED_GYM_GFX + 16 * rt:RED_GYM_GFX + 16 * rt + 16]
