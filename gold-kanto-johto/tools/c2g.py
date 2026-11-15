@@ -62,6 +62,7 @@ class Xlat:
     def sprite(s, v, ctx=''):
         if v >= 0xF0: return v   # SPRITE_VARS など
         if 0x67 <= v <= 0x7A: return v - 0x67 + 0x60     # クリスタル版の 新しい 人の絵（第11弾で 金に 入れる）
+        if v == 0x3F: return 0x74                         # クリスタル版の サカキ（第13弾）
         n = s.sp.get(v); g = G['sprite'].get(n) if n else None
         return g if g is not None else s._m('sprite %s' % n, v, ctx)
     def music(s, v, ctx=''):

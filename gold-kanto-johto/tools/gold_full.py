@@ -130,6 +130,13 @@ NB = E.next_bank; E.next_bank += 1
 _log = []
 gold_p10.apply(g, VAN, MOD, TB, NB, _log)
 print('トレーナー：バンク %02X、第10弾 バンク %02X' % (TB, NB)); print('\n'.join(_log))
+# ---- 野生（第12弾〜：カントーの 表は クリスタル版の もの）
+import gold_wild
+import os
+if not os.environ.get("NOWILD"): _lw = []; gold_wild.apply(g, MOD, E, E.X, _lw); print('\n'.join(_lw))
+# ---- 第13弾：ゆうれい戦
+import gold_ghost
+_lg = []; gold_ghost.apply(g, MOD, E, _lg); print('\n'.join(_lg))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
 open('/home/claude/work/out/gold_full.gbc', 'wb').write(g)
 print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.bankmap.items()})

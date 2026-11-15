@@ -122,8 +122,8 @@ def apply(g, MOD, E, log):
     OS = 0x47B0; NSP = 0x7A - 0x67 + 1; GS0 = 0x60
     base = 0x562B; tab = base + 36
     ents = bytearray()
-    for v in range(0x67, 0x7B):
-        e = M[fo(5, 0x7CD0) + (v - 1) * 6:fo(5, 0x7CD0) + (v - 1) * 6 + 6]
+    for v in list(range(0x67, 0x7B)) + [0x3F]:      # 0x3F：クリスタル版は 使っていない 人の 所に サカキ（第13弾）→ 金 $74
+        e = M[fo(5, 0x7CD0) + (v - 1) * 6:fo(5, 0x7CD0) + (v - 1) * 6 + 6] if v >= 0x67 else M[0x14727 + 6 * (v - 1):0x14727 + 6 * v]
         n = e[2]; src = fo(e[3], r16(e, 0)); sb, sa = A.put(M[src:src + n * 1])
         ents += bytes([sa & 0xFF, sa >> 8, n, sb, e[4], e[5]])
     code = bytearray()
@@ -135,5 +135,5 @@ def apply(g, MOD, E, log):
     for ad, k, f, i in ((0x4281, 5, 0, 0), (0x42E9, 6, 4, 1), (0x4306, 6, 5, 2)):
         o = fo(5, ad + k); assert g[o:o + 3] == bytes([0x21, (OS + f) & 0xFF, (OS + f) >> 8]), hex(ad)
         h = base + 12 * i; g[o:o + 3] = bytes([0xCD, h & 0xFF, h >> 8])
-    log.append('人の絵：クリスタル版 $67〜$7A → 金 $60〜$73（表 05:%04X）' % tab)
+    log.append('人の絵：クリスタル版 $67〜$7A → 金 $60〜$73、$3F（サカキ）→ $74（表 05:%04X）' % tab)
     return dict(hdr0=lo)
