@@ -62,6 +62,7 @@ def phases(rom):
         m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
         rom = m.apply(rom, ctx)
         print(f, '%08X' % crc(rom))
+        for l in ctx.pop('log', []): print('  ', l)
     return rom
 
 
