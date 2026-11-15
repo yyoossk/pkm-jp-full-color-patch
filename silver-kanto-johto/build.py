@@ -57,10 +57,13 @@ def phases(rom):
     d = os.path.join(H, 'phases')
     if not os.path.isdir(d): return rom
     ctx = {'H': H, 'B': B, 'sym': os.path.join(B, 'stage1.sym')}
-    for f in sorted(x for x in os.listdir(d) if x.startswith('phase') and x.endswith('.py')):
+    fs = sorted(x for x in os.listdir(d) if x.startswith('phase') and x.endswith('.py'))
+    fs.remove('phase_kanto.py'); fs.insert(0, 'phase_kanto.py')     # ROM を 4MB に する ので いちばん はじめ
+    for f in fs:
         spec = importlib.util.spec_from_file_location(f[:-3], os.path.join(d, f))
         m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
         rom = m.apply(rom, ctx)
+        assert len(rom) == 0x400000, '%s: ROM の 大きさが %X' % (f, len(rom))
         print(f, '%08X' % crc(rom))
         for l in ctx.pop('log', []): print('  ', l)
     return rom
