@@ -66,6 +66,12 @@ def apply(rom, ctx):
             elif i < len(slist): res.append(slist[i])
             elif i < len(clist): res.append(fix_items(T, clist[i], P)); nk += 1
         out[gi] = res
+    # クラス 63（レッド）は ゴールド（第47弾：シロガネやま。手持ちは クリスタル版の ヒビキと 同じ）
+    mv = lambda lv, sp_, *ms: bytes([lv, sp_, *ms])
+    import jptext
+    out[63][0] = jptext.enc('ゴールド@') + b'\x01' + mv(81, 0xB8, 0x39, 0x3A, 0x26, 0xCD) + mv(73, 0xC4, 0xBD, 0x73, 0x81, 0x5E) + \
+        mv(75, 0x8F, 0x85, 0xAD, 0x9C, 0x22) + mv(77, 0x9A, 0x73, 0x22, 0xEB, 0x4C) + mv(77, 0x9D, 0x35, 0x59, 0x81, 0x62) + \
+        mv(77, 0xA0, 0x39, 0xF2, 0xA3, 0x08) + b'\xff'
     # 置く：$4000〜$5511 と 表の 後ろ
     tab = S_TAB; free = [(0x4000, S_CODE), (S_TAB + 2 * NCLASS, 0x7C00)]   # $7C00〜 は クラスの 表
     cur = 0; addr = free[0][0]
@@ -154,7 +160,9 @@ def classes(rom, cmod, P, log):
             src = fo(real, r16(e, 1)); n = min(0x500, fo(real + 1, 0x4000) - src)
             rom[fo(port.cb(real), r16(e, 1)):fo(port.cb(real), r16(e, 1)) + n] = cmod[src:src + n]; real = port.cb(real)
         e[0] = real; pic += e
+    pic[3 * 62:3 * 63] = pic[3 * 11:3 * 12]                 # クラス 63（ゴールド）の 絵 = クラス 12（ゴールドの 絵）
     rom[fo(PB, 0x4000):fo(PB, 0x4000) + len(pic)] = pic
+    rom[fo(2, 0x74C3) + 4 * 63:fo(2, 0x74C3) + 4 * 64] = rom[fo(2, 0x74C3) + 4 * 12:fo(2, 0x74C3) + 4 * 13]
     g = 0x5188A; assert rom[g:g + 8] == bytes([0xFA, 0x0F, 0xD1, 0xA7, 0xC8, 0xFE, 0x43, 0xD0]); rom[g + 6] = N + 1
     n = 0
     for o in range(g, g + 80):
