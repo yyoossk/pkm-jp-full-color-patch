@@ -151,7 +151,13 @@ class Emit:
                 elif sem == 'cry_id': nv = v
                 elif sem in ('ram', 'address'):
                     nv = RAMMAP.get(v)
-                    if nv is None: nv = X._m('RAM', v, ctx)
+                    if nv is None:
+                        import asmx
+                        nv = asmx.RAM_FIX.get(v)
+                        if nv is None and v >= 0xFF80 and (v & 0xFF) in asmx.HRAM: nv = 0xFF00 | asmx.HRAM[v & 0xFF]
+                        if nv is None:
+                            gv, nm = asmx.RX.x(v)
+                            nv = gv if gv is not None else X._m('RAM %s' % nm, v, ctx)
                 elif 'pointer' in sem or sem == 'data':
                     if v not in (0, 0xFFFF): nv = s.ptr(b['bank'], v, ctx)[1]
                 data[off] = nv & 0xFF; data[off + 1] = nv >> 8

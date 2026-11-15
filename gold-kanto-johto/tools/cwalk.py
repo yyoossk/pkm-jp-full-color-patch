@@ -109,9 +109,10 @@ class Walk:
             p += 1
             if c == 0x00: mode = 'str'
             elif c in (0x01, 0x03): fix.append((p - o, 'dw', 'ram', 'text')); p += 2
-            elif c == 0x02: p += 3
+            elif c == 0x02: fix.append((p - o, 'dw', 'ram', 'text')); p += 3          # text_bcd
+
             elif c == 0x04: p += 4
-            elif c == 0x09: p += 3
+            elif c == 0x09: fix.append((p - o, 'dw', 'ram', 'text')); p += 3          # text_decimal
             elif c in (0x0C, 0x14): p += 1
             elif c == 0x16:
                 fix.append((p - o, 'dba', 'textfar', 'text')); s.add('text', s.r[p + 2], w(s.r, p), ctx); p += 3

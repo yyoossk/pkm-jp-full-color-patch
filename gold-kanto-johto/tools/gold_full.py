@@ -148,6 +148,7 @@ print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.ban
 print('読みかえできない:', len(E.X.miss))
 from collections import Counter
 for k, v in Counter(m.split('（')[0] for m in E.X.miss).most_common(): print(v, k)
+print('MISSLIST'); print('\n'.join(sorted(set(E.X.miss))))
 print('ポインター:', len(E.homemiss)); print('\n'.join(sorted(set(E.homemiss))))
 # どのマップの かたまりか（未配置の ポインターを 持つもの）
 _own = {}

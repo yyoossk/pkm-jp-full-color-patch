@@ -22,12 +22,16 @@ for l in open('/home/claude/work/goldsrc/src/jp_all.inc'):
     m = re.match(r'DEF J(B?)_(\S+) EQU \$([0-9a-f]+)', l)
     if m: (GB if m.group(1) else GJ)[m.group(2)] = int(m.group(3), 16)
 RX = rammap.RamX()
-RAM_FIX = {0xC2DD: 0xD165, 0xD071: 0xCF9D, 0xD296: 0xD143}   # D296：NewPokedexEntry の ポケモン（金 wNamedObjectIndex）   # 確かめた もの（c2g と 同じ）
+RAM_FIX = {0xC2DD: 0xD165, 0xD071: 0xCF9D, 0xD296: 0xD143,
+           0xD21C: 0xD0C6,        # wSurfingPlayerState
+           0xD833: 0xD780}        # 追加機能キットの 連れ歩きの 番号（金の 追加機能パッチ wFwSlot）   # D296：NewPokedexEntry の ポケモン（金 wNamedObjectIndex）   # 確かめた もの（c2g と 同じ）
 # クリスタル版の 足した フラグ（$800〜：$DA01〜）・シーンの 変数（$DA5F〜$DA64）→ 金（gold_flags.py の 並べ方）
 for _k in range(51): RAM_FIX[0xDA01 + _k] = 0xD70D + _k
 for _k in range(51, 67): RAM_FIX[0xDA01 + _k] = 0xD790 + (_k - 51)
 for _k in range(6): RAM_FIX[0xDA5F + _k] = 0xD7A4 + _k
-HRAM = {}                                     # クリスタル hXX → 金 hXX（必要に なったら 足す）
+FARMAP = {}                                   # うつした asm（クリスタル版 (バンク, 住所) → 金）
+HRAM = {h: h + 2 for h in range(0x8D, 0xE8)}   # クリスタル hXX → 金 hXX（$FF8D〜$FFE7 は 金が 2 うしろ。ホームの 同じ ルーチンで くらべた）
+HRAM.update({h: h for h in range(0x80, 0x8D)})
 
 def fo(b, a): return b * 0x4000 + a - 0x4000
 
@@ -76,7 +80,9 @@ def xlat(M, bank, a, new_addr, notes, size=None, code_len=None):
         if op == 0x3E and p + 5 < n and b[p + 2] == 0x21 and b[p + 5] == 0xCF:
             fb = b[p + 1]; fa = M[o + p + 3] | M[o + p + 4] << 8
             nm = CSD.get((fb, fa))
-            if nm and nm in GJ and nm in GB: b[p + 1] = GB[nm]; b[p + 3] = GJ[nm] & 0xFF; b[p + 4] = GJ[nm] >> 8; notes.append('farcall %s' % nm)
+            if (fb, fa) in FARMAP:
+                gb_, ga_ = FARMAP[(fb, fa)]; b[p + 1] = gb_; b[p + 3] = ga_ & 0xFF; b[p + 4] = ga_ >> 8; notes.append('farcall うつした %02X:%04X' % (fb, fa))
+            elif nm and nm in GJ and nm in GB: b[p + 1] = GB[nm]; b[p + 3] = GJ[nm] & 0xFF; b[p + 4] = GJ[nm] >> 8; notes.append('farcall %s' % nm)
             else: prob.append('farcall %02X:%04X（%s）' % (fb, fa, near(CS, fb, fa)))
         p += ln
     return bytes(b), prob
