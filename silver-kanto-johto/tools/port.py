@@ -26,6 +26,11 @@ def cb(b):
     return b                               # $80〜（追加機能キットの バンク）は 銀では 別に 作る
 
 
+# setval 0 / waitsfx（3バイト）
+SPECIAL_SUB = {'CheckMobileAdapterStatusSpecial': bytes([0x15, 0x00, 0x85]),
+               'StubbedTrainerRankings_Healings': bytes([0x85, 0x85, 0x85])}
+
+
 class Port:
     def __init__(s, silver, cmod, log):
         s.s = silver; s.c = cmod; s.log = log
@@ -142,8 +147,18 @@ class Port:
         elif f == 'T': s.s[q] = cb(v[0]); s.text(*v)
         elif f == 'm': s.movement(b, v)
         elif f == 'E': s.put16(q, s.x_flag(v))
-        elif f == 'G': s.put16(q, s.x_named(s.T.c_eng, s.T.g_eng, v, 'engineflag'))
-        elif f == 'S': s.put16(q, s.x_named(s.T.c_special, s.T.g_special, v, 'special'))
+        elif f == 'G':
+            if xlat.inv(s.T.c_eng).get(v) == 'ENGINE_PLAYER_IS_FEMALE':     # 銀の 主人公は いつも 男の子 → いつも 0 の フラグ
+                s.put16(q, s.T.g_eng['ENGINE_UNUSED_STATUSFLAGS2_3'])
+            else: s.put16(q, s.x_named(s.T.c_eng, s.T.g_eng, v, 'engineflag'))
+        elif f == 'S':
+            r = s.x_named(s.T.c_special, s.T.g_special, v, 'special')
+            cs = s.T.c_special; nm = cs[v] if isinstance(cs, list) and v < len(cs) else None
+            if nm in SPECIAL_SUB:                     # 銀に ない 特別な 処理（モバイル・つうしん の 記録）→ 同じ 長さの 命令
+                s.s[q - 1:q + 2] = SPECIAL_SUB[nm]
+            else:
+                if nm not in s.T.g_special: s.note('special_at', '%s %s' % (hex(v), getattr(s, 'curmap', '?')))
+                s.put16(q, r)
         elif f == 'D': s.put16(q, s.x_named(s.T.c_std, s.T.g_std, v, 'std'))
         elif f == 'M':
             g, m = s.x_map(v & 0xff, v >> 8); s.s[q] = g; s.s[q + 1] = m
@@ -201,7 +216,7 @@ class Port:
     # ---------- マップ
     def map(s, k):
         """クリスタル版の マップ k を 写して、銀の ヘッダー（9バイト）を 返す"""
-        CM = s.CM; c = s.c
+        CM = s.CM; c = s.c; s.curmap = CM.name.get(k, str(k))
         h = CM.header(k); at = CM.attributes(k)
         ab, aa = h['attr_bank'], h['attr']
         n_at = 12 + 12 * len(at['conns'])

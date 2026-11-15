@@ -149,6 +149,17 @@ def apply(rom, ctx):
         ho = SM.hdr[SM.id[n]]; rom[ho:ho + 9] = h
     log.append('マップ %d（グループ26 に %d 足した）、銀の 属性 %d を $%02X へ' % (len(keys), len(new), moved, ATTR_BANK))
 
+    # タマムシの ポケモンセンターの ミナキ（クリスタルの スイクンの 話。銀には ない）は 出さない：
+    # 人の フラグを いつも 立って いる EVENT_INITIALIZED_EVENTS に（BeastsCheck・MonCheck も 使われなく なる）
+    SM.rom = rom
+    ev = SM.events(SM.id['CELADON_POKECENTER_1F'])
+    o = ev['end'] - 13 * len(ev['objects'])
+    hid = 0
+    for i, ob in enumerate(ev['objects']):
+        if ob[0] == T.g_spr['SPRITE_SUPER_NERD']:
+            q = o + 13 * i + 11; w16(rom, q, T.g_ev['EVENT_INITIALIZED_EVENTS']); hid += 1
+    assert hid == 1, hid
+
     # ---- WRAM の アドレス（テキストの 数・名前、readmem など）を 銀の アドレスへ
     import wramxl
     wm = wramxl.build(corig, open(os.path.join(H, 'roms', 'gin1.gbc'), 'rb').read())
