@@ -16,7 +16,7 @@ def w16(r, o, v): r[o] = v & 0xFF; r[o + 1] = v >> 8
 G_NTS = 29                      # 金の タイルセット（0〜28）
 C_FIRST, C_LAST = 33, 53        # クリスタル版の 新しい タイルセット
 G26_FIRST = 14                  # クリスタル版も 金も、グループ 26 の 12・13 番の 所は 属性の データ（マップではない）
-G26_N = 149                     # クリスタル版 グループ 26 の 最後の 番号
+G26_N = 150                     # クリスタル版 グループ 26 の 最後の 番号
 W_MAPTILESET, W_BGPALS1, FARCOPYBYTES, LOADMAPPALS = 0xD074, 0xC200, 0x0DB6, 0x75CF
 ROOF_TAIL = 0x7626              # LoadMapPals の うしろ（ld a,[wEnvironment] / cp TOWN …）
 

@@ -36,6 +36,11 @@ HOMEMAP = {0x26B2: 0x27BF}   # ObjectEvent（jumptextfaceplayer ObjectEventText�
 # RAM（日本版クリスタル → 日本版金）
 RAMMAP = {0xD071: 0xCF9D, 0xC2DD: 0xD165}    # wStringBuffer3・wScriptVar（rammap.py で 確かめた）
 
+# 金で 空いていて、クリスタルでは 名前の ある 番号（クリスタル版は その 番号を 名前なしでは 使わない）
+EV_POOL = sorted((set(range(0x800)) - set(v for n, v in G['event'].items() if n.startswith('EVENT_')))
+                 & set(v for n, v in C['event'].items() if n.startswith('EVENT_')))
+EV_EXTRA = {}
+
 class Xlat:
     def __init__(s):
         s.miss = []
@@ -53,9 +58,18 @@ class Xlat:
         if n is None:
             if v in s.gfree: return v     # 名前のない（MOD で使い始めた）フラグは 金でも空いている同じ番号
             if 0x800 <= v <= 0xA17: return v   # 第15弾の 土台（gold_flags.py）で 金でも 使える
+            if v < 0x800:                        # 名前なしで 使っているが 金では 使われている 番号 → 空きを わりあてる
+                k = ('num', v)
+                if k not in EV_EXTRA: EV_EXTRA[k] = EV_POOL.pop(0)
+                return EV_EXTRA[k]
             return s._m('event', v, ctx)
         g = G['event'].get(n)
-        return g if g is not None else s._m('event ' + n, v, ctx)
+        if g is None:
+            # クリスタルに しか ない 名前の フラグ：金で 空いていて、クリスタル版が 名前なしで 使わない 番号を わりあてる
+            g = EV_EXTRA.get(n)
+            if g is None:
+                g = EV_POOL.pop(0); EV_EXTRA[n] = g
+        return g
     def engine(s, v, ctx=''):
         n = s.en.get(v); g = G['engine'].get(n) if n else None
         return g if g is not None else s._m('engine %s' % n, v, ctx)

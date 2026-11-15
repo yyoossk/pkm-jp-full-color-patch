@@ -11,6 +11,8 @@ g += bytes(0x400000 - len(g)); g[0x148] = 0x07
 # 4MB：バンク $80 以降のスクリプトから もどるとき 上のビットを消さない（クリスタル版 第67弾と同じ）
 o = 0x25 * 0x4000 + 0x7389 - 0x4000; assert g[o + 3:o + 5] == b'\xf6\x80'; g[o + 4] = 0x00
 o = 0x25 * 0x4000 + 0x7a16 - 0x4000; assert g[o + 0x13:o + 0x15] == b'\xe6\x7f'; g[o + 0x14] = 0xff
+# LoadMetatiles の 128 番より 後の ブロックが 前に もどる バグ（金の 追加機能パッチ bugfix 48 と 同じ。クリスタル版の 赤の 町が 使う）
+assert g[0x1FAF:0x1FB6] == bytes.fromhex('876f2600292929'); g[0x1FAF:0x1FB6] = bytes.fromhex('6f260029292929')
 # はじめの場所：スポーン0 を レッドの家2F に（クリスタル版 05:SpawnPoints と同じ）
 o = 0x05 * 0x4000 + 0x5286 - 0x4000; assert g[o:o + 2] == b'\x18\x07'; g[o:o + 2] = b'\x0d\x04'
 # シーンの表：主人公の家1F の シーンの変数を レッドの家1F で使う（クリスタル版 13:506A と同じ）
@@ -108,7 +110,7 @@ while True:
 allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
-_la = []; gold_asm.apply(E, MOD, g, _la); print('\n'.join(_la))
+_la = []; gold_asm.apply(E, MOD, g, _la, cm); print('\n'.join(_la))
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 for k, b in allblobs.items(): E.write(k, b)
 finish_maps(E, MOD, g, cm, gm)
@@ -134,6 +136,9 @@ print('トレーナー：バンク %02X、第10弾 バンク %02X' % (TB, NB)); 
 import gold_wild
 import os
 if not os.environ.get("NOWILD"): _lw = []; gold_wild.apply(g, MOD, E, E.X, _lw); print('\n'.join(_lw))
+# ---- 第12弾ほか：大事な どうぐ
+import gold_items
+_li = []; gold_items.apply(g, MOD, E, _li); print('\n'.join(_li))
 # ---- 第13弾：ゆうれい戦
 import gold_ghost
 _lg = []; gold_ghost.apply(g, MOD, E, _lg); print('\n'.join(_lg))

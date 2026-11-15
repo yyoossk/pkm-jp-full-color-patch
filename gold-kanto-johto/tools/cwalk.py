@@ -76,6 +76,8 @@ class Walk:
                     if name in ('givepokemail', 'checkpokemail'): k = 'raw'
                     if name == 'getstring' or (name == 'givepoke'): k = 'string'
                     s.add(k, b, ptr, ctx)
+                elif t == 'dw' and sem == 'queue_pointer':
+                    s.add('cmdqueue', b, w(s.r, q), ctx)
                 elif t == 'dw' and sem == 'data':
                     s.add('movement', b, w(s.r, q), ctx)
                 elif t == 'dw' and sem == 'menu_header':
@@ -120,6 +122,18 @@ class Walk:
             else:
                 s.notes.append('不明なセリフ命令 %02X at %02X:%04X（%s）' % (c, b, a + p - o - 1, ctx)); break
         s.put('text', b, a, p - o, fix)
+
+    def w_cmdqueue(s, b, a, ctx):
+        # cmdqueue：db 種類 / dw データ / dw 0。種類 2（STONETABLE）の データは stonetable（db 入口, 人 / dw スクリプト）… $FF
+        o = fo(b, a); typ = s.r[o]; d = w(s.r, o + 1)
+        s.put('cmdqueue', b, a, 5, [(1, 'dw', 'data_pointer', 'cmdqueue')])
+        if typ == 2: s.add('stonetable', b, d, ctx)
+        else: s.notes.append('cmdqueue 種類 %d（%s）' % (typ, ctx))
+    def w_stonetable(s, b, a, ctx):
+        o = fo(b, a); p = o; fix = []
+        while s.r[p] != 0xFF:
+            fix.append((p - o + 2, 'dw', 'script_pointer', 'stonetable')); s.add('script', b, w(s.r, p + 2), ctx); p += 4
+        s.put('stonetable', b, a, p - o + 1, fix)
 
     def w_movement(s, b, a, ctx):
         o = fo(b, a); p = o
