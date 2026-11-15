@@ -270,3 +270,14 @@
     SPRITE_KRIS → SPRITE_CHRIS（c2g の ENGINE_ALIAS・SPRITE_ALIAS）。
   ・レッドの家2F：パソコンの あとの warp NONE（0,0）を そのまま（c2g mapid）。
   ・3つとも クリスタル版と 並べて 同じ。
+
+■ 第65弾 サファリの 表示（tools/asm/gold_safarihud.asm、gold_safari.py の hud_bytes で rgbasm して サファリの バンクの $7900 へ）
+  ・クリスタル版は 町の 名前の 看板（PlaceMapNameSign）の あとに よぶが、金には 看板が ないので
+    HandleMapBackground（25:6726）の farcall ScrollScreen（25:672C）を この 処理への farcall に（はじめに ScrollScreen）。
+  ・サファリの 外では、出していた とき（hWY = $80）だけ $90 に もどす。
+  ・金は 草むらの ゆれなど（emote）を 字の $F8〜（数字の 2〜9）に 読むので、表示の 字は VRAM バンク1 に 写して
+    属性 $8F（バンク1）で 出す（.Full の とき、字の 絵は 金の ROM 3E:42F2 の 1bpp から ビルドで 入れる）。
+  ・パレット 7 は 金は WRAM0（wBGPals1 $C200・wBGPals2 $C280）。hCGBPalUpdate $FFE7。
+  ・たしかめた：あと nnnほ ボール nnこ、歩くと へる、メニューを とじると また 出る、放送の 文字の 窓は ふつう、受付では 消える。
+  ・のこる ちがい：スタートメニューを 開いた 1コマだけ、上の「のこり歩数/500」の 9 が こわれて 見える
+    （メニューが 字を 読みなおす 前に かく。金の むしとり大会の 表示と 同じ しくみ）。

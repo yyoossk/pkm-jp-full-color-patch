@@ -93,6 +93,26 @@ def fix_texts(M, g, SB, lo, hi):
         elif c in (0x05, 0x06, 0x07, 0x0A, 0x0B, 0x0D): pass
         else: raise Exception('セリフの 命令 %02X at %04X' % (c, p - 1))
 
+RGBDS = '/home/claude/rgbds-src'
+def hud_bytes(addr):
+    import subprocess, tempfile, os
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'asm', 'gold_safarihud.asm')
+    G = open('/home/claude/work/ref/kin_late.gbc', 'rb').read(); font = fo(0x3E, 0x42F2)   # 金の 字（1bpp、$80〜）
+    tiles = [0x7F, 0xE5, 0xB1, 0xC4, 0xCE, 0x9C, 0xE3, 0xA6, 0xBA] + list(range(0xF6, 0x100))
+    inc = ''
+    for t in tiles:
+        b = bytes(8) if t < 0x80 else G[font + (t - 0x80) * 8:font + (t - 0x80) * 8 + 8]
+        inc += '\tdb $%02x, %s\n' % (t, ', '.join('$%02x' % x for x in b))
+    with tempfile.TemporaryDirectory() as d:
+        open(d + '/glyphs.inc', 'w').write(inc)
+        subprocess.run([RGBDS + '/rgbasm', '-I', d, '-DHUD_ADDR=%d' % addr, '-o', d + '/h.o', src], check=True)
+        subprocess.run([RGBDS + '/rgblink', '-n', d + '/h.sym', '-o', d + '/h.gbc', d + '/h.o'], check=True)
+        r = open(d + '/h.gbc', 'rb').read()
+        end = max(int(l.split()[0].split(':')[1], 16) for l in open(d + '/h.sym') if l[:3] == '01:')
+    b = r[0x4000 + addr - 0x4000:]
+    n = len(b.rstrip(b'\x00\xff'))
+    return b[:n]
+
 class A:
     """小さな アセンブラ（ラベルつき）"""
     def __init__(s, base): s.base = base; s.b = bytearray(); s.lab = {}; s.fix = []
@@ -195,6 +215,11 @@ def apply(g, M, E, log):
         o = fo(0x04, adr); assert G[o:o + 3] == bytes([0x21, 0x65, 0xD5])
         n_ = 13 if adr == 0x6B6D else 15
         g[o:o + n_] = bytes([0x3E, SB, 0x21, lab[l_] & 0xFF, lab[l_] >> 8, 0xCF, 0xC9]) + bytes(n_ - 7)
+    # ---- 第65弾：歩いて いる ときの 表示（asm/gold_safarihud.asm を この バンクの $7900 に）
+    hud = hud_bytes(0x7900); assert len(hud) < 0x300
+    g[fo(SB, 0x7900):fo(SB, 0x7900) + len(hud)] = hud
+    o = fo(0x25, 0x672C); assert G[o:o + 6] == bytes([0x3E, 0x03, 0x21, 0xA9, 0x57, 0xCF])
+    g[o + 1] = SB; g[o + 3] = 0x00; g[o + 4] = 0x79
     # ---- マップの スクリプトの callasm
     for k in CALLASM: E.loc[k] = (SB, k[1])
     log.append('サファリ：バンク %02X（戦い 7400・メニュー 7800・つり %04X：カントー %d マップ、とばした %s）' %
