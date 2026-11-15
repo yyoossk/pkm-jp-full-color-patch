@@ -55,4 +55,10 @@ def apply(rom, ctx):
     new = bytes([0xCD]) + w(BC) + bytes.fromhex('7c2002f601e0c4c9')
     rom[o:o + len(old)] = new + bytes(len(old) - len(new))
     log.append('スクリプトの バンク $80〜、カントーの 野生は にげない、かいりきの 岩は 段差を こえる、ボールの 色')
+    # 第96弾：ドア・ワープの 色の フェード（$23:$4287・$4296）の 1段の 待ちを 2 → 1 フレーム
+    for a in (0x4287, 0x4296):
+        o = fo(0x23, a); assert rom[o + 6:o + 9] == bytes([0x0E, 0x02, 0xCD]); rom[o + 7] = 0x01
+    # 第99弾：シゲル（SPRITE_BLUE 7）の フィールドの 絵を 青（PAL_OW_BLUE）に
+    o = 0x147B0 + 6 * 6; assert rom[o + 5] == 0; rom[o + 5] = 1
+    log.append('ドアの フェード 1フレームずつ（第96弾）・シゲルの 絵の 色（第99弾）')
     return rom

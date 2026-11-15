@@ -52,7 +52,8 @@ def apply(rom, ctx):
     SM = gsc.Maps(bytes(rom), gsc.PG + '/constants/map_constants.asm')
     lm = SM.header(SM.id['REDS_HOUSE_2F'])['landmark']
     W = 0x7FF0; wb = port.cb(0x36)                                               # $B6 の 終わり（空き）
-    code = bytes([0xCD, 0x67, 0x58, 0x3E, lm, 0xEA, 0xFB, 0xDE, 0xC9])
+    # 第100弾：ずかんの ならびは さいしょ 番号順（wLastDexMode $D671 = DEXMODE_OLD）
+    code = bytes([0xCD, 0x67, 0x58, 0x3E, lm, 0xEA, 0xFB, 0xDE, 0x3E, 0x01, 0xEA, 0x71, 0xD6, 0xC9])
     assert not any(rom[fo(wb, W):fo(wb, W) + len(code)])
     rom[fo(wb, W):fo(wb, W) + len(code)] = code
     o = fo(1, S_OAK)
