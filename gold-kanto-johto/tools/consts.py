@@ -19,7 +19,7 @@ def parse(repo, files):
             if m: val=ev(m.group(1),d); continue
             m=re.match(r'DEF\s+(\w+)\s+EQU\s+(.+)',l) or re.match(r'DEF\s+(\w+)\s*=\s*(.+)',l)
             if m:
-                try: d[m.group(1)]=ev(m.group(2),d)
+                try: d[m.group(1)]=ev(m.group(2).replace('const_value',str(val)),d)
                 except Exception: pass
     return d
 def ev(s,d):
@@ -45,6 +45,7 @@ def all_tables(repo):
     T['landmark']=parse(repo,['constants/landmark_constants.asm'])
     T['item']=parse(repo,['constants/item_constants.asm'])
     T['pokemon']=parse(repo,['constants/pokemon_constants.asm'])
+    T['tileset']=parse(repo,['constants/tileset_constants.asm'])
     T['special']={n:i for i,n in enumerate(table_names(repo,'data/events/special_pointers.asm',r'add_special (\w+)'))}
     T['std']={n:i for i,n in enumerate(table_names(repo,'engine/events/std_scripts.asm',r'add_stdscript (\w+)'))}
     return T

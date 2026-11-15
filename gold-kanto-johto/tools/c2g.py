@@ -43,6 +43,7 @@ class Xlat:
         s.mu = inv(C['music'], 'MUSIC_'); s.sf = inv(C['sfx'], 'SFX_')
         s.spc = {v: n for n, v in C['special'].items()}; s.stdn = {v: n for n, v in C['std'].items()}
         s.tc = {v: n for n, v in C['trainerclass'].items()}
+        s.ts = inv(C['tileset'], 'TILESET_'); s.lm = inv(C['landmark'], 'LANDMARK_')
         s.gfree = set(range(0x800)) - set(v for n, v in G['event'].items() if n.startswith('EVENT_'))
     def _m(s, what, v, ctx):
         s.miss.append('%s %s（%s）' % (what, hex(v) if isinstance(v, int) else v, ctx)); return v
@@ -74,8 +75,14 @@ class Xlat:
         n = s.stdn.get(v); g = G['std'].get(n) if n else None
         return g if g is not None else s._m('std %s' % n, v, ctx)
     def tclass(s, v, ctx=''):
-        n = s.tc.get(v); g = G['trainerclass'].get(n) if n else None
-        return g if g is not None else s._m('trainerclass %s' % n, v, ctx)
+        # 日本版の トレーナーの種類の番号は 1〜66 が 金と同じ（67 なぞのせいねん は 金にない）
+        return v if 1 <= v <= 66 else s._m('trainerclass', v, ctx)
+    def tileset(s, v, ctx=''):
+        n = s.ts.get(v); g = G['tileset'].get(n) if n else None
+        return g if g is not None else s._m('tileset %s' % n, v, ctx)
+    def landmark(s, v, ctx=''):
+        n = s.lm.get(v); g = G['landmark'].get(n) if n else None
+        return g if g is not None else s._m('landmark %s' % n, v, ctx)
     def mapid(s, gn, ctx=''):
         n = CMAP.get(gn); n = MAPALIAS.get(n, n)
         g = GMAP.get(n)
@@ -201,8 +208,12 @@ def finish_maps(E, crom, grom, cmaps_by_name, gmaps):
                     gA = grom[gmn['attr']:gmn['attr'] + 3] if gmn else None
                     if gA and (gA[1], gA[2]) != (A[1], A[2]): X._m('つながり先の大きさがちがう', cn, cname)
                 c[2:4] = (gblk + strip - cblk).to_bytes(2, 'little')
+            # wOverworldMapBlocks：クリスタル $C800 → 金 $C700（つながりの 書きこみ先と 窓）
+            for k in (4, 10): c[k:k + 2] = (w(c, k) - 0x100).to_bytes(2, 'little')
             attr += c
         aa = E.fill[gb]; E.fill[gb] += len(attr)
         grom[gb * 0x4000 + aa - 0x4000:gb * 0x4000 + aa - 0x4000 + len(attr)] = attr
-        h = gm['hdr']
+        h = gm['hdr']; ch = crom[chdr:chdr + 9]
         grom[h] = gb; grom[h + 3] = aa & 0xFF; grom[h + 4] = aa >> 8
+        grom[h + 1] = X.tileset(ch[1], cname); grom[h + 2] = ch[2]
+        grom[h + 5] = X.landmark(ch[5], cname); grom[h + 6] = X.music(ch[6], cname); grom[h + 7] = ch[7]; grom[h + 8] = ch[8]
