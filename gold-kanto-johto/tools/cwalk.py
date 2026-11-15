@@ -9,8 +9,8 @@ def fo(b, a): return a if a < 0x4000 else b * 0x4000 + a - 0x4000
 def w(r, o): return r[o] | r[o + 1] << 8
 
 # --- スクリプト命令の引数（pokegold のマクロから）
-def load_spec():
-    s = open(R + 'pokegold/macros/scripts/events.asm').read()
+def load_spec(repo='pokecrystal'):
+    s = open(R + repo + '/macros/scripts/events.asm').read()
     parts = re.split(r'\n\s*const (\w+)_command[^\n]*\n', s)
     spec = []
     for i in range(1, len(parts), 2):
@@ -21,7 +21,7 @@ def load_spec():
             m = re.match(r'(db|dw|dba|map_id|bigdt)\s+(.*?)(?:;\s*(.*))?$', l)
             if not m or l.startswith('db ' + name + '_command'): continue
             args.append((m.group(1), (m.group(3) or m.group(2)).strip()))
-        spec.append((name, args))
+        if name != 'farjumptext': spec.append((name, args))   # 日本版クリスタルには farjumptext がない
     return spec
 SPEC = load_spec()
 FIX = {  # 引数の形を手で決めるもの（if があるマクロ）
@@ -34,14 +34,14 @@ for i, (n, a) in enumerate(SPEC):
     if n in FIX and FIX[n] is not None: SPEC[i] = (n, FIX[n])
 OP = {n: i for i, (n, a) in enumerate(SPEC)}
 END = {'end', 'endcallback', 'endall', 'reloadend', 'sjump', 'farsjump', 'memjump', 'jumptext', 'jumptextfaceplayer',
-       'jumpstd', 'stopandsjump'}
+       'jumpstd', 'stopandsjump', 'fruittree'}
 SIZE = {'db': 1, 'dw': 2, 'dba': 3, 'map_id': 2, 'bigdt': 3}
 
 class Walk:
     def __init__(s, rom):
         s.r = rom; s.blobs = {}; s.todo = []; s.notes = []
     def add(s, kind, b, a, ctx=''):
-        if a == 0 or a == 0xFFFF: return
+        if a == 0 or a == 0xFFFF or a < 0x4000: return   # ホーム（$0000-$3FFF）は 金の住所に 読みかえる（c2g）
         key = (b if a >= 0x4000 else 0, a)
         if key not in s.blobs and (kind, key) not in [(k, x) for k, x, _ in s.todo]:
             s.todo.append((kind, key, ctx))
@@ -74,6 +74,7 @@ class Walk:
                     k = 'text' if 'text' in sem else 'movement' if (name in ('applymovement', 'applymovementlasttalked')) else \
                         'mart' if name == 'pokemart' else 'elevator' if name == 'elevator' else 'script'
                     if name in ('givepokemail', 'checkpokemail'): k = 'raw'
+                    if name == 'getstring' or (name == 'givepoke'): k = 'string'
                     s.add(k, b, ptr, ctx)
                 elif t == 'dw' and sem == 'data':
                     s.add('movement', b, w(s.r, q), ctx)
@@ -129,6 +130,10 @@ class Walk:
             if c in (0x46, 0x4F, 0x55): p += 1  # step_sleep n / step_dig n / step_shake n
             if c in (0x49, 0x4A, 0x4B): break   # remove_object / loop / stop
         s.put('movement', b, a, p - o, [])
+    def w_string(s, b, a, ctx):
+        o = fo(b, a); p = o
+        while s.r[p] != 0x50: p += 1
+        s.put('string', b, a, p + 1 - o, [])
     def w_raw(s, b, a, ctx):
         s.notes.append('raw データ %02X:%04X（%s）大きさ不明' % (b, a, ctx)); s.put('raw', b, a, 0, [])
     def w_mart(s, b, a, ctx): s.put('raw', b, a, 0, [])

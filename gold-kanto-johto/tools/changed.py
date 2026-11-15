@@ -10,7 +10,8 @@ def changed_maps(van, mod):
             res.append((m['name'],'ERR '+str(e))); continue
         diff=mod[m['hdr']:m['hdr']+9]!=van[m['hdr']:m['hdr']+9]
         a=m['attr']; diff|=mod[a:a+12+len(at['connections'])]!=van[a:a+12+len(at['connections'])]
-        eo=fo(at['scbank'],at['events']); diff|=mod[eo:eo+300]!=van[eo:eo+300]
+        eo=fo(at['scbank'],at['events']); el=2+3+5*len(at['warps'])+8*len(at['coords'])+5*len(at['bgs'])+1+13*len(at['objs']); diff|=mod[eo:eo+el]!=van[eo:eo+el]
+        so=fo(at['scbank'],at['scripts']); sl=2+4*len(at['scenes'])+3*len(at['callbacks']); diff|=mod[so:so+sl]!=van[so:so+sl]
         bo=fo(at['blkbank'],at['blk']); n=at['h']*at['w']; diff|=mod[bo:bo+n]!=van[bo:bo+n]
         for k,b in W.blobs.items():
             o=fo(b['bank'],b['addr']); 
