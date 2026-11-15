@@ -126,6 +126,7 @@ class Port:
                 s.copy(b, a, ln)
                 d = s.dst(b, a)
                 if op == 0x5d: s.trainers.add((args[0][1], args[1][1]))
+                s.curop = name
                 if s.once(d):
                     if op not in cscript.SILVER_OP: s.note('op', '%s @ %02X:%04X' % (name, b, a))
                     else: s.s[d] = cscript.SILVER_OP[op]
@@ -169,9 +170,33 @@ class Port:
         elif f == 'L': s.s[q] = s.x_trclass(v)
         elif f == 'A': s.s[q] = cb(v[0]); s.note('asm', 'callasm %02X:%04X' % v)
         elif f == 'X': s.s[q] = cb(v[0]); s.note('far', 'data %02X:%04X' % v)
-        elif f in 'RUN': s.note('data', '%s %02X:%04X' % (f, b, v))
+        elif f in 'RU' and s.data(b, v, getattr(s, 'curop', ''), stack): pass
+        elif f in 'RUN': s.note('data', '%s %02X:%04X %s %s' % (f, b, v, getattr(s, 'curop', ''), getattr(s, 'curmap', '')))
         elif f == 'w' and 0xC000 <= v < 0xE000:
             s.ram.setdefault(v, set()).add('script'); s.ram_pos.append((v, q))
+
+    # ---------- スクリプトが 読む データ（エレベーター・メニュー・石の 表）
+    def data(s, b, a, op, stack):
+        c = s.c; o = fo(b, a)
+        if op == 'elevator':                                 # db 数, (階, ワープ, マップ)×数, -1
+            n = c[o]; ln = 2 + 4 * n; s.copy(b, a, ln); d = s.dst(b, a)
+            for i in range(n):
+                q = d + 1 + 4 * i + 2
+                if s.once(q):
+                    g, m = s.x_map(c[o + 1 + 4 * i + 2], c[o + 1 + 4 * i + 3]); s.s[q] = g; s.s[q + 1] = m
+            return True
+        if op == 'loadmenu':                                 # ヘッダー 8 ＋ データ（フラグ, 数, 文字列@ × 数）
+            s.copy(b, a, 8); dp = r16(c, o + 5); p = fo(b, dp); n = c[p + 1]; q = p + 2
+            for i in range(n):
+                while c[q] != 0x50: q += 1
+                q += 1
+            s.copy(b, dp, q - p); return True
+        if op == 'writecmdqueue':                            # dbw 種類, 表 / dw 0。石の 表：db ワープ, 人 / dw スクリプト … -1
+            s.copy(b, a, 5); t = r16(c, o + 1); p = fo(b, t); n = 0
+            while c[p + 4 * n] != 0xFF:
+                stack.append((b, r16(c, p + 4 * n + 2))); n += 1
+            s.copy(b, t, 4 * n + 1); return True
+        return False
 
     # ---------- テキスト
     def text(s, b, a):
