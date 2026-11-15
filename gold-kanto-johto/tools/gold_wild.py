@@ -10,6 +10,8 @@ def w16(r, o, v): r[o] = v & 0xFF; r[o + 1] = v >> 8
 
 CODE_LO, CODE_HI = 0x65EF, 0x6C1B
 G_KG, G_KW = 0x78A6, 0x7E29
+G_JG, G_JW = 0x6C1B, 0x774F                      # 金の ジョウトの 表（第60弾：MOD の ジョウトの 表＝第2世代だけ に かえる）
+M_JG, M_JW = (0x0A, 0x660C), (0x0A, 0x7E3F)
 FARCALLS = [0x5E17, 0x507E6, 0x507F0, 0x91EC4, 0x97B26, 0x97B7F, 0x97BC5, 0x97BCB]   # 3e 0a 21 lo hi cf
 FARCALLS2 = [0x3F742]                                                                  # 21 lo hi 3e 0a cf
 DBAS = [0xC347, 0xC34A, 0xC34D, 0xC371, 0x15501, 0x1553D, 0x15540]
@@ -30,20 +32,26 @@ def apply(g, MOD, E, X, log):
         a = r16(g, o + 1)
         g[fo(0x0A, a):fo(0x0A, a) + 7] = bytes([0x3E, WB, 0x21, a & 0xFF, a >> 8, 0xCF, 0xC9])
     # クリスタル版の カントーの 表
-    def table(bank, a, sz):
+    import c2g
+    skip = []
+    def table(bank, a, sz, only_gold=False):
         o = fo(bank, a); out = bytearray()
         while MOD[o] != 0xFF:
-            e = bytearray(MOD[o:o + sz]); gg, nn = X.mapid((e[0], e[1]), 'wild'); e[0], e[1] = gg, nn
+            e = bytearray(MOD[o:o + sz])
+            if only_gold and c2g.CMAP.get((e[0], e[1])) not in c2g.GMAP: skip.append(c2g.CMAP.get((e[0], e[1]))); o += sz; continue
+            gg, nn = X.mapid((e[0], e[1]), 'wild'); e[0], e[1] = gg, nn
             out += e; o += sz
         return out + b'\xff'
     kg = table(*M_KG, 47); kw = table(*M_KW, 9)
-    a_kg = 0x4000; a_kw = a_kg + len(kg); end = a_kw + len(kw); assert end <= CODE_LO
-    g[fo(WB, a_kg):fo(WB, a_kg) + len(kg)] = kg; g[fo(WB, a_kw):fo(WB, a_kw) + len(kw)] = kw
+    jg = table(*M_JG, 47, True); jw = table(*M_JW, 9, True)
+    a_kg = 0x4000; a_kw = a_kg + len(kg); a_jg = a_kw + len(kw); a_jw = a_jg + len(jg); end = a_jw + len(jw); assert end <= CODE_LO, hex(end)
+    for a_, t_ in ((a_kg, kg), (a_kw, kw), (a_jg, jg), (a_jw, jw)): g[fo(WB, a_):fo(WB, a_) + len(t_)] = t_
     n = 0
     seg = bytes(g[fo(WB, CODE_LO):fo(WB, CODE_HI)])
     for m in re.finditer(rb'[\x21\x11\x01](..)', seg, re.S):
         v = m.group(1)[0] | m.group(1)[1] << 8
-        if v in (G_KG, G_KW):
-            w16(g, fo(WB, CODE_LO) + m.start() + 1, a_kg if v == G_KG else a_kw); n += 1
-    log.append('野生：バンク %02X（カントー 草むら %d・水 %d、表を 指す 所 %d）' % (WB, len(kg) // 47, len(kw) // 9, n))
+        if v in (G_KG, G_KW, G_JG, G_JW):
+            w16(g, fo(WB, CODE_LO) + m.start() + 1, {G_KG: a_kg, G_KW: a_kw, G_JG: a_jg, G_JW: a_jw}[v]); n += 1
+    log.append('野生：バンク %02X（カントー 草むら %d・水 %d、ジョウト 草むら %d・水 %d、表を 指す 所 %d、金に ない マップ %s）' % (
+        WB, len(kg) // 47, len(kw) // 9, len(jg) // 47, len(jw) // 9, n, sorted(set(skip))))
     return WB
