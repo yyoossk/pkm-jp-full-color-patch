@@ -11,67 +11,57 @@ def free25(g, n):
     return a
 
 def p54_winloss(g, log):
-    """第54弾：トレーナーの 負けた／勝った ときの セリフを、winlosstext を 書いた スクリプトの バンクから 読む"""
-    o = fo(0x25, 0x702F); assert g[o:o + 3] == bytes([0x21, 0x5C, 0xCF])
-    a = free25(g, 10)
-    g[fo(0x25, a):fo(0x25, a) + 10] = bytes([0xFA, 0x52, 0xD1, 0xEA, W_WINLOSS_BANK & 0xFF, W_WINLOSS_BANK >> 8,
-                                            0x21, 0x5C, 0xCF, 0xC9])           # ld a,[wScriptBank] / ld [..],a / ld hl,wWinTextPointer
-    g[o:o + 3] = bytes([0xCD, a & 0xFF, a >> 8])
-    o = 0x38C0
-    assert bytes(g[o:o + 15]) == bytes.fromhex('fa0bd1fe011805215ccf180cfae3cf')
-    W = W_WINLOSS_BANK
-    code = bytes([0xFA, 0xE3, 0xCF, 0x21, 0x5C, 0xCF, 0xA7, 0x28, 0x03, 0x21, 0x5E, 0xCF, 0x2A, 0x66, 0x6F,
-                  0xFA, W & 0xFF, W >> 8, 0xA7, 0x20, 0x03, 0xCD, 0xEC, 0x2C,
-                  0xF5, 0xAF, 0xEA, W & 0xFF, W >> 8, 0xF1,
-                  0xCD, 0x66, 0x33, 0xCD, 0xAE, 0x33, 0xCD, 0x26, 0x0A, 0xC9])
-    assert bytes(g[o + 0x1B:o + 0x28]) == bytes.fromhex('cdec2ccd6633cdae33cd260ac9')
-    assert len(code) == 0x28
-    g[o:o + 0x28] = code
-    log.append('第54弾 winlosstext：25:%04X、ホーム 38C0（バンクは %04X）' % (a, W))
+    """第54弾：トレーナーの 負けた／勝った ときの セリフを、スクリプトの バンク（wScriptBank）から 読む。
+       金の 追加機能パッチの PrintWinLossText の フック（ホーム $00F6：再戦の バンク $42 だけ）を すべての バンクに"""
+    o = 0x00F6; assert bytes(g[o:o + 10]) == bytes.fromhex('fa52d1fe42c8c3ec2c00')
+    g[o:o + 4] = bytes([0xFA, 0x52, 0xD1, 0xC9])
+    log.append('第54弾 winlosstext：ホーム 00F6（wScriptBank）')
 
 def p69_ledges(g, log):
     """第69弾：赤の マップ（クリスタル タイルセット 40 → 金 36）の 段差を 赤と 同じに（手前から とびこえる・ほかは かべ）。
-       金の TryStep（04:4176 の call CheckLandPerms）→ 04:7F80（あき）"""
+       金の TryStep（04:4176 の call CheckLandPerms）→ バンク 04 の あき（9バイト）→ HFI → バンク 7E の 本体。
+       本体：とぶ ＝ キャリー・z、かべ ＝ キャリー・nz、歩く ＝ nc。とぶ ときは 04 で pop hl（TryStep の 呼び出し元へ）"""
     from gold_safari import A
+    import gold_hfi
     o = fo(0x04, 0x4176); assert g[o:o + 3] == bytes([0xCD, 0x9E, 0x43])
-    h = 0x7F80; assert not any(g[fo(0x04, h):fo(0x04, h) + 0x40])
-    a = A(h)
-    a.db(0xCD, 0x9E, 0x43, 0xD8)                         # call CheckLandPerms / ret c
-    a.db(0xFA, 0x74, 0xD0, 0xFE, 36); a.jr(0x20, 'walk')  # wMapTileset == 36
+    a = A(gold_hfi.here())
+    a.db(0x3E, 0x04, 0x21, 0x9E, 0x43, 0xCF); a.jr(0x38, 'wall')        # farcall CheckLandPerms
+    a.db(0xFA, 0x74, 0xD0, 0xFE, 36); a.jr(0x20, 'walk')              # wMapTileset == 36
     a.db(0xFA, 0x5C, 0xCF, 0x5F, 0xE6, 0xF0, 0xFE, 0xA0); a.jr(0x20, 'walk')
-    a.db(0x7B, 0xE6, 0x07, 0x5F, 0x16, 0x00, 0x21, 0x1E, 0x42, 0x19)
+    a.db(0x7B, 0xE6, 0x07, 0x5F, 0x16, 0x00, 0x21); a.dw('tab'); a.db(0x19)
     a.db(0xFA, 0x59, 0xCF, 0xA6); a.jr(0x28, 'wall')
-    a.db(0xE1, 0x11, 0x16, 0x00, 0xCD, 0x45, 0x3D)       # pop hl / ld de,SFX_JUMP_OVER_LEDGE / call PlaySFX
-    a.db(0x3E, 0x03, 0xCD, 0x5F, 0x42, 0x3E, 0x07, 0x37, 0xC9)
-    a.L('wall'); a.db(0x37, 0xC9)
+    a.db(0x11, 0x16, 0x00, 0xCD, 0x45, 0x3D)                          # PlaySFX SFX_JUMP_OVER_LEDGE
+    a.db(0x1E, 0x03, 0x3E, 0x04, 0x21, 0x60, 0x42, 0xCF)               # e=3 / farcall DoStep（ld e,a の あと）
+    a.db(0x3E, 0x07, 0xFE, 0x07, 0x37, 0xC9)                          # a=7・z・キャリー
+    a.L('wall'); a.db(0x3E, 0x01, 0xA7, 0x37, 0xC9)
     a.L('walk'); a.db(0xA7, 0xC9)
-    b = a.fin(); g[fo(0x04, h):fo(0x04, h) + len(b)] = b
-    g[o + 1] = h & 0xFF; g[o + 2] = h >> 8
-    log.append('第69弾 段差：04:4176 → 04:%04X（%d バイト）' % (h, len(b)))
+    a.L('tab'); a.b += g[fo(0x04, 0x421E):fo(0x04, 0x4226)]
+    t = gold_hfi.put(g, a.fin())
+    L = gold_hfi.local(g, 0x04, 9)
+    g[fo(0x04, L):fo(0x04, L) + 9] = bytes([0xCD, gold_hfi.HFI & 255, gold_hfi.HFI >> 8, t & 255, t >> 8, 0xD0, 0xC0, 0xE1, 0xC9])
+    g[o + 1] = L & 0xFF; g[o + 2] = L >> 8
+    log.append('第69弾 段差：04:4176 → 04:%04X → 7E:%04X' % (L, t))
 
 def p27_cut(g, M, log):
     """第27弾：赤の タイルセット（クリスタル 40 → 金 36）でも いあいぎり（赤の 木 $3C/$3F/$3D と、草など は タイルセット 3 と 同じ）。
-       金の CutTreeBlockPointers（03:48F5、ld hl は 03:487D）を 03 の うしろへ 移して 36 を 足す"""
-    o = fo(0x03, 0x487D); assert g[o:o + 3] == bytes([0x21, 0xF5, 0x48])
-    t = fo(0x03, 0x48F5); old = []
-    while g[t] != 0xFF: old.append((g[t], g[t + 1] | g[t + 2] << 8)); t += 3
+       金の CutTreeBlockPointers（03:48F5）の タイルセット 3（KANTO。のこる マップは 4つで 木が ない）の 行を 36 に かえ、
+       MOD の 表（03:4881）を バンク 03 の あきへ（キットで あきが 32 バイト しか ない ため 表は 動かさない）"""
+    import gold_hfi
+    t = fo(0x03, 0x48F5)
+    while g[t] != 3: assert g[t] != 0xFF; t += 3
     ml = fo(0x03, 0x4881); lst = b''
     while M[ml] != 0xFF: lst += M[ml:ml + 3]; ml += 3
     lst += b'\xff'
-    s_ = g[0x03 * 0x4000:0x04 * 0x4000]; i = len(s_)
-    while s_[i - 1] in (0, 0xFF): i -= 1
-    base = 0x4000 + i + 2; tab = base; la = tab + 3 * (len(old) + 1) + 1
-    data = b''.join(bytes([ts, p & 0xFF, p >> 8]) for ts, p in old) + bytes([36, la & 0xFF, la >> 8, 0xFF]) + lst
-    assert base + len(data) <= 0x8000
-    g[fo(0x03, base):fo(0x03, base) + len(data)] = data
-    g[o + 1] = tab & 0xFF; g[o + 2] = tab >> 8
-    log.append('第27弾 いあいぎり：表 03:%04X（タイルセット 36 を 足す）' % tab)
+    L = gold_hfi.local(g, 0x03, len(lst)); g[fo(3, L):fo(3, L) + len(lst)] = lst
+    g[t] = 36; g[t + 1] = L & 255; g[t + 2] = L >> 8
+    log.append('第27弾 いあいぎり：03:%04X（タイルセット 3 の 行 → 36）' % L)
 
 def p32_spawns(g, M, log):
     """赤の 町の 飛ぶ所・負けた ときに もどる 所（SpawnPoints。クリスタル版 05:5346 → 金 05:5286、番号は 同じ）と、
-       第32弾：もどる 所が ない ときは マサラ（スポーン 2）。クリスタル 04:63E8 → 金 04:6795（04:7FC0 へ）"""
+       第32弾：もどる 所が ない ときは マサラ（スポーン 2）。クリスタル 04:63E8 → 金 04:6795
+       （ld a,c / jr c / xor a → jp nc,あき（ld a,2 / jp ld [wDefaultSpawnpoint]）"""
     import sys; sys.path.insert(0, '/home/claude/work/scripts')
-    import c2g
+    import c2g, gold_hfi
     cm = fo(0x05, 0x5346); gm = fo(0x05, 0x5286); n = 0
     for i in range(14):                 # カントー（0〜13）だけ。ジョウトは 金の 町の まま
         c = M[cm + 4 * i:cm + 4 * i + 4]
@@ -80,10 +70,10 @@ def p32_spawns(g, M, log):
         gg, gn = c2g.GMAP[nm]; new = bytes([gg, gn, c[2], c[3]])
         if bytes(g[gm + 4 * i:gm + 4 * i + 4]) != new: g[gm + 4 * i:gm + 4 * i + 4] = new; n += 1
     o = fo(0x04, 0x6795); assert bytes(g[o:o + 8]) == bytes.fromhex('793801afea20cfc9')
-    h = 0x7FC0; assert not any(g[fo(0x04, h):fo(0x04, h) + 10])
-    g[fo(0x04, h):fo(0x04, h) + 9] = bytes.fromhex('793802' '3e02' 'ea20cf' 'c9')
-    g[o:o + 3] = bytes([0xC3, h & 0xFF, h >> 8])
-    log.append('スポーン：%d こ 赤の 位置に、負けた ときの もどる 所 04:%04X' % (n, h))
+    L = gold_hfi.local(g, 0x04, 5)
+    g[fo(0x04, L):fo(0x04, L) + 5] = bytes([0x3E, 0x02, 0xC3, 0x99, 0x67])
+    g[o:o + 8] = bytes([0xD2, L & 255, L >> 8, 0x79, 0xEA, 0x20, 0xCF, 0xC9])
+    log.append('スポーン：%d こ 赤の 位置に、負けた ときの もどる 所 04:%04X' % (n, L))
 
 def pokepic_color(g, log):
     """pokepic の 窓の ポケモンを 色つきに（クリスタル版 02:7F9D と 同じ。金 _CGB_Pokepic 02:5966 → 02:7C30）"""
@@ -121,21 +111,25 @@ def p75_marts(g, M, log):
 
 def p55_koga(g, TB, log):
     """第55弾：セキチクジムの キョウ（KOGA の 2ばん）は 「ジムリーダー」の 名前・カントーの ジムリーダーの 曲。
-       ホーム $3F80／$3F95（クリスタル版と 同じ 住所。金では あき）"""
+       GetTrainerClassName・GetOTName（TB の 5511／553D の 6バイト）→ call TB:5500（HFI）→ 7E の 本体。
+       IsKantoGymLeader（0F:5071）→ 0F の あき"""
+    import gold_hfi
     CLS, OID = 0xD10A, 0xD10D
-    assert not any(g[0x3F80:0x3FB0])
-    a = bytes([0x79, 0xFE, 0x0F, 0x20, 0x0A, 0xFA, OID & 255, OID >> 8, 0xFE, 0x02, 0x79, 0x20, 0x02, 0x3E, 0x11,
-               0x21, 0xC1, 0xD1, 0xFE, 0x09, 0xC9])
+    body = bytes([0x79, 0xFE, 0x0F, 0x20, 0x0A, 0xFA, OID & 255, OID >> 8, 0xFE, 0x02, 0x79, 0x20, 0x02, 0x3E, 0x11,
+                  0x21, 0xC1, 0xD1, 0xFE, 0x09, 0xC9])
+    t = gold_hfi.put(g, body)
+    S = 0x5500; so = fo(TB, S); assert not any(g[so:so + 6])
+    g[so:so + 6] = bytes([0xCD, gold_hfi.HFI & 255, gold_hfi.HFI >> 8, t & 255, t >> 8, 0xC9])
+    for ad in (0x5511, 0x553D):
+        o = fo(TB, ad); assert g[o:o + 6] == bytes.fromhex('21c1d179fe09'), (hex(ad), g[o:o + 6].hex())
+        g[o:o + 6] = bytes([0xCD, S & 255, S >> 8, 0, 0, 0])
+    L = gold_hfi.local(g, 0x0F, 22)
+    o = fo(0x0F, 0x5071); assert g[o:o + 3] == bytes.fromhex('21774c'), g[o:o + 3].hex()
     b = bytes([0xFA, CLS & 255, CLS >> 8, 0xFE, 0x0F, 0x20, 0x09, 0xFA, OID & 255, OID >> 8, 0xFE, 0x02, 0x20, 0x02,
                0x37, 0xC9, 0x21, 0x77, 0x4C, 0xC3, 0x79, 0x50])
-    g[0x3F80:0x3F80 + len(a)] = a; assert len(a) <= 0x15
-    g[0x3F95:0x3F95 + len(b)] = b
-    for bk, ad in ((0x0E, 0x5511), (TB, 0x5511), (0x0E, 0x553D), (TB, 0x553D)):   # GetTrainerClassName・GetOTName
-        o = fo(bk, ad); assert g[o:o + 6] == bytes.fromhex('21c1d179fe09'), (hex(bk), g[o:o + 6].hex())
-        g[o:o + 6] = bytes.fromhex('cd803f000000')
-    o = fo(0x0F, 0x5071); assert g[o:o + 3] == bytes.fromhex('21774c'); g[o:o + 3] = bytes.fromhex('c3953f')
-    log.append('第55弾 キョウ：ホーム 3F80／3F95、0E・%02X:5511／553D、0F:5071' % TB)
-
+    g[fo(0x0F, L):fo(0x0F, L) + 22] = b
+    g[o:o + 3] = bytes([0xC3, L & 255, L >> 8])
+    log.append('第55弾 キョウ：%02X:5500→7E:%04X、0F:5071→0F:%04X' % (TB, t, L))
 
 def p57_evos(g, M, log):
     """第57弾：つうしん進化を Lv37 に（MOD の 進化の 表を そのまま。長さは 同じ）"""
@@ -188,31 +182,30 @@ def p57_hm_lugia(g, M, log):
 
 def p57_trade_evo(g, log):
     """第57弾：つうしん進化（どうぐ つき）も Lv37 から 通信なしで（MOD 10:641C → 7FA0）。
-       金の バンク 10 は いっぱい → ホーム $3FB0"""
-    o = fo(0x10, 0x641F); assert g[o:o + 7] == bytes.fromhex('fa3cd0a7ca6365')
-    H = 0x3FB0; assert not any(g[H:H + 0x18])
-    st = bytes.fromhex('fa3cd0a7c0' 'fac4d0a7200a' 'fa24d0fe253803' 'f601c9' 'afc9')
-    g[H:H + len(st)] = st
-    g[o:o + 7] = bytes([0xCD, H & 255, H >> 8, 0xCA, 0x63, 0x65, 0x00])
-    log.append('第57弾 つうしん進化：10:641F → ホーム %04X' % H)
-
+       金の 10:641F〜642B（通信の しらべ・かわらずのいし）→ その場で call HFI / dw 本体 / jp z,しない"""
+    import gold_hfi
+    o = fo(0x10, 0x641F); assert g[o:o + 13] == bytes.fromhex('fa3cd0a7ca6365cdcb65ca6365')
+    body = bytes.fromhex('fa3cd0a7' '200d' 'fac4d0a7' '2010' 'fa24d0fe25' '3809'
+                         'e5' '3e10' '21cb65' 'cf' 'e1' 'c9' 'afc9')
+    t = gold_hfi.put(g, body)
+    g[o:o + 13] = bytes([0xCD, gold_hfi.HFI & 255, gold_hfi.HFI >> 8, t & 255, t >> 8, 0xCA, 0x63, 0x65]) + bytes(5)
+    log.append('第57弾 つうしん進化：10:641F → 7E:%04X' % t)
 
 def p01_continue_boulder(g, log):
     """MOD 01:7E83：エンディングの あとの つづきは、ジョウト編（フラグ $34C）の 前なら マサラ（2）、あとなら ワカバ（$0E）。
-       MOD 01:7EC0：かいりきの 岩は 床（タイルの 当たり 0）にしか 動かない（WillObjectBumpIntoWater の 前）"""
+       （01:5E38 の 5バイト → その場で call HFI / dw 本体）
+       MOD 01:7EC0：かいりきの 岩は 床（タイルの 当たり 0）にしか 動かない（WillObjectBumpIntoWater の 前。01 の あき）"""
+    import gold_hfi
     EVF = 0xD7AA; ev = 0x34C; adr = EVF + (ev >> 3); bit = ev & 7
-    A = 0x7FA0; o = fo(1, A); assert not any(g[o:o + 0x40])
-    st = bytes([0xFA, adr & 255, adr >> 8, 0xCB, 0x47 | bit << 3, 0x3E, 0x0E, 0x20, 0x02, 0x3E, 0x02,
-                0xEA, 0x20, 0xCF, 0xC9])
-    g[o:o + len(st)] = st
+    st = bytes([0xF5, 0xFA, adr & 255, adr >> 8, 0xCB, 0x47 | bit << 3, 0x3E, 0x0E, 0x20, 0x02, 0x3E, 0x02,
+                0xEA, 0x20, 0xCF, 0xF1, 0xC9])
+    t = gold_hfi.put(g, st)
     c = fo(1, 0x5E38); assert g[c:c + 6] == bytes.fromhex('3e0eea20cfcd')
-    g[c:c + 5] = bytes([0xCD, A & 255, A >> 8, 0x00, 0x00])
-    B = 0x7FB0; o = fo(1, B)
+    g[c:c + 5] = bytes([0xCD, gold_hfi.HFI & 255, gold_hfi.HFI >> 8, t & 255, t >> 8])
     bl = bytes.fromhex('210600' '09' 'cb76' '2003' 'c3897a' 'e1' '210e00' '09' '7e' 'cda716' 'a7' 'c8' '37' 'c9')
-    g[o:o + len(bl)] = bl
+    B = gold_hfi.local(g, 0x01, len(bl)); g[fo(1, B):fo(1, B) + len(bl)] = bl
     w = fo(1, 0x7A31); assert g[w:w + 3] == bytes.fromhex('cd897a'); g[w + 1] = B & 255; g[w + 2] = B >> 8
-    log.append('MOD 01:7E83／7EC0：つづきの 出る所（01:5E38）・かいりきの 岩（01:7A31）')
-
+    log.append('MOD 01:7E83／7EC0：つづきの 出る所（7E:%04X）・かいりきの 岩（01:%04X）' % (t, B))
 
 def p_items(g, M, log):
     """MOD の どうぐの 属性：マスターボールの 値段、りゅうのキバ／りゅうのウロコ の 持たせた 効果（もとの バグ なおし）"""
@@ -227,8 +220,9 @@ def p66_jj_colors(g, M, log):
     """第66弾：ムサシとコジロウ（トレーナーの 種類 $48）の 戦いの 絵の 色（MOD 02:4E74 → 9C:4400）。
        金の _CGB_FinishBattleScreenLayout（02:5435 call ApplyAttrmap）→ 02:7E30"""
     from gold_safari import A
-    o = fo(2, 0x5435); assert g[o:o + 4] == bytes.fromhex('cdcb5ac9')
-    B = 0x7E30; assert not any(g[fo(2, B):fo(2, B) + 0x80])
+    o = fo(2, 0x542F); assert g[o:o + 3] == bytes.fromhex('c3cb5a')   # キット：farcall 3F:6F40 / jp ApplyAttrmap
+    import gold_hfi
+    B = gold_hfi.local(g, 0x02, 0x68)
     a = A(B)
     a.db(0xFA, 0x08, 0xD1, 0xFE, 0x02); a.jr(0x20, 'done')
     a.db(0xFA, 0xDF, 0xD0, 0xA7); a.jr(0x20, 'done')
@@ -244,7 +238,7 @@ def p66_jj_colors(g, M, log):
     a.L('done'); a.db(0xC3, 0xCB, 0x5A)
     po = fo(0x9C, 0x4462)
     a.L('pals'); a.b += M[po:po + 8]; a.L('pals2'); a.b += M[po + 8:po + 16]
-    code = a.fin(); assert len(code) <= 0x80
+    code = a.fin(); assert len(code) <= 0x68
     g[fo(2, B):fo(2, B) + len(code)] = code
     g[o:o + 3] = bytes([0xC3, B & 255, B >> 8])
     log.append('第66弾 ムサシとコジロウの 色：02:5435 → 02:%04X（%d バイト）' % (B, len(code)))
@@ -338,6 +332,5 @@ def apply(g, log, M=None, TB=None):
     p01_continue_boulder(g, log)
     if M is not None: p_items(g, M, log)
     if M is not None: p66_jj_colors(g, M, log)
-    if M is not None: p21_seafoam_surf(g, M, log)
     if M is not None: p_catch_dude(g, M, log)
     if M is not None: p60_treemons(g, M, log)

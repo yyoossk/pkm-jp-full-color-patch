@@ -6,13 +6,16 @@ from changed import changed_maps
 VAN = open('/home/claude/roms/Pocket Monsters - Crystal Version (Japan).gbc', 'rb').read()
 MOD = open('/home/claude/work/ref/crystal_kj.gbc', 'rb').read()
 VAN = VAN + bytes(len(MOD) - len(VAN))
-g = bytearray(open('/home/claude/work/ref/kin_late.gbc', 'rb').read())
+import os as _os
+BASE = _os.environ.get('GBASE', '/home/claude/work/ref/kin64.gbc')   # 第64弾：金の 追加機能パッチ（gold_kit.py）
+g = bytearray(open(BASE, 'rb').read())
 g += bytes(0x400000 - len(g)); g[0x148] = 0x07
+import gold_hfi; gold_hfi.install(g)   # 第64弾：ホームの HFI（元の バンクに あきが ないので 本体は バンク $7E）
 # 4MB：バンク $80 以降のスクリプトから もどるとき 上のビットを消さない（クリスタル版 第67弾と同じ）
 o = 0x25 * 0x4000 + 0x7389 - 0x4000; assert g[o + 3:o + 5] == b'\xf6\x80'; g[o + 4] = 0x00
 o = 0x25 * 0x4000 + 0x7a16 - 0x4000; assert g[o + 0x13:o + 0x15] == b'\xe6\x7f'; g[o + 0x14] = 0xff
 # LoadMetatiles の 128 番より 後の ブロックが 前に もどる バグ（金の 追加機能パッチ bugfix 48 と 同じ。クリスタル版の 赤の 町が 使う）
-assert g[0x1FAF:0x1FB6] == bytes.fromhex('876f2600292929'); g[0x1FAF:0x1FB6] = bytes.fromhex('6f260029292929')
+assert g[0x1FAF:0x1FB6] in (bytes.fromhex('876f2600292929'), bytes.fromhex('6f260029292929')); g[0x1FAF:0x1FB6] = bytes.fromhex('6f260029292929')   # キットは もう なおしている
 # はじめの場所：スポーン0 を レッドの家2F に（クリスタル版 05:SpawnPoints と同じ）
 o = 0x05 * 0x4000 + 0x5286 - 0x4000; assert g[o:o + 2] == b'\x18\x07'; g[o:o + 2] = b'\x0d\x04'
 # シーンの表：主人公の家1F の シーンの変数を レッドの家1F で使う（クリスタル版 13:506A と同じ）
@@ -110,7 +113,20 @@ while True:
         if not any(_unplaced(W, keys) for W, at in walks.values()): break
         continue
     for nm, why in drop: print('金のまま（入れない マップへ つながる）:', nm, why); del walks[nm]
-_lj = []; gold_johto.gold_texts(walks, VAN, bytes(open('/home/claude/work/ref/kin_late.gbc', 'rb').read()), _lj); print('\n'.join(_lj))
+# 第21弾 ふたごじま B4F（G26_067）の (7,11) から 下の 水へ：岩 2つ（フラグ $883・$884）が 落ちるまで なみのり できない。
+# キットで バンク 03 に あきが ないので、マップの 看板（BGEVENT_IFNOTSET）で「ながれが はやくて ダメだ！」（MOD 63:6117）を 出す
+if 'G26_067' in walks:
+    _W, _at = walks['G26_067']; _cb = _at['scbank']
+    _tx = MOD[fo(0x63, 0x611A):fo(0x63, 0x612A)]
+    _W.blobs[(_cb, 0x8030)] = dict(kind='text', bank=_cb, addr=0x8030, data=bytes(_tx), fix=[], extra={})
+    _W.blobs[(_cb, 0x8020)] = dict(kind='script', bank=_cb, addr=0x8020, data=bytes([0x52, 0x30, 0x80]),
+                                   fix=[(1, 'dw', 'text_pointer', 'jumptext')], extra={})
+    for _i, _ev in enumerate((0x883, 0x884)):
+        _a = 0x8000 + 8 * _i
+        _W.blobs[(_cb, _a)] = dict(kind='raw', bank=_cb, addr=_a, data=bytes([_ev & 255, _ev >> 8, 0x20, 0x80]),
+                                   fix=[(0, 'dw', 'event_flag', 'cond'), (2, 'dw', 'script_pointer', 'cond')], extra={})
+        _at['bgs'].append(bytes([11 + 1, 7, 6, _a & 255, _a >> 8]))
+_lj = []; gold_johto.gold_texts(walks, VAN, bytes(open(BASE, 'rb').read()), _lj); print('\n'.join(_lj))
 allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
@@ -119,7 +135,7 @@ for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, 
 for k, b in allblobs.items(): E.write(k, b)
 gold_johto.patch_attrs(E, g, None)
 import gold_johto2
-_lj2 = []; gold_johto2.apply(E, g, bytes(open('/home/claude/work/ref/kin_late.gbc', 'rb').read()), MOD, VAN, _lj2); print('\n'.join(_lj2))
+_lj2 = []; gold_johto2.apply(E, g, bytes(open(BASE, 'rb').read()), MOD, VAN, _lj2); print('\n'.join(_lj2))
 finish_maps(E, MOD, g, cm, gm)
 # ---- トレーナー：読むコード（0E:$5511-$595B）ごと 新しいバンクへ（クリスタル版 第13弾と同じ考え）。手持ちは 第10弾で 入れる
 import re as _re
@@ -131,6 +147,10 @@ for m in list(_re.finditer(rb'\x21(..)\x3e\x0e\xcf', bytes(g[:0x200000]), _re.S)
     ad = m.group(1)[0] | m.group(1)[1] << 8
     if 0x5511 <= ad < 0x595C: g[m.start() + 4] = TB; n += 1
 assert n == 12, n
+# 第64弾：金の 追加機能パッチの 再戦の 手持ちの フック（0E:5764 call $7FE0）→ TB の あき（$54C0）に 写す
+if g[dst + 0x5764:dst + 0x5767] == b'\xcd\xe0\x7f':
+    assert not any(g[dst + 0x54C0:dst + 0x54D0])
+    g[dst + 0x54C0:dst + 0x54D0] = g[src + 0x7FE0:src + 0x7FF0]; g[dst + 0x5765:dst + 0x5767] = b'\xc0\x54'
 for o in (0x2aba9, 0x2abb1, 0x2abbd, 0x2abc7, 0x2abea, 0x2ac04):   # RandomPhoneMon の ld a, BANK(TrainerGroups)
     assert g[o:o + 3] == b'\x3e\x0e\xcd'; g[o + 1] = TB
 # ---- 第10弾：トレーナーの種類 67〜79（名前・絵・色・DV・属性・ジムリーダーの表・手持ち）

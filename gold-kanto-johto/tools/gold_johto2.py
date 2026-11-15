@@ -17,7 +17,7 @@ TEXT = [
     ('Route27', 'カントーちほう　への<LINE>だいいっぽを　ふみだした！', 'ふるさとの　カントーちほうは<LINE>もう　すぐ　そこだ！'),
 ]
 # 再戦を 足す 人：(マップ, MOD の 人の 番号, 金の 人の 番号)
-GRAFT = [('EcruteakGym', 0, 0), ('BlackthornGym1F', 0, 0)]
+GRAFT = []   # ジムリーダーの 再戦は 金の 追加機能パッチ（rematch_gold.asm）の もの
 # MOD の スクリプトに いれかえる 看板・人：(マップ, 種類, MOD の 番号, 金の 番号)
 # （ウバメの ほこらの セレビィ（殿堂入りの あと Lv70）は 第64弾 金の 追加機能パッチの 伝説キットで）
 SWAP = [('FastShipCabins_SW_SSW_NW', 'bg', 0, 0), ('FastShipCabins_SW_SSW_NW', 'bg', 1, 1),   # ワカバタウンに とうちゃく

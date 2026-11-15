@@ -218,8 +218,12 @@ def apply(g, M, E, log):
     # ---- 第65弾：歩いて いる ときの 表示（asm/gold_safarihud.asm を この バンクの $7900 に）
     hud = hud_bytes(0x7900); assert len(hud) < 0x300
     g[fo(SB, 0x7900):fo(SB, 0x7900) + len(hud)] = hud
-    o = fo(0x25, 0x672C); assert G[o:o + 6] == bytes([0x3E, 0x03, 0x21, 0xA9, 0x57, 0xCF])
-    g[o + 1] = SB; g[o + 3] = 0x00; g[o + 4] = 0x79
+    st = fo(0x7F, 0x4001)
+    if bytes(g[st:st + 6]) == bytes.fromhex('3e00210079cf'):       # 第64弾：金の 追加機能パッチ（gold_kit.py の SafariHUD の 入口）
+        g[st + 1] = SB; g[st + 3] = 0x06                              # 札が 毎フレーム 呼ぶ → ScrollScreen の あと（$7906）から
+    else:
+        o = fo(0x25, 0x672C); assert G[o:o + 6] == bytes([0x3E, 0x03, 0x21, 0xA9, 0x57, 0xCF])
+        g[o + 1] = SB; g[o + 3] = 0x00; g[o + 4] = 0x79
     # ---- マップの スクリプトの callasm
     for k in CALLASM: E.loc[k] = (SB, k[1])
     log.append('サファリ：バンク %02X（戦い 7400・メニュー 7800・つり %04X：カントー %d マップ、とばした %s）' %

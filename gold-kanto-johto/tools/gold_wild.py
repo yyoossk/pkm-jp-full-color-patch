@@ -21,14 +21,17 @@ def apply(g, MOD, E, X, log):
     WB = E.next_bank; E.next_bank += 1
     g[fo(WB, 0x4000):fo(WB + 1, 0x4000)] = g[fo(0x0A, 0x4000):fo(0x0B, 0x4000)]
     g[fo(WB, 0x4000):fo(WB, CODE_LO)] = bytes(CODE_LO - 0x4000)
+    kit = []
     for o in FARCALLS:
-        assert g[o:o + 3] == b'\x3e\x0a\x21' and g[o + 5] == 0xCF and CODE_LO <= r16(g, o + 3) < CODE_HI; g[o + 1] = WB
+        if g[o:o + 3] != b'\x3e\x0a\x21': kit.append(hex(o)); continue          # 金の 追加機能パッチが かえた 所（そのまま）
+        assert g[o + 5] == 0xCF and CODE_LO <= r16(g, o + 3) < CODE_HI; g[o + 1] = WB
     for o in FARCALLS2:
         assert g[o + 3:o + 6] == b'\x3e\x0a\xcf' and CODE_LO <= r16(g, o + 1) < CODE_HI; g[o + 4] = WB
     # dba（特別処理・マップの 準備の 命令）は バンクの 上の ビットを 別の 意味に 使う 所が あるので、バンク 0A の まま にして、
     # バンク 0A の 元の 入口（もう 使わない）に WB への farcall を 置く
     for o in DBAS:
-        assert g[o] == 0x0A and CODE_LO <= r16(g, o + 1) < CODE_HI
+        if g[o] != 0x0A: kit.append(hex(o)); continue
+        assert CODE_LO <= r16(g, o + 1) < CODE_HI
         a = r16(g, o + 1)
         g[fo(0x0A, a):fo(0x0A, a) + 7] = bytes([0x3E, WB, 0x21, a & 0xFF, a >> 8, 0xCF, 0xC9])
     # クリスタル版の カントーの 表
@@ -52,6 +55,6 @@ def apply(g, MOD, E, X, log):
         v = m.group(1)[0] | m.group(1)[1] << 8
         if v in (G_KG, G_KW, G_JG, G_JW):
             w16(g, fo(WB, CODE_LO) + m.start() + 1, {G_KG: a_kg, G_KW: a_kw, G_JG: a_jg, G_JW: a_jw}[v]); n += 1
-    log.append('野生：バンク %02X（カントー 草むら %d・水 %d、ジョウト 草むら %d・水 %d、表を 指す 所 %d、金に ない マップ %s）' % (
-        WB, len(kg) // 47, len(kw) // 9, len(jg) // 47, len(jw) // 9, n, sorted(set(skip))))
+    log.append('野生：バンク %02X（カントー 草むら %d・水 %d、ジョウト 草むら %d・水 %d、表を 指す 所 %d、金に ない マップ %s、キットが かえた 所 %s）' % (
+        WB, len(kg) // 47, len(kw) // 9, len(jg) // 47, len(jw) // 9, n, sorted(set(skip)), kit))
     return WB

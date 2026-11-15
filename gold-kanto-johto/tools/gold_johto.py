@@ -7,8 +7,9 @@ from cwalk import Walk
 from cmaps import maplist
 from maps import CMGP, GMGP
 
-SAME = ('OlivineGym MahoganyGym SlowpokeWellB1F TeamRocketBaseB1F SilverCaveRoom3 MoveDeletersHouse AzaleaGym '
-        'LakeOfRage VioletGym GoldenrodGym BillsFamilysHouse OlivinePort FastShip1F CianwoodGym NewBarkTown').split()
+# （ジムリーダーの 再戦・わざを おもいだす 人は キットの 機能 → 金の 追加機能パッチの もの（rematch_gold・moverelearn）を 使う）
+SAME = ('SlowpokeWellB1F TeamRocketBaseB1F SilverCaveRoom3 '
+        'LakeOfRage BillsFamilysHouse OlivinePort FastShip1F NewBarkTown').split()
 # つくりが ちがうが、MOD が 話を 書きかえた マップ（カントーから 来た サトシの はじまり）：MOD の ものを そのまま
 FULL = ['ElmsLab', 'PlayersHouse1F', 'MrPokemonsHouse']
 

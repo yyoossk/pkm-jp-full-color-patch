@@ -81,7 +81,9 @@ def apply(g, SB, log):
     a.L('l_ok'); a.db(0xC1, 0xE1)
     a.L('l_nx'); a.db(0x0D); a.jr(0x20, 'l_lp'); a.jr(0x18, 'go')
     a.L('reload'); a.far(0x05, 0x413F)
-    a.L('go'); a.db(0x3E, 0x02, 0xCD, 0x11, 0x27); a.far(0x09, 0x4488); a.far(0x02, 0x4767); a.db(0xC9)
+    KIT = bytes(g[fo(0x05, 0x5560):fo(0x05, 0x5567)]) == bytes.fromhex('3e79210640cfc9')   # 金の 追加機能パッチの 連れ歩き
+    if KIT: a.L('go'); a.far(0x79, 0x4006); a.db(0xC9)            # キットの LoadMapObjects の つづき（連れ歩き こみ）
+    else: a.L('go'); a.db(0x3E, 0x02, 0xCD, 0x11, 0x27); a.far(0x09, 0x4488); a.far(0x02, 0x4767); a.db(0xC9)
     a.L('mtab')
     for gr, n, i in mtab: a.db(gr, n, i)
     a.db(0xFF)
@@ -94,6 +96,9 @@ def apply(g, SB, log):
     # ---- フック
     o = fo(0x05, 0x41A8); assert g[o:o + 17] == bytes.fromhex('fac6d93d4f0600215e4609092a666f0e0b')
     g[o:o + 15] = bytes([0x3E, SB, 0x21, lab['fill'] & 0xFF, lab['fill'] >> 8, 0xCF, 0x21, BUF & 0xFF, BUF >> 8]) + bytes(6)
-    o = fo(0x05, 0x5560); assert g[o:o + 18] == bytes.fromhex('3e02cd27113e09218844cf3e02216747cfc9'.replace('cd2711', 'cd1127'))
-    g[o:o + 18] = bytes([0x3E, SB, 0x21, lab['lmo'] & 0xFF, lab['lmo'] >> 8, 0xCF, 0xC9]) + bytes(11)
+    o = fo(0x05, 0x5560)
+    if KIT: g[o:o + 7] = bytes([0x3E, SB, 0x21, lab['lmo'] & 0xFF, lab['lmo'] >> 8, 0xCF, 0xC9])
+    else:
+        assert g[o:o + 18] == bytes.fromhex('3e02cd11273e09218844cf3e02216747cfc9')
+        g[o:o + 18] = bytes([0x3E, SB, 0x21, lab['lmo'] & 0xFF, lab['lmo'] >> 8, 0xCF, 0xC9]) + bytes(11)
     log.append('人の絵の 表：バンク %02X（表 %d こ、マップごと %d）' % (SB, len(lists), len(mtab)))
