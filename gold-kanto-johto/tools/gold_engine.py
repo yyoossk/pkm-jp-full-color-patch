@@ -280,6 +280,19 @@ def p21_seafoam_surf(g, M, log):
     log.append('第21弾 ふたごじま B4F の なみのり：ホーム %04X〜%04X、03:%04X〜' % (H, H + len(code), T))
 
 
+def p_catch_dude(g, M, log):
+    """MOD 13:63A2 → 7FC2：トキワシティ（23:3）の つかまえかたの おじいさんの 名前。金 08:7A0E ld hl,DudeName → 08:7F60"""
+    import asmx as RX
+    o = fo(8, RX.GJ['CatchTutorial'] + 0x22); assert g[o:o + 6] == bytes.fromhex('21727a11b5d1')
+    B = 0x7F60; b = fo(8, B); assert not any(g[b:b + 0x20])
+    name = M[fo(0x13, 0x7FBC):fo(0x13, 0x7FC2)]; assert name[-1] == 0x50
+    st = bytes([0xFA, 0xC6, 0xD9, 0xFE, 0x17, 0x20, 0x0B, 0xFA, 0xC7, 0xD9, 0xFE, 0x03, 0x20, 0x04,
+                0x21, (B + 0x18) & 255, (B + 0x18) >> 8, 0xC9, 0x21, 0x72, 0x7A, 0xC9])
+    g[b:b + len(st)] = st; g[b + 0x18:b + 0x18 + 6] = name
+    g[o:o + 3] = bytes([0xCD, B & 255, B >> 8])
+    log.append('つかまえかたの おじいさん（トキワ）：08:%04X' % B)
+
+
 def apply(g, log, M=None, TB=None):
     if TB is not None: p55_koga(g, TB, log)
     p75_copyobject(g, log)
@@ -296,3 +309,4 @@ def apply(g, log, M=None, TB=None):
     if M is not None: p_items(g, M, log)
     if M is not None: p66_jj_colors(g, M, log)
     if M is not None: p21_seafoam_surf(g, M, log)
+    if M is not None: p_catch_dude(g, M, log)
