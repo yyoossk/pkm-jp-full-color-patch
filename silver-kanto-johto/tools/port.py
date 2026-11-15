@@ -37,6 +37,9 @@ class Port:
         s.copied = set()          # 写した クリスタルの 位置
         s.ext_flags = {}          # クリスタルの フラグ → 銀の フラグ（足した もの）
         s.todo = {}
+        s.ram = {}; s.ram_pos = []  # 使って いる WRAM の アドレス（読みかえる）
+        s.trainers = set()        # カントーで 使う (クラス, 番号)（クリスタルの 番号）
+        s.force = {}              # クリスタルの フラグ → 銀の フラグ（シーンに 使う バイトは まとめて 動かす）
 
     def note(s, kind, msg):
         s.todo.setdefault(kind, set()).add(msg)
@@ -62,6 +65,7 @@ class Port:
     # ---------- 番号の 読みかえ
     def x_flag(s, v):
         if v == 0xFFFF or v == 0: return v
+        if v in s.force: return s.force[v]
         n = xlat.inv(s.T.c_ev).get(v)
         if v >= 0x800:                                     # この MOD が 足した フラグ（第15弾）
             return v
@@ -116,6 +120,7 @@ class Port:
                     s.note('bad', str(e)); break
                 s.copy(b, a, ln)
                 d = s.dst(b, a)
+                if op == 0x5d: s.trainers.add((args[0][1], args[1][1]))
                 if s.once(d):
                     if op not in cscript.SILVER_OP: s.note('op', '%s @ %02X:%04X' % (name, b, a))
                     else: s.s[d] = cscript.SILVER_OP[op]
@@ -150,6 +155,8 @@ class Port:
         elif f == 'A': s.s[q] = cb(v[0]); s.note('asm', 'callasm %02X:%04X' % v)
         elif f == 'X': s.s[q] = cb(v[0]); s.note('far', 'data %02X:%04X' % v)
         elif f in 'RUN': s.note('data', '%s %02X:%04X' % (f, b, v))
+        elif f == 'w' and 0xC000 <= v < 0xE000:
+            s.ram.setdefault(v, set()).add('script'); s.ram_pos.append((v, q))
 
     # ---------- テキスト
     def text(s, b, a):
@@ -177,7 +184,8 @@ class Port:
                 if s.once(q): s.s[q] = cb(fb)
                 s.text(fb, fa)
             elif c in (0x01, 0x02, 0x09):
-                pass                                               # RAM の アドレス（同じ ならよいが あとで 確かめる）
+                s.ram.setdefault(r16(s.c, o + 1), set()).add('text%02X' % c)
+                s.ram_pos.append((r16(s.c, o + 1), s.dst(b, a) + 1))
             a += ln
 
     def movement(s, b, a):
@@ -240,12 +248,14 @@ class Port:
                 s.s[p] = s.x_sprite(ob[0])
                 fl = ob[11] | ob[12] << 8; s.put16(p + 11, s.x_flag(fl))
             typ = ob[7] & 0x0f; ptr = ob[9] | ob[10] << 8
-            if typ == 0 and ptr: s.script(sb, ptr)
+            if typ == 0 and ptr == 0x26B2: s.put16(p + 9, 0x27BF)       # ObjectEvent（ホーム）
+            elif typ == 0 and ptr: s.script(sb, ptr)
             elif typ == 1:
                 s.copy(sb, ptr, 2); q = s.dst(sb, ptr)
                 if s.once(q): s.s[q] = s.x_item(c[fo(sb, ptr)])
             elif typ == 2:
                 s.copy(sb, ptr, 14); q = s.dst(sb, ptr); o = fo(sb, ptr)
+                s.trainers.add((c[o + 2], c[o + 3]))
                 if s.once(q):
                     s.put16(q, s.x_flag(r16(c, o))); s.s[q + 2] = s.x_trclass(c[o + 2])
                 for i in (4, 6, 8):
