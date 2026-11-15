@@ -4,7 +4,10 @@
      and $7F → and $FF）。
    第78弾：カントーでは 野生の ポケモンが にげださない（赤と 同じ）。TryEnemyFlee（$0F:$44FA）の はじめの 2つの しらべを
      $E8:$4140 の 処理に（カントー なら nz ＝ にげない）。カントーかは クリスタルの IsInJohto と 同じ しかた
-     （ランドマーク：$5E こうそくせん は ジョウト、0 なら もどる マップ、$2E マサラ 以上 は カントー）。"""
+     （ランドマーク：$5E こうそくせん は ジョウト、0 なら もどる マップ、$2E マサラ 以上 は カントー）。
+   第76弾：かいりきの 岩は 赤と 同じく 段差（赤の 高さの へり＝横の かべ）を こえて 動く（チャンピオンロード 3F）。
+     WillObjectBumpIntoWater（$01:$79F6 の call CanObjectLeaveTile）→ 岩（OBJECT_PALETTE ビット6）なら タイルの 通れる
+     かだけ。銀の バンク1 は いっぱい なので、使わなく なった 銀の オーキドの 話（$01:$5FBA〜$6063）の 所に 置く。"""
 import os, sys
 H = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(H, 'tools'))
@@ -34,5 +37,12 @@ def apply(rom, ctx):
     assert rom[site:site + 13] == bytes.fromhex('fa08d13d204dfa3ecbcb7f2046')
     stay = 0x44FA + 6 + 0x4D
     rom[site:site + 13] = bytes([0x3E, FB, 0x21]) + w(FLEE) + bytes([0xCF, 0x20, stay - (0x44FA + 8)]) + bytes(5)
-    log.append('スクリプトの バンク $80〜、カントーの 野生は にげない')
+    # 第76弾
+    B1 = 0x5FC0
+    code = bytes([0x21, 0x06, 0x00, 0x09, 0xCB, 0x76, 0x20, 0x03, 0xC3, 0x4E, 0x7A,
+                  0xE1, 0x21, 0x0F, 0x00, 0x09, 0x7E, 0xCD, 0xA7, 0x16, 0xA7, 0xC8, 0x37, 0xC9])
+    assert rom[fo(1, 0x5FB3):fo(1, 0x5FB3) + 7] == bytes([0x3E, 0xB6, 0x21, 0xF0, 0x7F, 0xCF, 0xC9])   # phase_oakspeech の フック
+    o = fo(1, B1); rom[o:o + len(code)] = code
+    o = fo(1, 0x79F6); assert rom[o:o + 3] == bytes([0xCD, 0x4E, 0x7A]); rom[o + 1:o + 3] = w(B1)
+    log.append('スクリプトの バンク $80〜、カントーの 野生は にげない、かいりきの 岩は 段差を こえる')
     return rom
