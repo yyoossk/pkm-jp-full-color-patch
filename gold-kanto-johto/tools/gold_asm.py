@@ -30,6 +30,10 @@ AUTO = {
     (0x63, 0x4D2B): {},                                   # ミュウを つかまえたか
     (0x69, 0x4048): {}, (0x73, 0x54DB): {}, (0x68, 0x67C5): {},   # つかまえた 数
     (0x73, 0x54F5): {}, (0x5B, 0x5827): {},             # カビゴンを つかまえたか
+    (0x63, 0x7611): {},                                   # ジョウトの バッジの 数（ジムリーダーの 再戦）
+    (0x96, 0x5089): {'size': 0x522A - 0x5089, 'also': [0x50A2, 0x5121], 'data': [(0x522A, 8), (0x5232, 4)],
+                     'imm': {0x6753: 0x695F}, 'ram': {0xD00E: 0xDE12, 0xD02C: 0xDE30, 0xD02D: 0xDE31}},          # わざを おもいだす（MOD）：えらぶ・おもいだせる わざの 一覧・メニュー
+    (0x96, 0x5236): {'size': 0x5268 - 0x5236},   # （ram：金の 通信の 相手の ニックネームの 所 $DE12〜 を 一時的に）          # （おぼえさせる）
     # サファリ（6E:507D など）は 第28弾の サファリの しくみと いっしょに
 }
 PORTED = set(AUTO) | {(cb, x) for (cb, ca), o in AUTO.items() for x in o.get('also', [])}
@@ -72,6 +76,10 @@ def apply(E, M, g, log, cm):
             if out[i] in (0x21, 0x11, 0x01):
                 v = M[fo(cb, ca) + i + 1] | M[fo(cb, ca) + i + 2] << 8
                 if v in dmap: out[i + 1] = dmap[v] & 0xFF; out[i + 2] = dmap[v] >> 8; prob = [p for p in prob if p != 'データ? %02X:%04X' % (cb, v)]
+        for k_, v_ in opt.get('imm', {}).items():    # ほかの バンクの データ（ld hl,xxxx）
+            for i in range(len(out) - 2):
+                if out[i] == 0x21 and M[fo(cb, ca) + i + 1] | M[fo(cb, ca) + i + 2] << 8 == k_:
+                    out[i + 1] = v_ & 0xFF; out[i + 2] = v_ >> 8; prob = [p for p in prob if p != 'データ? %02X:%04X' % (cb, k_)]
         if opt.get('svbk1'):                        # クリスタルの WRAM バンク 5（色・LY）→ 金は バンク 0（バンクを かえない）
             for i in range(len(out) - 3):
                 if out[i:i + 4] == bytes([0x3E, 0x05, 0xE0, 0x70]): out[i + 1] = 0x01

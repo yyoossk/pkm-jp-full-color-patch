@@ -48,7 +48,8 @@ for n in range(gold_p11.G26_FIRST, gold_p11.G26_N + 1):
     _c2g.CMAP[(26, n)] = nm; _c2g.GMAP[nm] = (26, n)
 KANTO = [m['name'] for m in maplist(MOD, CMGP, 'pokecrystal') if KL <= MOD[m['hdr'] + 5] <= KE and m['name'] not in JOHTO_SIDE]
 KANTO += [nm for nm in G26 if KL <= MOD[cm[nm]['hdr'] + 5] <= KE]
-names = sorted(set(KANTO))   # ジョウトは 金のまま（MOD だけの 変更は フェーズごとに 入れる） if len(sys.argv) < 2 else sys.argv[1].split(',')
+import gold_johto
+names = sorted(set(KANTO) | set(gold_johto.SAME))   # ジョウトは 金のまま（MOD だけの 変更は フェーズごとに 入れる） if len(sys.argv) < 2 else sys.argv[1].split(',')
 walks = {}
 for nm in names:
     W = Walk(MOD)
@@ -109,12 +110,14 @@ while True:
         if not any(_unplaced(W, keys) for W, at in walks.values()): break
         continue
     for nm, why in drop: print('金のまま（入れない マップへ つながる）:', nm, why); del walks[nm]
+_lj = []; gold_johto.gold_texts(walks, VAN, bytes(open('/home/claude/work/ref/kin_late.gbc', 'rb').read()), _lj); print('\n'.join(_lj))
 allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
 _la = []; gold_asm.apply(E, MOD, g, _la, cm); gold_safari.apply(g, MOD, E, _la); gold_specials.apply(g, MOD, E.next_bank, _la); E.next_bank += 1; print('\n'.join(_la))
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 for k, b in allblobs.items(): E.write(k, b)
+gold_johto.patch_attrs(E, g, None)
 finish_maps(E, MOD, g, cm, gm)
 # ---- トレーナー：読むコード（0E:$5511-$595B）ごと 新しいバンクへ（クリスタル版 第13弾と同じ考え）。手持ちは 第10弾で 入れる
 import re as _re
