@@ -95,9 +95,35 @@ def pokepic_color(g, log):
     g[o:o + 5] = bytes([0xCD, h & 0xFF, h >> 8, 0, 0])
     log.append('pokepic の 色：02:%04X（%d バイト）' % (h, len(code)))
 
+def p75_copyobject(g, log):
+    """第75弾：appear で 画面に いる 人を 2人に しない（CopyObjectStruct：すでに 人の 入れものが あれば もどる）。
+       金 02:46D7 → 02:7C54"""
+    o = fo(0x02, 0x46D7); assert bytes(g[o:o + 5]) == bytes.fromhex('cde627a7c0')
+    h = 0x7C54; assert not any(g[fo(0x02, h):fo(0x02, h) + 10])
+    g[fo(0x02, h):fo(0x02, h) + 10] = bytes([0x0A, 0xFE, 0xFF, 0xC0, 0xCD, 0xE6, 0x27, 0xC3, 0xDA, 0x46])
+    g[o:o + 3] = bytes([0xC3, h & 0xFF, h >> 8])
+    log.append('第75弾 CopyObjectStruct：02:%04X' % h)
+
+def p75_marts(g, M, log):
+    """MOD のカントーのショップの品ぞろえ（赤の品ぞろえ）。金の 05:66C7-6755 に詰めなおす"""
+    CT, GT = fo(5, 0x64C3), fo(5, 0x65EA)
+    assert g[GT + 36] == 0xC7 and g[GT + 37] == 0x66
+    out = bytearray(); ptr = []
+    for k in range(18, 34):
+        p = M[CT + 2 * k] | M[CT + 2 * k + 1] << 8; o = fo(5, p); n = M[o]
+        ptr.append(0x66C7 + len(out)); out += bytes([n]) + M[o + 1:o + 1 + n] + b'\xff'
+    assert len(out) <= 0x6756 - 0x66C7
+    g[fo(5, 0x66C7):fo(5, 0x66C7) + len(out)] = out
+    for i, a in enumerate(ptr):
+        g[GT + 2 * (18 + i)] = a & 255; g[GT + 2 * (18 + i) + 1] = a >> 8
+    log.append('第75弾 ショップ：カントー16か所の品ぞろえ（%d バイト）' % len(out))
+
+
 def apply(g, log, M=None):
+    p75_copyobject(g, log)
     pokepic_color(g, log)
     if M is not None: p32_spawns(g, M, log)
     if M is not None: p27_cut(g, M, log)
     p69_ledges(g, log)
     p54_winloss(g, log)
+    if M is not None: p75_marts(g, M, log)
