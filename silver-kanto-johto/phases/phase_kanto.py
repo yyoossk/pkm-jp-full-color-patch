@@ -30,8 +30,10 @@ def apply(rom, ctx):
 
     # ---- 2. MOD の バンク
     rom[0x60 * 0x4000:0x7D * 0x4000] = cmod[0x60 * 0x4000:0x7D * 0x4000]
-    for b in (0x7D, 0x7E) + DATA_BANKS:
-        d = port.cb(b) if b < 0x60 else b
+    for b in DATA_BANKS:                     # MOD が データを 置いた クリスタルの バンクは まるごと（元と 同じ バイトも 要る）
+        d = port.cb(b); rom[d * 0x4000:(d + 1) * 0x4000] = cmod[b * 0x4000:(b + 1) * 0x4000]
+    for b in (0x7D, 0x7E):
+        d = b
         for i in range(0x4000):
             o = b * 0x4000 + i
             if cmod[o] != corig[o]: rom[d * 0x4000 + i] = cmod[o]
