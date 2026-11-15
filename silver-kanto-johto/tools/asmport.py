@@ -80,7 +80,7 @@ def walk(rom, bank, addr, limit=4000):
 
 
 # 手で しらべた ホームの 関数（クリスタル → 銀）
-HOME_EXTRA = {0x1D07: 0x1B60, 0x31C2: 0x33C6}
+HOME_EXTRA = {0x1D07: 0x1B60, 0x31C2: 0x33C6, 0x3037: 0x30D6}   # 3037 FarCopyWRAM → CopyBytes（銀の 色は WRAM0）
 # 手で しらべた WRAM・HRAM（クリスタル → 銀）
 WRAM_EXTRA = {
     0xD067: 0xCF93, 0xD068: 0xCF94, 0xD069: 0xCF95, 0xD06A: 0xCF96, 0xD21C: 0xD0C6, 0xD833: 0xD7A3,
@@ -130,6 +130,8 @@ class Translator:
                     t = s.wram(v)
                     if t: rom[o + d + 1] = t & 0xff; rom[o + d + 2] = t >> 8
                     else: un.append('wram %04X' % v)
+            elif op == 0xE0 and s.c[o + 1] == 0x70 and getattr(s, 'nosvbk', False):
+                rom[o + d] = 0x00; rom[o + d + 1] = 0x00            # ldh [rSVBK],a を 消す（銀は スタックが $DFxx）
             elif op in (0xE0, 0xF0) and s.c[o + 1] >= 0x80:
                 v = 0xFF00 + s.c[o + 1]; t = s.wram(v)
                 if t: rom[o + d + 1] = t & 0xff

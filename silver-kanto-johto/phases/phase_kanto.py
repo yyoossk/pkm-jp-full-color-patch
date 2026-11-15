@@ -17,7 +17,7 @@ ROM4 = 0x400000
 ATTR_BANK = 0xE0          # 銀の マップの 属性を バンク$25 から 動かす 先（グループ26 を のばす 場所を あける）
 TS_BANK = 0xE1            # タイルセットの 表
 EXT_FLAGS = 0xD60D        # $800〜 の フラグの もと（$D60D+$100 = $D70D〜$D7A9。$D6E5〜$D70C は 地名の 看板が 使う）
-DATA_BANKS = (0x47, 0x59, 0x5A, 0x5B, 0x5D)   # MOD が 日本版クリスタルの 空きに 置いた データ
+DATA_BANKS = (0x13, 0x47, 0x59, 0x5A, 0x5B, 0x5D)   # $13 は この MOD の タイルごとの 色の 表（palmap）   # MOD が 日本版クリスタルの 空きに 置いた データ
 
 
 def w16(rom, o, v): rom[o] = v & 0xff; rom[o + 1] = v >> 8
@@ -100,7 +100,7 @@ def apply(rom, ctx):
         for f in (0, 3, 6): e[f] = port.cb(e[f])
         a = r16(e, 9); w16(e, 9, canim.get(a, canim.get(0x42E7, a)))
         if r16(e, 9) == a and a not in canim: P.note('tileset', 'anim %d %04X' % (i, a))
-        w16(e, 13, cpal.get(r16(e, 13), kanto_pal))          # MOD の パレットの 表は あとで（第44弾）
+        if r16(e, 13) in cpal: w16(e, 13, cpal[r16(e, 13)])  # クリスタルの もとの palmap → 銀の もの。MOD の palmap は $93 に（読む 所を フック）
         tab[15 * i:15 * i + 15] = e
     o = fo(TS_BANK, 0x4000); rom[o:o + len(tab)] = tab
     assert rom[0x2DB8:0x2DBB] == bytes([0x21, 0x2B, 0x56]) and rom[0x2DCA:0x2DCC] == bytes([0x3E, 0x05])
@@ -198,6 +198,39 @@ def apply(rom, ctx):
         rom[fo(5, hp):fo(5, hp) + len(code)] = code
         rom[off] = 0xCD; w16(rom, off + 1, hp); hp += len(code)
     assert hp <= 0x562B + 15 * 29
+
+    # ---- この MOD が 変えた 人の絵（主人公＝レッドの 絵・自転車・サカキ・ボール・岩の 色）を 銀の 表へ
+    S_OW = 0x147B0; C_OW = 0x14727
+    for i in range(1, 0x67):
+        ce = bytearray(cmod[C_OW + 6 * (i - 1):C_OW + 6 * i]); oe = corig[C_OW + 6 * (i - 1):C_OW + 6 * i]
+        b, a = ce[3], r16(ce, 0); size = {1: 0xC0, 2: 0xC0, 3: 0x40}.get(ce[4], ce[2])
+        src = fo(b, a)
+        gfx_changed = b < 0x80 and cmod[src:src + size] != corig[src:src + size]
+        if bytes(ce) == oe and not gfx_changed: continue
+        if b < 0x60:
+            d = fo(port.cb(b), a); rom[d:d + size] = cmod[src:src + size]; ce[3] = port.cb(b)
+        si = P.x_sprite(i)
+        rom[S_OW + 6 * (si - 1):S_OW + 6 * si] = ce
+        log.append('人の絵 %02X → 銀 %02X を クリスタル版の ものに' % (i, si))
+
+    # ---- 外の マップの 人の絵の 表（銀は 1グループ 11まで）：カントーの グループは、その グループの 外の マップで 使う 絵
+    OUT_TAB, OUT_N = 0x465E, 11
+    from collections import Counter
+    use = {}
+    for k in keys:
+        h = CM.header(k)
+        if h['env'] not in (1, 2): continue
+        sg, sm = P.x_map(*k)
+        for ob in CM.events(k)['objects']:
+            if ob[0] and ob[0] < 0xF0: use.setdefault(sg, Counter())[P.x_sprite(ob[0])] += 1
+    lp = hp
+    for g, cnt in sorted(use.items()):
+        spr = [s for s, n in cnt.most_common()]
+        if len(spr) > OUT_N: P.note('outdoor', 'group %d: %d 絵（%s は 入らない）' % (g, len(spr), spr[OUT_N:])); spr = spr[:OUT_N]
+        blob = bytes(spr + [0] * (OUT_N - len(spr)))
+        rom[fo(5, lp):fo(5, lp) + OUT_N] = blob
+        w16(rom, fo(5, OUT_TAB) + 2 * (g - 1), lp); lp += OUT_N
+    assert lp <= 0x562B + 15 * 29, hex(lp)
 
     # ---- 新しい ゲームは レッドの いえ 2F から（第1〜9弾。クリスタル版と 同じ 3,3）
     assert rom[0x15286:0x1528A] == bytes([24, 7, 3, 3])
