@@ -77,6 +77,9 @@ def apply(rom, ctx):
         sg, sm = P.x_map(g, m)
         r = x_addr(a, CM.name[(g, m)])
         newtab = [e for e in newtab if (e[0], e[1]) != (sg, sm)] + [(sg, sm, r)]
+    # アセンブリだけが つかう バイト：$DACE（フラグ $348〜。78:5E9E など）、$D836（MOD の 変数。47:7E4E〜7F13）
+    x_addr(0xDACE, None)
+    amap[0xD836] = free.pop(0)
     blob = b''.join(bytes([g, m, a & 0xff, a >> 8]) for g, m, a in newtab) + b'\xff'
     o = fo(TS_BANK, 0x4400); rom[o:o + len(blob)] = blob
     rom[0x1F47] = TS_BANK; w16(rom, 0x1F4A, 0x4400)

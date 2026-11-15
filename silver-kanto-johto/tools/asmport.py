@@ -80,7 +80,7 @@ def walk(rom, bank, addr, limit=4000):
 
 
 # 手で しらべた ホームの 関数（クリスタル → 銀）
-HOME_EXTRA = {0x1D07: 0x1B60, 0x31C2: 0x33C6, 0x3037: 0x30D6}   # 3037 FarCopyWRAM → CopyBytes（銀の 色は WRAM0）
+HOME_EXTRA = {0x1D07: 0x1B60, 0x31C2: 0x33C6, 0x3037: 0x30D6, 0x379E: 0x395D}   # 3037 FarCopyWRAM → CopyBytes（銀の 色は WRAM0）、379E PlayMonCry
 # 手で しらべた WRAM・HRAM（クリスタル → 銀）
 WRAM_EXTRA = {
     0xD067: 0xCF93, 0xD068: 0xCF94, 0xD069: 0xCF95, 0xD06A: 0xCF96, 0xD21C: 0xD0C6, 0xD833: 0xD7A3,
@@ -88,6 +88,8 @@ WRAM_EXTRA = {
     0xDE3E: 0xDB89, 0xDE3F: 0xDB8A, 0xDE4C: 0xDB97, 0xDE89: 0xDBD4, 0xDE8A: 0xDBD5, 0xDBC3: 0xD90D,
     0xD841: 0xD566, 0xFFAD: 0xFFAF, 0xFFC6: 0xFFC8, 0xFFC7: 0xFFC9, 0xFFC8: 0xFFCA,
 }
+# 形で 1つに しぼれない 関数（そだてや：あずける・ひきとる など）
+FAR_EXTRA = {(0x03, 0x607F): (0x03, 0x60D2), (0x03, 0x6946): (0x03, 0x696E), (0x03, 0x5F76): (0x03, 0x5FC9)}
 C_EXT_LO, C_EXT_HI, EXT_DELTA = 0xDA01, 0xDA65, 0xD901 - 0xD60D
 
 
@@ -102,6 +104,7 @@ class Translator:
         if s.fidx is None:
             g = bytes(s.g[:0x100000]) + bytes(64); s.fidx = {}
             for o in range(0x4000, 0x100000): s.fidx.setdefault(norm(g, o, 16), []).append(o)
+        if (b, a) in FAR_EXTRA: return FAR_EXTRA[(b, a)]
         o = fo(b, a); hits = s.fidx.get(norm(s.co, o, 16), [])
         if len(hits) > 1:
             same = [h for h in hits if h // 0x4000 == b]
