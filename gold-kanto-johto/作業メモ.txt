@@ -30,4 +30,15 @@
 ■ すすみぐあい
   ・道具（SameBoy ハーネス・RGBDS 1.0.4）・くらべる用のクリスタル完成 ROM・金の追加機能パッチのビルド（4つとも CRC 一致）まで。
   ・命令の対応表まで できた。
-  ・つぎ：第1〜9弾（ソース/base の IPS の中身）を 金へ。
+  ・道具（tools/）：
+      consts.py   pret の定数（イベントフラグ・人の絵・曲・トレーナー・特別処理・std）を名前で読む。xlat() でクリスタル→金。
+      maps.py / cmaps.py  マップの表（クリスタル $25:$4000、金 $25:$40ED）を名前つきで読む。
+      cwalk.py    クリスタル（改造後）のマップから スクリプト・セリフ・移動データ・トレーナーを たどって集める。
+      changed.py  元のクリスタルと くらべて 中身が変わったマップをさがす。
+      mkjpsym.py  英語版 pokecrystal.sym → 日本版クリスタルの住所（crystal_jp.sym、12153こ）。金は goldsrc/src/jp_all.inc を使う。
+  ・第9弾までで変わったマップ：66こ（カントーの道路・ジム・四天王・マサラ・オーキド研究所・クチバ/アサギのみなと など。
+    ジョウトもいくつか）。cwalk の まだの所：Route44・SilverCaveRoom3・Route45・FuchsiaCity・BattleTowerHallway で
+    範囲外エラー、Route1/2/8/11・LancesRoom・RedsHouse1F で 不明な命令（人の種類 3・4 や asm を スクリプトと読んでいる）。
+  ・金で 使えない もの：special 57こ（BattleTower・Celebi・Buena など）、std 6こ（GiftM/F など）、曲 10こ（MUSIC_CLAIR など）、
+    人の絵 7こ（SPRITE_KRIS・SUICUNE など）。使っていたら 移植するか 書きかえる。
+  ・つぎ：cwalk の まちがいを直す → 66このマップを 金の形に書き出す道具（ID の読みかえ・ポケモンの置き場所）→ 金を4MB にして入れる。
