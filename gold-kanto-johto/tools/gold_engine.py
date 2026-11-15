@@ -119,7 +119,26 @@ def p75_marts(g, M, log):
     log.append('第75弾 ショップ：カントー16か所の品ぞろえ（%d バイト）' % len(out))
 
 
-def apply(g, log, M=None):
+def p55_koga(g, TB, log):
+    """第55弾：セキチクジムの キョウ（KOGA の 2ばん）は 「ジムリーダー」の 名前・カントーの ジムリーダーの 曲。
+       ホーム $3F80／$3F95（クリスタル版と 同じ 住所。金では あき）"""
+    CLS, OID = 0xD10A, 0xD10D
+    assert not any(g[0x3F80:0x3FB0])
+    a = bytes([0x79, 0xFE, 0x0F, 0x20, 0x0A, 0xFA, OID & 255, OID >> 8, 0xFE, 0x02, 0x79, 0x20, 0x02, 0x3E, 0x11,
+               0x21, 0xC1, 0xD1, 0xFE, 0x09, 0xC9])
+    b = bytes([0xFA, CLS & 255, CLS >> 8, 0xFE, 0x0F, 0x20, 0x09, 0xFA, OID & 255, OID >> 8, 0xFE, 0x02, 0x20, 0x02,
+               0x37, 0xC9, 0x21, 0x77, 0x4C, 0xC3, 0x79, 0x50])
+    g[0x3F80:0x3F80 + len(a)] = a; assert len(a) <= 0x15
+    g[0x3F95:0x3F95 + len(b)] = b
+    for bk, ad in ((0x0E, 0x5511), (TB, 0x5511), (0x0E, 0x553D), (TB, 0x553D)):   # GetTrainerClassName・GetOTName
+        o = fo(bk, ad); assert g[o:o + 6] == bytes.fromhex('21c1d179fe09'), (hex(bk), g[o:o + 6].hex())
+        g[o:o + 6] = bytes.fromhex('cd803f000000')
+    o = fo(0x0F, 0x5071); assert g[o:o + 3] == bytes.fromhex('21774c'); g[o:o + 3] = bytes.fromhex('c3953f')
+    log.append('第55弾 キョウ：ホーム 3F80／3F95、0E・%02X:5511／553D、0F:5071' % TB)
+
+
+def apply(g, log, M=None, TB=None):
+    if TB is not None: p55_koga(g, TB, log)
     p75_copyobject(g, log)
     pokepic_color(g, log)
     if M is not None: p32_spawns(g, M, log)
