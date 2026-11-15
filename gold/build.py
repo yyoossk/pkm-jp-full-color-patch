@@ -58,12 +58,12 @@ FILES=[
     'src/follow_gold.asm',
     'src/prizetm_gold.asm',
     'src/statuscolor_gold.asm',
-    'src/dexinfo_gold.asm','src/tmshop.asm','src/daycareout.asm','src/eggfast.asm']
+    'src/dexinfo_gold.asm','src/tmshop.asm','src/daycareout.asm','src/eggfast.asm','src/nobillcall.asm']
 # 251ひき そろう版：野生・ショップ・ずかんの 文字の ファイルを かえて、edition251_gold.asm を 足す
 FILES251=[{'src/wild_gold.asm':'src/wild251_gold.asm','src/masterball.asm':'src/masterball251.asm',
            'src/dexinfo_gold.asm':'src/dexinfo251_gold.asm'}.get(f,f) for f in FILES]+['src/edition251_gold.asm']
-EXPECT={'kin.gbc':0x5ED0CE0A,'kin60.gbc':0x0446F4D2,   # Ver.1.5.1
-        'kin251.gbc':0xE4AD16F0,'kin251_60.gbc':0xAA8665C5}   # Ver.1.5.0 の 251ひき そろう版
+EXPECT={'kin.gbc':0x3BCC0B7D,'kin60.gbc':0xFE03E35A,   # Ver.1.5.1 ＋ マサキの 電話を とめる（まだ リリースして いない）
+        'kin251.gbc':0x2DC0CEFD,'kin251_60.gbc':0x7CEE43F8}   # Ver.1.5.0 の 251ひき そろう版
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)
