@@ -168,9 +168,17 @@ def apply(rom, ctx):
         wm2 = wramxl.build_all(corig, g1, Hm); pickle.dump(wm2, open(cache, 'wb'))
     wm2 = dict(wm2); wm2.update(wm)
     TR = asmport.Translator(cmod, corig, g1, wm2, Hm, log)
+    # 殿堂入りの 画面（$59:6DCE・6E08）は クリスタルの WRAM バンク5（色・LYOverrides）を 使う → 銀の WRAM0 へ
+    wm59 = dict(wm2); wm59.update(asmport.WRAM_EXTRA)
+    for a in range(0xD000, 0xD100): wm59[a] = 0xC200 + (a - 0xD000)       # 色
+    for a in range(0xD100, 0xD190): wm59[a] = 0xC700 + (a - 0xD100)       # wLYOverrides
+    for a in range(0xD190, 0xD195): wm59[a] = free.pop(0)                 # バンク5 の 作業用
+    wm59.update({0xC568: 0xC468, 0xCE95: 0xCD95})                         # タイルマップ・属性マップ（-$100）
+    TR59 = asmport.Translator(cmod, corig, g1, wm59, Hm, log); TR59.wm = wm59; TR59.nosvbk = True
     for x in sorted(P.todo.get('asm', ())):
         bb, aa = [int(v, 16) for v in x.split()[1].split(':')]
-        TR.routine(rom, bb, aa, x.split()[1])
+        (TR59 if bb == 0x59 else TR).routine(rom, bb, aa, x.split()[1])
+    TR.unres.update(TR59.unres)
     P.todo['asm'] = {'%s %s' % (k, ' '.join(v)) for k, v in TR.unres.items()}
 
     # ---- 5. イベントフラグ $800〜（第15弾）：EventFlagAction $2EEB → $0018（rst $18・$20 は 使われて いない）
