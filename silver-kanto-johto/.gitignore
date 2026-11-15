@@ -1,3 +1,4 @@
 roms/*.gbc
 build/
 *.sav
+__pycache__/
