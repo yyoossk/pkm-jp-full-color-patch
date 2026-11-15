@@ -1,11 +1,11 @@
-ポケットモンスター金 追加機能パッチ　ソース（Ver.1.5.1）
+ポケットモンスター金 追加機能パッチ　ソース（Ver.1.5.2）
 ==============================================
 
-このフォルダで python3 build.py を 実行すると、Ver.1.5.1 の ROM が できます。
-  ・kin.gbc（通常版）　CRC32 5ED0CE0A
-  ・kin60.gbc（60fps版）CRC32 0446F4D2
-  ・kin251.gbc（251ひき そろう版の 通常版）　CRC32 E4AD16F0
-  ・kin251_60.gbc（251ひき そろう版の 60fps版）CRC32 AA8665C5
+このフォルダで python3 build.py を 実行すると、Ver.1.5.2 の ROM が できます。
+  ・kin.gbc（通常版）　CRC32 3BCC0B7D
+  ・kin60.gbc（60fps版）CRC32 FE03E35A
+  ・kin251.gbc（251ひき そろう版の 通常版）　CRC32 2DC0CEFD
+  ・kin251_60.gbc（251ひき そろう版の 60fps版）CRC32 7CEE43F8
     251ひき そろう版：野生（src/wild251_gold.asm）・ショップ（src/masterball251.asm）・ずかんの 文字（src/dexinfo251_gold.asm）を
     かえて、src/edition251_gold.asm を 足す（build.py の FILES251）。ふつうの 版の ROM は かわらない。
     ・野生：その 版で 出ない ポケモンを、ほかの 2つの 版と 同じ マップ・枠・レベルに（朝・昼に 足して 夜は 元の まま など）。
@@ -17,10 +17,10 @@
     ・殿堂入りの あと：アルフの いせきの けんきゅうじょで オムナイト・カブト（Lv30）、シロガネやまの おくに ミュウツー（Lv70）、
       グレンじまに ミュウ（Lv50）。しるしは wEdFlags（$d7a3）。
     ・コガネデパート 4F で しんかの いし 6つ・おうじゃのしるし を 2100円で 売る。
-  （Ver.1.5.1 の あと（まだ リリースして いない）：
+  （Ver.1.5.2 で かえた もの：
     ・src/nobillcall.asm：ボックスが いっぱいに なった ときの マサキからの 電話を かけて こない ように した
       （PokeBallEffect .SendToPC の set BATTLERESULT_BOX_FULL, [hl] を nop に。自動で 次の ボックスに 切りかえる ので）。
-    CRC32：通常版 3BCC0B7D・60fps版 FE03E35A・251ひき 2DC0CEFD・251ひき 60fps 7CEE43F8）
+    Ver.1.5.1 の リリースは 通常版 5ED0CE0A・60fps版 0446F4D2・251ひき E4AD16F0・251ひき 60fps AA8665C5）
   （Ver.1.5.1 で 直した もの：
     ・イベントの follow（人が 先頭で 主人公が ついて いく）でも、Bダッシュの とき 連れ歩きの 予定（wFollowMovementQueue）を
       はやい 歩きに かえる 処理（Fw_FastQueue）が 動きうる 形 だった（クリスタルの キキョウシティの せんせいの バグと 同じ しくみ）。
