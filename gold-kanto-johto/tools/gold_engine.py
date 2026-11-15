@@ -186,6 +186,43 @@ def p57_hm_lugia(g, M, log):
     log.append('第57弾 ひでんマシン：251 しゅるい、ルギア・ホウオウの 覚える技（〜10:%04X）' % end)
 
 
+def p57_trade_evo(g, log):
+    """第57弾：つうしん進化（どうぐ つき）も Lv37 から 通信なしで（MOD 10:641C → 7FA0）。
+       金の バンク 10 は いっぱい → ホーム $3FB0"""
+    o = fo(0x10, 0x641F); assert g[o:o + 7] == bytes.fromhex('fa3cd0a7ca6365')
+    H = 0x3FB0; assert not any(g[H:H + 0x18])
+    st = bytes.fromhex('fa3cd0a7c0' 'fac4d0a7200a' 'fa24d0fe253803' 'f601c9' 'afc9')
+    g[H:H + len(st)] = st
+    g[o:o + 7] = bytes([0xCD, H & 255, H >> 8, 0xCA, 0x63, 0x65, 0x00])
+    log.append('第57弾 つうしん進化：10:641F → ホーム %04X' % H)
+
+
+def p01_continue_boulder(g, log):
+    """MOD 01:7E83：エンディングの あとの つづきは、ジョウト編（フラグ $34C）の 前なら マサラ（2）、あとなら ワカバ（$0E）。
+       MOD 01:7EC0：かいりきの 岩は 床（タイルの 当たり 0）にしか 動かない（WillObjectBumpIntoWater の 前）"""
+    EVF = 0xD7AA; ev = 0x34C; adr = EVF + (ev >> 3); bit = ev & 7
+    A = 0x7FA0; o = fo(1, A); assert not any(g[o:o + 0x40])
+    st = bytes([0xFA, adr & 255, adr >> 8, 0xCB, 0x47 | bit << 3, 0x3E, 0x0E, 0x20, 0x02, 0x3E, 0x02,
+                0xEA, 0x20, 0xCF, 0xC9])
+    g[o:o + len(st)] = st
+    c = fo(1, 0x5E38); assert g[c:c + 6] == bytes.fromhex('3e0eea20cfcd')
+    g[c:c + 5] = bytes([0xCD, A & 255, A >> 8, 0x00, 0x00])
+    B = 0x7FB0; o = fo(1, B)
+    bl = bytes.fromhex('210600' '09' 'cb76' '2003' 'c3897a' 'e1' '210e00' '09' '7e' 'cda716' 'a7' 'c8' '37' 'c9')
+    g[o:o + len(bl)] = bl
+    w = fo(1, 0x7A31); assert g[w:w + 3] == bytes.fromhex('cd897a'); g[w + 1] = B & 255; g[w + 2] = B >> 8
+    log.append('MOD 01:7E83／7EC0：つづきの 出る所（01:5E38）・かいりきの 岩（01:7A31）')
+
+
+def p_items(g, M, log):
+    """MOD の どうぐの 属性：マスターボールの 値段、りゅうのキバ／りゅうのウロコ の 持たせた 効果（もとの バグ なおし）"""
+    import asmx as RX
+    mo = fo(1, 0x69FA); go = fo(RX.GB['ItemAttributes'], RX.GJ['ItemAttributes'])
+    for it in (0x01, 0x90, 0x97):
+        i = it - 1; g[go + 7 * i:go + 7 * i + 7] = M[mo + 7 * i:mo + 7 * i + 7]
+    log.append('どうぐの 属性：01・90・97')
+
+
 def apply(g, log, M=None, TB=None):
     if TB is not None: p55_koga(g, TB, log)
     p75_copyobject(g, log)
@@ -197,3 +234,6 @@ def apply(g, log, M=None, TB=None):
     if M is not None: p75_marts(g, M, log)
     if M is not None: p57_evos(g, M, log)
     if M is not None: p57_hm_lugia(g, M, log)
+    p57_trade_evo(g, log)
+    p01_continue_boulder(g, log)
+    if M is not None: p_items(g, M, log)
