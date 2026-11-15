@@ -39,8 +39,22 @@ TEXTS = {
     (0x35, 0x4187): 'あら　<PLAYER>くん！<LINE>また　でかけるの？<PARA>きを　つけて<LINE>いってらっしゃい！',
     (0x36, 0x5949): 'もしもし…<PARA><……>　<PLAYER>？<LINE>オーキドはかせから　きいたわ<CONT>ジョウトに　ついたのね！<PARA>'
                     'おかねとかって　どうするの？<LINE>おかあさん　ちょきんしてあげようか？',
+    # 第83弾：カントーの チャンピオンに あう ことば（いかりのみずうみの ワタル・イブキ・フスベジムの 人・27ばんどうろ）
+    (0x2F, 0x4D86): '<PLAYER>じゃないか！<LINE>きみも　うわさを　ききつけて<CONT>やってきたのかい？<PARA>'
+                    '<POKEMON>りーグで　たたかって<LINE>いらいだな<PARA>'
+                    'おれも　ここの　うわさを　ききつけ<LINE>しんそうを　しらべていたんだが<……><PARA>'
+                    '<PLAYER>！<LINE>きみの　じつりょくは<CONT>よく　しっている<PARA>'
+                    'よかったら　おれと　いっしょに<LINE>しらべて　くれないか？',
+    (0x2D, 0x5493): 'わたしは　みとめないわ<PARA>まけて　いうのも　なんだけど<LINE>'
+                    'りーグの　チャンピオン　でも<CONT>いまの　あなたは　みとめられない<PARA><……>　そうだわ！<PARA>'
+                    'この　<POKEMON>ジムの　うらに<LINE>りゅうのあな　とよばれる<CONT>ばしょが　あるの<PARA>'
+                    'ちゅうおうに　ほこらが　あるから<LINE>そこへ　いきなさい<PARA>もし　そこで　あなたが<LINE>'
+                    'あまい　かんがえを　かえられたなら<PARA>ジムバッジを　わたすに　ふさわしい<LINE><TRAINER>として　みとめてあげるわ！',
+    (0x34, 0x4F78): 'きみは　いま！<PARA>ふるさとの　カントーちほうは<LINE>もう　すぐ　そこだ！<PARA>'
+                    'なんだったら　タウンマップで<LINE>かくにんして　ごらん！',
+    (0x2D, 0x56FE): 'えっ！　ドラゴンつかいの<LINE>ワタルさんに　あったことが<CONT>あるって？<PARA>さすが　チャンピオン　だね！',
 }
-REPLACE = [(0x22, 0x6A37, '3ねんほど　まえ', 'つい　この　まえ')]
+REPLACE = []   # 「3ねんほど まえ」は 第83弾で もとに もどす（ジョウトは 3ねんご）
 TICKET = (0x13, 0x6745)
 
 
@@ -52,13 +66,15 @@ def apply(rom, ctx):
         o = fo(b, t); assert rom[o] == 0x00; old_len = rom.index(0x57, o) - o + 1
         seg = range(fo(b, 0x4000), fo(b, 0x8000) - 2)
         refs = [k for k in seg if rom[k] in (0x4C, 0x51, 0x52) and rom[k + 1] == t & 0xFF and rom[k + 2] == t >> 8]
-        kinds = {rom[k] for k in refs}; assert len(kinds) == 1 and refs, (hex(b), hex(t), kinds)
-        kind = kinds.pop()
-        far = bytes([0x4B, CB, a & 0xFF, a >> 8])
-        stub = {0x4C: far + b'\x90', 0x51: b'\x6A\x47' + far + b'\x53\x49\x90', 0x52: b'\x47' + far + b'\x53\x49\x90'}[kind]
-        assert len(stub) <= old_len
-        rom[o:o + len(stub)] = stub
-        for k in refs: rom[k] = 0x00 if kind == 0x4C else 0x03          # scall / sjump
+        assert refs, (hex(b), hex(t))
+        far = bytes([0x4B, CB, a & 0xFF, a >> 8]); at = t; tot = 0
+        for kind in sorted({rom[k] for k in refs}):
+            stub = {0x4C: far + b'\x90', 0x51: b'\x6A\x47' + far + b'\x53\x49\x90', 0x52: b'\x47' + far + b'\x53\x49\x90'}[kind]
+            tot += len(stub); assert tot <= old_len
+            rom[fo(b, at):fo(b, at) + len(stub)] = stub
+            for k in refs:
+                if rom[k] == kind: rom[k] = 0x00 if kind == 0x4C else 0x03; rom[k + 1] = at & 0xFF; rom[k + 2] = at >> 8   # scall / sjump
+            at += len(stub)
         a += len(new); n += len(refs)
     for b, t, x, y in REPLACE:
         o = fo(b, t); e = rom.index(0x57, o); ex, ey = jptext.enc(x), jptext.enc(y); assert len(ex) == len(ey)

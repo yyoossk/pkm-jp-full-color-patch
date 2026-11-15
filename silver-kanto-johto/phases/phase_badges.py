@@ -1,13 +1,13 @@
 """ロケットだんの コガネ・ラジオとうの 事件は ジョウトの バッジの かずだけで きめる（第82弾の 銀版）：
    主人公は カントーの バッジ 8こを もって いるので、VAR_BADGES（ジョウト＋カントー）では 6・7 に ならず 物語が とまる。
    ジムリーダーの「ロケットだんを うごかす」所（ifequal 7 / ifequal 6 / end、7か所）を、ジョウトの バッジ（wJohtoBadges $D56F）だけ
-   かぞえてから に する。本体 $E8:$5200。"""
+   かぞえてから に する。本体 $E8:$5800。"""
 import os, sys, re
 H = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(H, 'tools'))
 from gsc import fo
 
-CB, CA = 0xE8, 0x5200
+CB, CA = 0xE8, 0x5800
 W_JOHTO, COUNTSETBITS, W_NUMSETBITS, W_SCRIPTVAR = 0xD56F, 0x3504, 0xD143, 0xD165
 
 
