@@ -169,6 +169,10 @@ class Emit:
             elif t == 'db':
                 if sem == 'sprite': data[off] = X.sprite(data[off], ctx)
                 elif sem == 'trainer_group': data[off] = X.tclass(data[off], ctx)
+                elif sem == 'opcode':
+                    nv = {0x9F: 0x9E, 0xA0: 0x9F, 0xA1: 0xA0, 0xA2: 0xA1}.get(data[off])   # swarm・halloffame・credits・warpfacing
+                    if nv is None: X._m('命令 %02X %s' % (data[off], name), data[off], ctx)
+                    else: data[off] = nv
         o = gb * 0x4000 + ga - 0x4000
         s.rom[o:o + len(data)] = data
 

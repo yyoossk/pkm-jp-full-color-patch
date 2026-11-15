@@ -62,6 +62,7 @@ class Walk:
             if op >= len(SPEC):
                 s.notes.append('不明な命令 %02X at %02X:%04X (%s)' % (op, b, a + p - o, ctx)); p += 1; break
             name, args = SPEC[op]
+            if op >= 0x9E: fix.append((p - o, 'db', 'opcode', name))     # 金と 番号が ちがう 命令
             q = p + 1
             if name == 'givepoke':
                 args = [('db', 'pokemon'), ('db', 'level'), ('db', 'item'), ('db', 'trainer')]

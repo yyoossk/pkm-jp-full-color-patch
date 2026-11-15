@@ -17,6 +17,9 @@ AUTO = {
     (0x63, 0x6551): {'size': 0x65A5 + 8 - 0x6551, 'code': 0x65A5 - 0x6551},   # チャンピオンロードの スイッチの 上の 岩（表 4こ）
     (0x68, 0x510F): {'data': [(0x5107, 8), (0x4DF7, 49 * 16)], 'bank_ops': [0x2C]},   # かがくはくぶつかんの カセキ（カブトプス）
     (0x68, 0x4DA8): {'data': [(0x4DA0, 8), (0x4A90, 49 * 16)], 'bank_ops': [0x2C]},   # （プテラ）
+    (0x59, 0x6DCE): {'size': 0x6F2C - 0x6DCE, 'code': 0x6F1C - 0x6DCE, 'also': [0x6E08], 'svbk1': True,   # クチバの 船の 出発（第16弾）
+                      'ram': {0xD0F8: 0xC2F8, 0xD100: 0xC700, 0xD14F: 0xC74F, 0xC568: 0xC468}},
+    (0x47, 0x7F13): {},                                   # 殿堂入りで セレビィを つかまえていなければ もう一度（第63弾）
     (0x65, 0x6A1C): {}, (0x67, 0x7496): {},             # ずかんに のせて 見せる（かくとう道場・セキチク）
     (0x74, 0x6F52): {}, (0x74, 0x6F5B): {}, (0x74, 0x6F69): {},   # 5ばんどうろの そだてや
     (0x2E, 0x61FA): {'size': 0x620F - 0x61FA, 'code': 10},       # （あずけられない ポケモンの 表：IsInArray）
@@ -63,12 +66,15 @@ def apply(E, M, g, log, cm):
         for da, dn in opt.get('data', []):
             db_, dd = _put(E, g, cb, M[fo(cb, da):fo(cb, da) + dn]); dmap[da] = dd
         na = E.fill[gb]
-        out, prob = asmx.xlat(M, cb, ca, na, notes, size, opt.get('code'))
+        out, prob = asmx.xlat(M, cb, ca, na, notes, size, opt.get('code'), opt.get('ram'))
         out = bytearray(out)
         for i in range(len(out) - 2):
             if out[i] in (0x21, 0x11, 0x01):
                 v = M[fo(cb, ca) + i + 1] | M[fo(cb, ca) + i + 2] << 8
                 if v in dmap: out[i + 1] = dmap[v] & 0xFF; out[i + 2] = dmap[v] >> 8; prob = [p for p in prob if p != 'データ? %02X:%04X' % (cb, v)]
+        if opt.get('svbk1'):                        # クリスタルの WRAM バンク 5（色・LY）→ 金は バンク 0（バンクを かえない）
+            for i in range(len(out) - 3):
+                if out[i:i + 4] == bytes([0x3E, 0x05, 0xE0, 0x70]): out[i + 1] = 0x01
         for i in opt.get('bank_ops', []):           # ld b,バンク など（データの バンク）
             assert out[i] == cb; out[i] = gb
         for k, v in data_fix.items():

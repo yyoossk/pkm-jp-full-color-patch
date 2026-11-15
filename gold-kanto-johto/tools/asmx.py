@@ -22,9 +22,12 @@ for l in open('/home/claude/work/goldsrc/src/jp_all.inc'):
     m = re.match(r'DEF J(B?)_(\S+) EQU \$([0-9a-f]+)', l)
     if m: (GB if m.group(1) else GJ)[m.group(2)] = int(m.group(3), 16)
 RX = rammap.RamX()
-RAM_FIX = {0xC2DD: 0xD165, 0xD071: 0xCF9D, 0xD296: 0xD143,
-           0xD21C: 0xD0C6,        # wSurfingPlayerState
-           0xD833: 0xD780}        # 追加機能キットの 連れ歩きの 番号（金の 追加機能パッチ wFwSlot）   # D296：NewPokedexEntry の ポケモン（金 wNamedObjectIndex）   # 確かめた もの（c2g と 同じ）
+RAM_FIX = {0xC2DD: 0xD165,          # wScriptVar
+           0xD071: 0xCF9D,          # wStringBuffer3
+           0xD296: 0xD143,          # NewPokedexEntry の ポケモン（金 wNamedObjectIndex）
+           0xD21C: 0xD0C6,          # wSurfingPlayerState
+           0xD833: 0xD780,          # 追加機能キットの 連れ歩きの 番号（金の 追加機能パッチ wFwSlot）
+           0xD836: 0xD7A1}          # 追加機能キットの wLegendFlags（金の 追加機能パッチも 同じ 形：ビット0 セレビィ）
 # クリスタル版の 足した フラグ（$800〜：$DA01〜）・シーンの 変数（$DA5F〜$DA64）→ 金（gold_flags.py の 並べ方）
 for _k in range(51): RAM_FIX[0xDA01 + _k] = 0xD70D + _k
 for _k in range(51, 67): RAM_FIX[0xDA01 + _k] = 0xD790 + (_k - 51)
@@ -48,7 +51,7 @@ def extent(M, bank, a):
         if op in END and p > mx: return p - o
         if p - o > 0x300: raise Exception('長すぎる')
 
-def xlat(M, bank, a, new_addr, notes, size=None, code_len=None):
+def xlat(M, bank, a, new_addr, notes, size=None, code_len=None, ram=None):
     """→ (bytes, 問題の リスト)"""
     o = fo(bank, a); n = size or extent(M, bank, a); b = bytearray(M[o:o + n]); prob = []
     p = 0
@@ -61,7 +64,7 @@ def xlat(M, bank, a, new_addr, notes, size=None, code_len=None):
         if ln == 3 and op not in (0x31,):
             v = b[p + 1] | b[p + 2] << 8; nv = None
             if 0xC000 <= v < 0xE000:
-                nv = RAM_FIX.get(v)
+                nv = (ram or {}).get(v, RAM_FIX.get(v))
                 if nv is None:
                     gv, nm = RX.x(v)
                     if gv is None: prob.append('RAM %04X（%s）' % (v, nm))

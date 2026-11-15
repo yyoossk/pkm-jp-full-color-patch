@@ -69,6 +69,7 @@ def _misses(W, at, nm):
                  'sound_pointer': X.sfx, 'sprite': X.sprite}.get(sem)
             if f: f(v, ctx)
             if t == 'map_id': X.mapid((MOD[o], MOD[o + 1]), ctx)
+            if sem == 'opcode' and MOD[o] not in (0x9F, 0xA0, 0xA1, 0xA2): X._m('命令 %02X' % MOD[o], MOD[o], ctx)
     return X.miss
 for nm in list(walks):
     if nm not in CHG:
@@ -139,6 +140,9 @@ if not os.environ.get("NOWILD"): _lw = []; gold_wild.apply(g, MOD, E, E.X, _lw);
 # ---- 第12弾ほか：大事な どうぐ
 import gold_items
 _li = []; gold_items.apply(g, MOD, E, _li); print('\n'.join(_li))
+# ---- シーンの 変数の 表
+import gold_scenes
+_ls = []; gold_scenes.apply(g, MOD, VAN, E, set(walks), _ls); print('\n'.join(_ls))
 # ---- 第13弾：ゆうれい戦
 import gold_ghost
 _lg = []; gold_ghost.apply(g, MOD, E, _lg); print('\n'.join(_lg))
