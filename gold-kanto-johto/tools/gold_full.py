@@ -29,7 +29,7 @@ _C = _at('pokecrystal'); KL, KE = _C['landmark']['KANTO_LANDMARK'], _C['landmark
 JOHTO_SIDE = {'Route26', 'Route27', 'TohjoFalls', 'Route26HealHouse', 'DayOfWeekSiblingsHouse', 'Route27SandstormHouse'}
 E = Emit(g)
 # ---- 第11弾の 土台：新しい タイルセット・グループ 26 の 14〜149 番
-import gold_p11, c2g as _c2g
+import gold_p11, gold_safari, c2g as _c2g
 _l11 = []
 _p11 = gold_p11.apply(g, MOD, E, _l11)
 # ---- 第15弾の 土台：イベントフラグ $800〜
@@ -91,7 +91,7 @@ def _unplaced(W, keys):
                 if aa >= 0x4000 and (bb, aa) not in keys: out.append((bb, aa))
     return out
 while True:
-    keys = set(gold_asm.PORTED)
+    keys = set(gold_asm.PORTED) | gold_safari.CALLASM
     for nm, (W, at) in walks.items(): keys |= set(W.blobs)
     drop = [(nm, '未移植の asm %02X:%04X' % _unplaced(W, keys)[0]) for nm, (W, at) in walks.items() if _unplaced(W, keys)]
     for nm, why in drop: print('金のまま（' + why + '）:', nm); del walks[nm]
@@ -111,7 +111,7 @@ while True:
 allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
-_la = []; gold_asm.apply(E, MOD, g, _la, cm); print('\n'.join(_la))
+_la = []; gold_asm.apply(E, MOD, g, _la, cm); gold_safari.apply(g, MOD, E, _la); print('\n'.join(_la))
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 for k, b in allblobs.items(): E.write(k, b)
 finish_maps(E, MOD, g, cm, gm)
