@@ -137,6 +137,55 @@ def p55_koga(g, TB, log):
     log.append('第55弾 キョウ：ホーム 3F80／3F95、0E・%02X:5511／553D、0F:5071' % TB)
 
 
+def p57_evos(g, M, log):
+    """第57弾：つうしん進化を Lv37 に（MOD の 進化の 表を そのまま。長さは 同じ）"""
+    def tab(R, first):
+        return R.find(bytes([first & 255, first >> 8]), fo(0x10, 0x4000), fo(0x11, 0x4000))
+    mt = tab(M, 0x6949)
+    import asmx as RX
+    gt = tab(g, RX.GJ['BulbasaurEvosAttacks'])
+    def part(R, t, i):
+        p = R[t + 2 * i] | R[t + 2 * i + 1] << 8; o = fo(0x10, p); e = o
+        while R[e]: e += 4 if R[e] == 5 else 3
+        return o, e
+    n = 0
+    for i in range(251):
+        mo, me = part(M, mt, i); go, ge = part(g, gt, i)
+        if M[mo:me] != g[go:ge]:
+            assert me - mo == ge - go, i
+            g[go:ge] = M[mo:me]; n += 1
+    log.append('第57弾 進化：%d しゅるい' % n)
+
+
+def p57_hm_lugia(g, M, log):
+    """MOD：どの ポケモンも ひでんマシン 1〜7 を おぼえられる（基礎データの わざマシンの 印）。
+       ルギア・ホウオウは Lv60 で エアロブラスト／せいなるほのお（MOD の 覚える技）"""
+    import asmx as RX
+    mo = fo(0x14, 0x54BA); go = fo(0x14, RX.GJ['BaseData'])
+    for i in range(251):
+        m30, m31 = M[mo + 32 * i + 30], M[mo + 32 * i + 31]
+        g[go + 32 * i + 30] |= m30 & 0xFC; g[go + 32 * i + 31] |= m31 & 0x01
+    gt = g.find(bytes([RX.GJ['BulbasaurEvosAttacks'] & 255, RX.GJ['BulbasaurEvosAttacks'] >> 8]), fo(0x10, 0x4000), fo(0x11, 0x4000))
+    mt = M.find(bytes([0x49, 0x69]), fo(0x10, 0x4000), fo(0x11, 0x4000))
+    def ent(R, t, i):
+        p = R[t + 2 * i] | R[t + 2 * i + 1] << 8; o = fo(0x10, p); s = o
+        while R[o]: o += 4 if R[o] == 5 else 3
+        o += 1
+        while R[o]: o += 2
+        return p, bytes(R[s:o + 1])
+    p249 = ent(g, gt, 248)[0]
+    blob = ent(M, mt, 248)[1] + ent(M, mt, 249)[1] + ent(g, gt, 250)[1]
+    end = p249 + len(blob); assert end <= 0x8000
+    tail = g[fo(0x10, ent(g, gt, 250)[0]) + len(ent(g, gt, 250)[1]):fo(0x11, 0x4000)]
+    assert not any(b not in (0, 0xFF) for b in tail)
+    g[fo(0x10, p249):fo(0x10, p249) + len(blob)] = blob
+    a = p249
+    for k, i in enumerate((248, 249, 250)):
+        g[gt + 2 * i] = a & 255; g[gt + 2 * i + 1] = a >> 8
+        a += len((ent(M, mt, 248)[1], ent(M, mt, 249)[1], b'')[k]) if k < 2 else 0
+    log.append('第57弾 ひでんマシン：251 しゅるい、ルギア・ホウオウの 覚える技（〜10:%04X）' % end)
+
+
 def apply(g, log, M=None, TB=None):
     if TB is not None: p55_koga(g, TB, log)
     p75_copyobject(g, log)
@@ -146,3 +195,5 @@ def apply(g, log, M=None, TB=None):
     p69_ledges(g, log)
     p54_winloss(g, log)
     if M is not None: p75_marts(g, M, log)
+    if M is not None: p57_evos(g, M, log)
+    if M is not None: p57_hm_lugia(g, M, log)
