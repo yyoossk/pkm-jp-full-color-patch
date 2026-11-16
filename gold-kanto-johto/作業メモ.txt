@@ -365,4 +365,12 @@
     rst 8 を 使わず、スタックに もどり先・「pop af / rst $10 / ret」（ホーム $0AE6）・$4417 を 積んで ホームの Bankswitch へ jp。
     金の IntroSequence（01:63EF）→ farcall RedOpening、hBGMapAddress = $9800、jp 01:6408。
     たしかめた：コピーライト〜流れ星〜ゲンガーと ニドリーノ〜タイトル（クリスタル版と 同じ 絵）、曲、スタート → メニュー → さいしょから。
+  ・第54弾 殿堂入りと スタッフロール（tools/gold_hof.py、tools/red/phase54.asm）：同じく 金の 住所で 組みなおす。データは 35:67A3〜。
+    金で かえた 所：主人公の 絵は 金の CAL の 絵（GetTrainerPic）と 後ろ姿（GetTrainerBackpic 0F:79B8）、WRAM バンク 5 は 使わない、
+    farcall：GetMonFrontpic → 14:577F（predef $3C の 本体）、GetMonBackpic 14:57ED、Credits → 21:6A9C（b = 状態で 入る）、PrintNum $31F9。
+    曲：クリスタル版の バンク $20 を まるごと 写し、金の 曲 $52・$53（GS の オープニング。もう 使わない）を そこへ。
+    金の HallOfFame の 21:6600〜660A（xor a / ld [wGameLogicPaused], a / call AnimateHallOfFame / pop af / jp Credits）→
+    pop af / ld b,a / farcall（wGameLogicPaused は こちらで 0 に）。EVENT_BEAT_ELITE_FOUR（$44）が あれば 金の 殿堂入り。
+    たしかめた：カントー（ポケモン → 主人公 → ずかんの 評価 → スタッフロール → THE END、曲）、ジョウト（金の まま）。
+    クリスタル版と 同じく ずかんの 評価で ボタン待ち。
   ・34ばんどうろの そだてやの 人の 位置（MOD の 小さな 変更）は クリスタル版の マップの つごう なので 金には 入れない。

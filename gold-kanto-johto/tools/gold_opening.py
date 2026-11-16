@@ -99,13 +99,13 @@ def mons_inc(pics, mon_addr, mon_bank):
     return inc
 
 
-def assemble(src, jpinc, inc, code_bank, code_addr, extra=()):
+def assemble(src, jpinc, inc, code_bank, code_addr, name='phase53'):
     with tempfile.TemporaryDirectory() as d:
-        open(d + '/phase53.asm', 'w').write(src)
+        open(d + '/%s.asm' % name, 'w').write(src)
         open(d + '/jp.inc', 'w').write(jpinc)
-        open(d + '/phase53_data.inc', 'w').write('\n'.join(inc) + '\n')
+        open(d + '/%s_data.inc' % name, 'w').write('\n'.join(inc) + '\n')
         subprocess.run([RGBDS + '/rgbasm', '-I', d, '-D', 'CODE_BANK=$%X' % code_bank, '-D', 'CODE_ADDR=$%X' % code_addr,
-                        '-o', d + '/a.o', d + '/phase53.asm'], check=True)
+                        '-o', d + '/a.o', d + '/%s.asm' % name], check=True)
         subprocess.run([RGBDS + '/rgblink', '-w', '-o', d + '/a.gbc', '-n', d + '/a.sym', d + '/a.o'], check=True)
         r = open(d + '/a.gbc', 'rb').read()
         sym = {}
