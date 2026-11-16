@@ -36,7 +36,7 @@ VALUE = {0x0062, 0x0006}
 
 def find_initname(G):
     """金の InitName（home/string.asm）：クリスタル版 $2ECB と 同じ 並び"""
-    M = open('/home/claude/work/ref/crystal_kj.gbc', 'rb').read()
+    M = open(__import__('os').environ.get('MODROM', '/home/claude/work/ref/crystal_kj2.gbc'), 'rb').read()
     pat = M[0x2ECB:0x2ECB + 24]
     import re
     # 3バイトの 命令の 引数は ちがって よい

@@ -85,6 +85,8 @@ class Xlat:
         n = s.sp.get(v); n = SPRITE_ALIAS.get(n, n); g = G['sprite'].get(n) if n else None
         return g if g is not None else s._m('sprite %s' % n, v, ctx)
     def music(s, v, ctx=''):
+        if 0xF0 <= v <= 0xF3: return v                    # 第98弾：シゲルの 曲（赤の 音の しくみ 1。gold_opening）
+        if v == 0x52: return 0x01                          # 第102弾：赤の Music_Dungeon2（金では MUSIC_TITLE の 番号。gold_hof）
         n = s.mu.get(v); g = G['music'].get(n) if n else None
         return g if g is not None else s._m('music %s' % n, v, ctx)
     def sfx(s, v, ctx=''):

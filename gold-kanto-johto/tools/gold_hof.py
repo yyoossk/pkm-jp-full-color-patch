@@ -156,6 +156,12 @@ def apply(g, M, E, log):
         mo = fo(0x3A, 0x506E) + 3 * cid; assert M[mo] == MOD_AUDIO
         go = fo(0x3A, 0x506E) + 3 * gid
         g[go:go + 3] = bytes([aud_bank, M[mo + 1], M[mo + 2]])
+    # 第102弾：トキワのもり などの 曲（クリスタル版 $52 → 金 $01。c2g）
+    mo = fo(0x3A, 0x506E) + 3 * 0x52
+    if M[mo] == MOD_AUDIO:
+        go = fo(0x3A, 0x506E) + 3 * 0x01
+        g[go:go + 3] = bytes([aud_bank, M[mo + 1], M[mo + 2]])
+        log.append('第102弾：赤の Music_Dungeon2 → 金の 曲 $01（%02X:%04X）' % (aud_bank, M[mo + 1] | M[mo + 2] << 8))
     # 金の HallOfFame の おわり（21:6600〜660A）：xor a / ld [wGameLogicPaused], a / call AnimateHallOfFame / pop af / jp Credits
     o = fo(0x21, 0x6600)
     assert G0[o:o + 11] == bytes([0xAF, 0xEA, 0xCC, 0xC1, 0xCD, GJ['AnimateHallOfFame'] & 0xFF, GJ['AnimateHallOfFame'] >> 8,

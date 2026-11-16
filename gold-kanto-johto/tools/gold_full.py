@@ -4,7 +4,7 @@ sys.path.insert(0, '/home/claude/work/scripts')
 from c2g import *
 from changed import changed_maps
 VAN = open('/home/claude/roms/Pocket Monsters - Crystal Version (Japan).gbc', 'rb').read()
-MOD = open('/home/claude/work/ref/crystal_kj.gbc', 'rb').read()
+MOD = open(__import__('os').environ.get('MODROM', '/home/claude/work/ref/crystal_kj2.gbc'), 'rb').read()
 VAN = VAN + bytes(len(MOD) - len(VAN))
 import os as _os
 BASE = _os.environ.get('GBASE', '/home/claude/work/ref/kin64.gbc')   # 第64弾：金の 追加機能パッチ（gold_kit.py）
@@ -184,6 +184,8 @@ import gold_hof
 _lh = []; gold_hof.apply(g, MOD, E, _lh); print('\n'.join(_lh))
 import gold_player
 _lp = []; gold_player.apply(g, MOD, E, _lp); print('\n'.join(_lp))
+import gold_fixes
+_lf = []; gold_fixes.apply(g, E, MOD, _lf); print('\n'.join(_lf))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
 open('/home/claude/work/out/gold_full.gbc', 'wb').write(g)
 print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.bankmap.items()})

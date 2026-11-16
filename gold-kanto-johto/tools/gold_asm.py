@@ -17,7 +17,8 @@ AUTO = {
     (0x63, 0x6551): {'size': 0x65A5 + 8 - 0x6551, 'code': 0x65A5 - 0x6551},   # チャンピオンロードの スイッチの 上の 岩（表 4こ）
     (0x68, 0x510F): {'data': [(0x5107, 8), (0x4DF7, 49 * 16)], 'bank_ops': [0x2C]},   # かがくはくぶつかんの カセキ（カブトプス）
     (0x68, 0x4DA8): {'data': [(0x4DA0, 8), (0x4A90, 49 * 16)], 'bank_ops': [0x2C]},   # （プテラ）
-    (0x59, 0x6DCE): {'size': 0x6F2C - 0x6DCE, 'code': 0x6F1C - 0x6DCE, 'also': [0x6E08], 'svbk1': True,   # クチバの 船の 出発（第16弾）
+    (0x59, 0x6F76): {'size': 0x6F85 - 0x6F76, 'data': [(0x6F85, 8)], 'ram': {0xD0F8: 0xC2F8}},   # 第107弾：けむりの 色（OBJ パレット 7）
+    (0x59, 0x6DCE): {'size': 0x6F2C - 0x6DCE, 'calls': {0x6F76: (0x59, 0x6F76)}, 'code': 0x6F1C - 0x6DCE, 'also': [0x6E08], 'svbk1': True,   # クチバの 船の 出発（第16弾）
                       'ram': {0xD0F8: 0xC2F8, 0xD100: 0xC700, 0xD14F: 0xC74F, 0xC568: 0xC468}},
     (0x47, 0x7F13): {},                                   # 殿堂入りで セレビィを つかまえていなければ もう一度（第63弾）
     (0x65, 0x6A1C): {}, (0x67, 0x7496): {},             # ずかんに のせて 見せる（かくとう道場・セキチク）
@@ -111,6 +112,11 @@ def apply(E, M, g, log, cm):
             for i in range(len(out) - 2):
                 if out[i] == 0x21 and M[fo(cb, ca) + i + 1] | M[fo(cb, ca) + i + 2] << 8 == k_:
                     out[i + 1] = v_ & 0xFF; out[i + 2] = v_ >> 8; prob = [p for p in prob if p != 'データ? %02X:%04X' % (cb, k_)]
+        for k_, kv in opt.get('calls', {}).items():   # 同じ バンクの 外の ルーチン（先に うつした もの）
+            for i in range(len(out) - 2):
+                if out[i] in (0xCD, 0xC3) and M[fo(cb, ca) + i + 1] | M[fo(cb, ca) + i + 2] << 8 == k_:
+                    tb_, ta_ = E.loc[kv]; assert tb_ == gb; out[i + 1] = ta_ & 0xFF; out[i + 2] = ta_ >> 8
+                    prob = [p for p in prob if not p.startswith('バンクの中 %02X:%04X' % (cb, k_))]
         if opt.get('svbk1'):                        # クリスタルの WRAM バンク 5（色・LY）→ 金は バンク 0（バンクを かえない）
             for i in range(len(out) - 3):
                 if out[i:i + 4] == bytes([0x3E, 0x05, 0xE0, 0x70]): out[i + 1] = 0x01

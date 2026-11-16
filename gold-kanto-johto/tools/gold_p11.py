@@ -37,6 +37,33 @@ class Alloc:
         a = s.a; s.g[fo(s.bank, a):fo(s.bank, a) + len(data)] = data; s.a += len(data)
         return s.bank, a
 
+_ANIM_FREE = [None]
+def _xlat_anim(g, M, a, log, ci):
+    """クリスタル版で 足した アニメの 表（第107弾 港の 水 など）：(引数, ルーチン) の ならびを 金の 住所に して バンク 3F の あきへ"""
+    import rammap
+    from asmx import CS, near
+    out = bytearray(); p = fo(0x3F, a)
+    for k in range(64):
+        par, rt = M[p] | M[p + 1] << 8, M[p + 2] | M[p + 3] << 8; p += 4
+        nm = near(CS, 0x3F, rt)
+        if not nm or nm[1] != 0 or nm[0] not in GJ: return None
+        if 0xC000 <= par < 0xE000:
+            gv, _ = rammap.RamX().x(par)
+            if gv is None: return None
+            par = gv
+        r = GJ[nm[0]]; out += bytes([par & 0xFF, par >> 8, r & 0xFF, r >> 8])
+        if nm[0] == 'DoneTileAnimation': break
+    else: return None
+    if _ANIM_FREE[0] is None:
+        t = 0x8000
+        while g[fo(0x3F, t - 1)] == 0: t -= 1
+        _ANIM_FREE[0] = t + 2
+    na = _ANIM_FREE[0]; assert na + len(out) <= 0x8000 - 8
+    g[fo(0x3F, na):fo(0x3F, na) + len(out)] = out; _ANIM_FREE[0] += len(out)
+    log.append('タイルセット %d：クリスタル版の アニメ 3F:%04X → 金 3F:%04X（%d こ）' % (ci, a, na, len(out) // 4))
+    return na
+
+
 def apply(g, MOD, E, log):
     from near import load, near
     CS = load('/home/claude/work/ref/crystal_jp.sym')
@@ -64,6 +91,7 @@ def apply(g, MOD, E, log):
         # 当たり（ブロックの 4つ）は 同じ バンクに ないと いけないか？ → 金は バンクごとに 読む（dba）ので 別々で よい
         anim_c = r16(e, 9); nm = near(CS, 0x3F, anim_c)
         anim = GJ.get(nm[0]) if nm and nm[1] == 0 else None
+        if anim is None: anim = _xlat_anim(g, M, anim_c, log, ci)
         if anim is None: anim = GJ['TilesetHouseAnim']; log.append('タイルセット %d：アニメ %s → 金 なし（House）' % (ci, nm))
         pmc = r16(e, 13)
         pmap = M[fo(0x13, pmc):fo(0x13, pmc) + 0x30]
@@ -75,6 +103,7 @@ def apply(g, MOD, E, log):
     tb, ta = A.put(bytes(tab))
     w16(g, o + 1, ta); g[o + 19] = tb
     log.append('タイルセット：表 %02X:%04X（%d こ）、パレットマップ バンク %02X（$%04X まで）' % (tb, ta, len(tab) // 15, PM, pm_a))
+    E.ts_pm = [PM, pm_a]; E.ts_n = len(tab) // 15
     # ---------- 色：クリスタル版の 表（6A:6EE9 の うしろ。[番号, ポインター]…$FF、64 バイトずつ）
     ho = fo(0x6A, 0x6EE9); assert M[ho:ho + 5] == bytes.fromhex('facad14721')
     t = fo(0x6A, r16(M, ho + 5)); pals = {}
@@ -88,6 +117,7 @@ def apply(g, MOD, E, log):
     code = bytes([0xCD, LOADMAPPALS & 0xFF, LOADMAPPALS >> 8,          # call LoadMapPals
                   0xFA, W_MAPTILESET & 0xFF, W_MAPTILESET >> 8,        # ld a,[wMapTileset]
                   0xD6, G_NTS, 0xD8,                                   # sub 29 ; ret c
+                  0xFE, C_LAST - C_FIRST + 1, 0xD0,                    # cp 21 ; ret nc（金の タイルセットの 写し：金の 色）
                   0x6F, 0x26, 0x00, 0x29, 0x29, 0x29, 0x29, 0x29, 0x29,  # hl = a*64
                   0x11, pa0 & 0xFF, pa0 >> 8, 0x19,                    # ld de,pals ; add hl,de
                   0x11, W_BGPALS1 & 0xFF, W_BGPALS1 >> 8,              # ld de,wBGPals1

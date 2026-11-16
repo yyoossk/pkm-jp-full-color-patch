@@ -115,7 +115,7 @@ def assemble(src, jpinc, inc, code_bank, code_addr, name='phase53'):
     return r, sym
 
 
-def gold_source(src, jpinc, glue_bank, red_bank, cry):
+def gold_source(src, jpinc, glue_bank, red_bank, cry, red1_bank=0):
     """クリスタル版の DEF → 金"""
     def hram(v): return 0xFF00 | HRAM.get(v & 0xFF, v & 0xFF) if v >= 0xFF80 else v
     def home(v, name):
@@ -147,7 +147,7 @@ def gold_source(src, jpinc, glue_bank, red_bank, cry):
     s, n = re.subn(r'\nSfx: [^\n]*\n(?:\t[^\n]*\n)+?\tret\n', '\nSfx:\n\tjp RedSfx\n', s); assert n == 1
     s, n = re.subn(r'\nMusic: [^\n]*\n(?:\t[^\n]*\n)+?\tret\n', '\nMusic:\n\tjp RedSfx\n', s); assert n == 1
     s, n = re.subn(r'\tcall PlayMonCry\n', '\tcall CryWrap\n', s); assert n == 1
-    s = s.replace('INCLUDE "phase53_data.inc"', GLUE % dict(red=red_bank, cry=cry, music=W_MUSIC, start=W_MUSIC + 1,
+    s = s.replace('INCLUDE "phase53_data.inc"', GLUE % dict(red=red_bank, red1=red1_bank, cry=cry, music=W_MUSIC, start=W_MUSIC + 1,
                                                           end=W_AUDIO_END, on=RED_ON, init=GJ['InitSound'])
                   + '\nINCLUDE "phase53_data.inc"')
     return s, j
@@ -228,6 +228,28 @@ RedSound:  ; e = 第53弾の 番号
 	db SFX_INTRO_WHOOSH, $BD, 0
 	db 0
 
+RivalMusic::  ; 第98弾：e = $F0〜$F3（シゲルの 曲。赤の 音の しくみ 1）
+	push de
+	xor a
+	ld [$%(music)X], a
+	call $%(init)X
+	ld hl, $%(start)X
+	ld bc, $%(end)X - $%(start)X
+.clear
+	xor a
+	ld [hli], a
+	dec bc
+	ld a, b
+	or c
+	jr nz, .clear
+	ld a, $A6
+	ld [$%(music)X], a
+	pop de
+	ld a, $%(red1)X
+	ld hl, $78B5
+	rst $08
+	ret
+
 CryWrap:  ; 金の 音に もどして 鳴き声
 	push af
 	xor a
@@ -255,6 +277,29 @@ def red_audio_bank(M):
     return bytes(B)
 
 
+RED_AUDIO1 = 0x9F             # クリスタル版の 第98弾：赤の バンク 2（Audio Engine 1）
+
+
+def red_audio1_bank(M):
+    """クリスタル版の バンク 9F（赤の バンク 2、音の RAM $C101〜）→ 金（RAM $C001〜）。78B5〜 は 第98弾の Red1Start"""
+    B = bytearray(M[RED_AUDIO1 * 0x4000:(RED_AUDIO1 + 1) * 0x4000])
+    def sweep(pc, end):
+        n = 0
+        while pc < end:
+            op = B[pc - 0x4000]; ln = L[op]
+            if ln == 3:
+                v = B[pc - 0x3FFF] | B[pc - 0x3FFE] << 8
+                if 0xC101 <= v <= 0xC200:
+                    v -= 0x100; B[pc - 0x3FFF] = v & 0xFF; B[pc - 0x3FFE] = v >> 8; n += 1
+            if op in (0xE0, 0xF0) and B[pc - 0x3FFF] >= 0x80: raise Exception('hram %04X' % pc)
+            pc += ln
+        return pc, n
+    pc, n = sweep(0x4000, 0x4A13); assert pc == 0x4A13 and n == 223, (hex(pc), n)
+    assert B[0x38B5] == 0xD5                                   # Red1Start: push de
+    pc, n2 = sweep(0x78B5, 0x78B5 + 0x3B); assert n2 == 6, n2
+    return bytes(B)
+
+
 def verify_crystal(M, src, jpinc, data, pics, dend):
     """クリスタル版の 住所で 組みなおして、できあがった クリスタル版と 同じか（第68弾で かえた 所は のぞく）"""
     r, sym = assemble(src, jpinc, head_inc(MOD_MON) + data + mons_inc(pics, pics[0][0], MOD_MON), 0x36, MOD_CODE)
@@ -274,7 +319,13 @@ def apply(g, M, E, log):
     code_bank = E.next_bank; E.next_bank += 1
     red_bank = E.next_bank; E.next_bank += 1
     assert not any(g[code_bank * 0x4000:(code_bank + 1) * 0x4000]) and not any(g[red_bank * 0x4000:(red_bank + 1) * 0x4000])
-    gs, gj = gold_source(src, jpinc, code_bank, red_bank, GJ['PlayMonCry'])
+    has98 = any(M[RED_AUDIO1 * 0x4000:(RED_AUDIO1 + 1) * 0x4000])
+    red1_bank = 0
+    if has98:
+        red1_bank = E.next_bank; E.next_bank += 1
+        assert not any(g[red1_bank * 0x4000:(red1_bank + 1) * 0x4000])
+        g[red1_bank * 0x4000:(red1_bank + 1) * 0x4000] = red_audio1_bank(M)
+    gs, gj = gold_source(src, jpinc, code_bank, red_bank, GJ['PlayMonCry'], red1_bank)
     mon_bank = E.next_bank; E.next_bank += 1
     assert not any(g[mon_bank * 0x4000:(mon_bank + 1) * 0x4000])
     r, sym = assemble(gs, gj, head_inc(mon_bank) + data + mons_inc(pics, 0x4000, mon_bank), code_bank, 0x4000)
@@ -287,16 +338,35 @@ def apply(g, M, E, log):
     # 割りこみの 中：rst 8（hTempBank・wFarCallBC）を 使わず、ホームの Bankswitch（$0010）と「pop af / rst $10 / ret」で 行き来する
     pop_sw = bytes(g[:0x4000]).find(bytes([0xF1, 0xD7, 0xC9]))
     t = 0x8000 - 0x48
-    back = t + 12 + 4 + 4 + 3 + 4 + 4 + 5
-    hook = bytes([0xFA, 0x00, 0xC0, 0xFE, RED_ON, 0x28, 0x05, 0xA7, 0xC8, 0xC3, 0x61, 0x40,
+    back = t + 48
+    hook = bytes([0xFA, 0x00, 0xC0, 0xFE, RED_ON, 0x30, 0x05, 0xA7, 0xC8, 0xC3, 0x61, 0x40,       # $A5 以上：赤の 音
                   0x3E, 0x77, 0xE0, 0x24,
                   0x21, back & 0xFF, back >> 8, 0xE5, 0x3E, 0x3A, 0xF5,
-                  0x21, pop_sw & 0xFF, pop_sw >> 8, 0xE5, 0x21, 0x17, 0x44, 0xE5,
-                  0x3E, red_bank, 0xC3, 0x10, 0x00, 0xC9])
+                  0x21, pop_sw & 0xFF, pop_sw >> 8, 0xE5,
+                  0xFA, 0x00, 0xC0, 0xFE, 0xA6,
+                  0x21, 0x17, 0x44, 0x3E, red_bank, 0x20, 0x05,                                     # $A5：しくみ 3
+                  0x21, 0x00, 0x40, 0x3E, red1_bank or red_bank,                                    # $A6：しくみ 1
+                  0xE5, 0xC3, 0x10, 0x00, 0xC9])
     assert len(hook) == back - t + 1 and g[0x10:0x16] == bytes.fromhex('e09fea0020c9')
-    ho = fo(0x3A, t); assert not any(g[ho - 1:ho + len(hook)]), 'bank 3A'
+    ho = fo(0x3A, t); assert not any(g[ho - 1:ho + len(hook) + 8]), 'bank 3A'
     g[ho:ho + len(hook)] = hook
     g[o:o + 5] = bytes([0xC3, t & 0xFF, t >> 8, 0x00, 0x00])
+    if has98:
+        # 第98弾：_PlayMusic の 頭（call MusicOff）→ 赤の 音の あとなら 金の 音を 初期化、$F0〜$F3 なら シゲルの 曲
+        import gold_hfi
+        rm = sym['RivalMusic'][1]
+        body = bytes([0xFA, 0x00, 0xC0, 0xFE, RED_ON, 0x38, 0x0C,
+                      0xD5, 0x3E, 0x3A, 0x21, 0x00, 0x40, 0xCF, 0xD1, 0xAF, 0xEA, 0x00, 0xC0,     # farcall _InitSound
+                      0x7A, 0xA7, 0x20, 0x0D, 0x7B, 0xFE, 0xF0, 0x38, 0x08,
+                      0x3E, code_bank, 0x21, rm & 0xFF, rm >> 8, 0xCF, 0x37, 0xC9,             # シゲルの 曲 → キャリー
+                      0xAF, 0xEA, 0x00, 0xC0, 0xC9])                                            # MusicOff（キャリーなし）
+        tb = gold_hfi.put(g, body)
+        sa = t + len(hook)
+        so = fo(0x3A, sa)
+        g[so:so + 8] = bytes([0xCD, gold_hfi.HFI & 0xFF, gold_hfi.HFI >> 8, tb & 0xFF, tb >> 8, 0xD0, 0xE1, 0xC9])
+        o = fo(0x3A, 0x4B30); assert G0[o:o + 3] == bytes([0xCD, 0x57, 0x40])
+        g[o + 1:o + 3] = bytes([sa & 0xFF, sa >> 8])
+        log.append('第98弾：シゲルの 曲（赤の 音の しくみ 1）バンク %02X、_PlayMusic の フック 3A:%04X' % (red1_bank, sa))
     # 金の IntroSequence → 赤の オープニング → 01:6408
     o = fo(0x01, 0x63EF); assert G0[o:o + 9] == bytes.fromhex('2110533e39cf380621')
     ro = sym['RedOpening'][1]
