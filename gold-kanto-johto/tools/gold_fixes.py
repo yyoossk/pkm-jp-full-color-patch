@@ -247,6 +247,77 @@ def fix_gold_blocks(g, log, gmap):
     log.append('金の ブロックに もどした マップ：%s' % ' '.join(done))
 
 
+def fix_fishnest(g, log):
+    """追加機能パッチの「ぶんぷ」の 釣りの マーク（3F:7900〜）の 表を この 移植版の データで 作りなおす。
+       ジョウト（と 26〜28番道路・トージョウのたき）：マップの 釣りの グループ（金の FishGroups）・水の ある マップ。
+       カントー：第57弾の マップごとの 表（kmaps：つりざおの グループ → krod）。サファリの 足しは 使わない（本物の サファリが ある）"""
+    B = 0x3F
+    def r(a): return r16(g, fo(B, a))
+    assert g[fo(B, 0x794D)] == 0x21 and r(0x794E) == 0x7A2B
+    assert bytes(g[fo(B, 0x79E9):fo(B, 0x79EB)]) == bytes([0xFE, 13]) and g[fo(B, 0x79F0)] == 0x21 and r(0x79F1) == 0x7AA2
+    assert g[fo(B, 0x7994)] == 0x7B
+    gm = [r(0x7AA2 + 2 * i) for i in range(13)]
+    mons = []
+    for p in gm:
+        o = fo(B, p); l = []
+        while g[o]: l.append(g[o]); o += 1
+        mons.append(l)
+    end = fo(B, 0x7AA2) + 26 + sum(len(l) + 1 for l in mons)
+    # 第57弾の カントーの つり（03:524D の farcall の 先）
+    o = fo(0x03, 0x524D); SB = g[o + 1]; kf = r16(g, o + 3)
+    km = r16(g, fo(SB, kf + 9)); kr = r16(g, fo(SB, kf + 0x4B))
+    kmaps = []; o = fo(SB, km)
+    while g[o] != 0xFF: kmaps.append(tuple(g[o:o + 3])); o += 3
+    # マップの 見出し
+    mg = fo(0x25, 0x40ED); gp = []; o = mg
+    while not gp or o < fo(0x25, min(gp)): gp.append(r16(g, o)); o += 2
+    tb, ta = ts_table(g); TS = fo(tb, ta); CP = fo(0x3E, 0x734A)
+    def hdr(gi, mi): return fo(0x25, gp[gi - 1]) + 9 * (mi - 1)
+    def water(h):
+        ao = fo(g[h], r16(g, h + 3)); H, W = g[ao + 1], g[ao + 2]; bo = fo(g[ao + 3], r16(g, ao + 4))
+        t = TS + g[h + 1] * 15; co = fo(g[t + 6], r16(g, t + 7))
+        return any(g[CP + c] & 0x0F == 1 for b in set(g[bo:bo + W * H]) for c in g[co + b * 4:co + b * 4 + 4])
+    srt = sorted(set(gp)); pairs = []
+    kset = {(a, b) for a, b, _ in kmaps}
+    for gi in range(1, 26):
+        p = gp[gi - 1]; e = [q for q in srt if q > p][0]
+        for mi in range(1, (fo(0x25, e) - fo(0x25, p)) // 9 + 1):
+            h = hdr(gi, mi); lm, fg = g[h + 5], g[h + 8]
+            if (gi, mi) in kset or not lm or not fg or fg > 13 or 0x2E <= lm < 0x5A or lm > 0x5E: continue
+            if (gi, mi) == (3, 81): continue                       # SafariZoneBeta（行けない）
+            if water(h) and (lm, fg) not in pairs: pairs.append((lm, fg))
+    nj = len(pairs)
+    # カントー：グループ 14〜（つりざおの グループ sg → 14 + sg、データの ない 所（$FF）→ ボロ・いいつりざおだけ）
+    ks = sorted({s for _, _, s in kmaps if s != 0xFF}); kid = {s: 14 + i for i, s in enumerate(ks)}
+    kid[0xFF] = 14 + len(ks)
+    for s in ks:
+        l = [0x81, 0x76, 0x3C]
+        for i in range(4):
+            sp = g[fo(SB, kr) + s * 8 + i * 2]
+            if sp and sp not in l: l.append(sp)
+        mons.append(l)
+    mons.append([0x81, 0x76, 0x3C])
+    for a, b, s in kmaps:
+        lm = g[hdr(a, b) + 5]
+        if (lm, kid[s]) not in pairs: pairs.append((lm, kid[s]))
+    out = bytearray()
+    for lm, fg in pairs: out += bytes([lm, fg])
+    out.append(0)
+    gp_at = 0x7A2B + len(out); out += bytes(2 * len(mons)); la = 0x7A2B + len(out)
+    for i, l in enumerate(mons):
+        out[gp_at - 0x7A2B + 2 * i] = la & 0xFF; out[gp_at - 0x7A2B + 2 * i + 1] = la >> 8
+        out += bytes(l) + b'\0'; la += len(l) + 1
+    lim = end
+    while g[lim] == 0 and lim < fo(B, 0x8000): lim += 1
+    assert fo(B, 0x7A2B) + len(out) <= lim - 16, (hex(len(out)), hex(lim))
+    g[fo(B, 0x7A2B):end] = bytes(end - fo(B, 0x7A2B))
+    g[fo(B, 0x7A2B):fo(B, 0x7A2B) + len(out)] = out
+    g[fo(B, 0x79EA)] = len(mons); g[fo(B, 0x79F1)] = gp_at & 0xFF; g[fo(B, 0x79F2)] = gp_at >> 8
+    g[fo(B, 0x7994)] = 0xC9                                         # FishNest_Extra（キットの サファリ）を 使わない
+    log.append('つりの ぶんぷ：ジョウト %d・カントー %d か所、グループ %d（3F:7A2B〜%04X）' %
+               (nj, len(pairs) - nj, len(mons), 0x7A2B + len(out)))
+
+
 def apply(g, E, M, log):
     from maps import GMGP
     from cmaps import maplist
@@ -255,4 +326,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log)
