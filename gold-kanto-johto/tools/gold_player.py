@@ -1,6 +1,6 @@
 """第71弾（金）：主人公を 赤の 見た目に（クリスタル版の 第71弾と 同じ もの。絵は できあがった クリスタル版から 取る）。
    ・歩く 絵：金の 絵 1番（ゴールド）→ 金に ある 赤の 絵（SPRITE_RED、30:46C0）。名前の 画面の アイコンも（24:5F6D）。
-   ・自転車：クリスタル版の 自転車の 絵（赤フルカラーの もの。クリスタル版の 絵の 表の 2番め）。
+   ・自転車：pokered の 赤の 自転車の 絵（red_bike.png）。クリスタル版の 第71弾の 絵は ライバルの 歩く 絵だった。
    ・後ろ姿：クリスタル版の もの（LZ、6x6）。金の GetTrainerBackpic（0F:79B8）と 金の 殿堂入り（21:69C0）が 読む。
      ダイ（つかまえかたの 手本）の 後ろ姿も 同じ バンクへ 写す（ld b, バンク を 2つで 使うので）。
    ・前の 絵：クリスタル版の ChrisPic（22:48B2、7x7、たての 並び）を LZ に して トレーナーの 種類 CAL の 絵に
@@ -13,6 +13,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gold_opening import lzlen, fo
 
 RED_PAL = bytes.fromhex('5c46f620')
+POKERED = '/home/claude/work/mod/ref/pokered'
+
+
+def png2bpp(path):
+    from PIL import Image
+    im = Image.open(path).convert('L'); W, H = im.size; out = bytearray()
+    for ty in range(H // 8):
+        for tx in range(W // 8):
+            for y in range(8):
+                lo = hi = 0
+                for x in range(8):
+                    v = 3 - im.getpixel((tx * 8 + x, ty * 8 + y)) // 85
+                    lo |= (v & 1) << (7 - x); hi |= (v >> 1) << (7 - x)
+                out += bytes([lo, hi])
+    return bytes(out)
 CAL = 0x0C
 
 
@@ -39,8 +54,9 @@ def apply(g, M, E, log):
     o = fo(0x24, 0x5F6D); assert G0[o:o + 5] == bytes([0x11, 0x00, 0x40, 0x06, 0x30])
     g[o + 1:o + 3] = red[:2]; g[o + 4] = red[3]
     # 自転車
-    mt = fo(0x05, 0x4727); mb = M[mt + 6:mt + 12]; assert mb[2] == 0xC0
-    a = put(M[fo(mb[3], mb[0] | mb[1] << 8):fo(mb[3], mb[0] | mb[1] << 8) + 0x180])
+    # クリスタル版（第71弾）の 自転車の 絵は 赤フルカラーの 絵の 表の 2番め＝ライバルの 歩く 絵だったので、
+    # pokered の red_bike.png（16x96、6コマ。タイルは 左上・右上・左下・右下）を 2bpp に して 使う
+    a = put(png2bpp(os.path.join(POKERED, 'gfx/sprites/red_bike.png')))
     g[t + 6] = a & 0xFF; g[t + 7] = a >> 8; g[t + 9] = nb
     # 後ろ姿（クリスタル版：ld b, bank / ld hl, pic）
     assert M[0x3FC38] == 0x06 and M[0x3FC3A] == 0x21

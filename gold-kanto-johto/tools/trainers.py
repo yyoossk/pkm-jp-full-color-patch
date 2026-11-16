@@ -47,4 +47,24 @@ def merged(c, p, g):
             else:
                 L.append(M[i][j])
         out.append(L)
+    return fix_gender(out)
+
+
+# MOD（第16・19・23・27・32弾など）は トレーナーの 名前を 男女 まぜた 表から じゅんばんに つけたので、
+# ふなのり（男）が ユミ、ミニスカート（女）が タカシ のように なる。男女の 合わない 名前だけ かえる
+FEMALE_CLS = {0x19, 0x1C, 0x1D, 0x21, 0x22, 0x27, 0x35, 0x37, 0x39, 0x3C, 0x3D, 0x3E, 0x42, 73}
+TO_MALE = {'ユミ': 'ユウキ', 'アヤ': 'アキラ', 'ミキ': 'ミツル', 'サオリ': 'サトル', 'エミ': 'エイジ', 'ナナ': 'ナオト',
+           'ミナミ': 'ミノル', 'アユミ': 'アユム', 'サトミ': 'サトシ', 'ユカリ': 'ユタカ', 'マユミ': 'マサル', 'ナツキ': 'ナツオ',
+           'チアキ': 'チカラ', 'カオリ': 'カオル', 'ハルカ': 'ハルキ', 'リエ': 'リキ'}
+TO_FEMALE = {'タカシ': 'タカコ', 'ヒロシ': 'ヒロミ', 'マコト': 'マキ', 'ユウジ': 'ユウコ', 'ケンタ': 'ケイコ', 'ショウタ': 'ショウコ',
+             'ダイスケ': 'ナツミ', 'リョウ': 'リョウコ', 'ナオキ': 'ナオミ', 'カズヤ': 'カズミ'}
+
+def fix_gender(out):
+    from jpchar import encode
+    for i, L in enumerate(out):
+        tbl = TO_FEMALE if i + 1 in FEMALE_CLS else TO_MALE
+        enc = {encode(a + '@'): encode(b + '@') for a, b in tbl.items()}
+        for j, e in enumerate(L):
+            k = e.index(0x50) + 1
+            if bytes(e[:k]) in enc: L[j] = enc[bytes(e[:k])] + bytes(e[k:])
     return out
