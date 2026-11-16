@@ -28,7 +28,7 @@ TSCONST = {}
 for i, l in enumerate(re.findall(r'^\s*const (\w+)', rd('constants/tileset_constants.asm'), re.M)): TSCONST[l] = i
 dims = {c: (int(w), int(h)) for c, w, h in re.findall(r'map_const (\w+),\s*(\d+),\s*(\d+)', rd('constants/map_constants.asm'))}
 ledge = set()
-for a, b, c, d in re.findall(r'db \$(\w+), \$(\w+), \$(\w+), \$(\w+)', rd('data/tilesets/ledge_tiles.asm')): ledge.add(int(c, 16))
+for a, c in re.findall(r'db \w+,\s*\$(\w+),\s*\$(\w+),', rd('data/tilesets/ledge_tiles.asm')): ledge.add(int(c, 16))
 WATER = {'Overworld', 'Forest', 'Gym', 'Dojo', 'Ship', 'ShipPort', 'Cavern', 'Facility', 'Plateau'}
 ymaps = {}
 for f in glob.glob(os.path.join(Y, 'data/maps/headers/*.asm')):
@@ -75,6 +75,8 @@ def pgrid(m):
         row = ''
         for x in range(m['w'] * 2):
             c = g[co + m['blk'][(y // 2) * m['w'] + x // 2] * 4 + (y % 2) * 2 + (x % 2)]; pm = g[CP + c] & 0x0F
+            row += ('D' if 0x70 <= c <= 0x7F else 'L' if 0xA0 <= c <= 0xAF else 'W' if pm == 0 else '~' if pm == 1 else 'X') if c != -1 else '?'
+            continue
             row += 'D' if 0x70 <= c <= 0x7F else 'L' if 0xA0 <= c <= 0xAF else 'W' if pm == 0 else '~' if pm == 1 else 'X'
         G.append(row)
     return G, [(x, y) for x, y in m['warps']]
@@ -86,16 +88,16 @@ for name, ym in sorted(ymaps.items()):
         if (pm['w'], pm['h']) != (ym['w'], ym['h']): continue
         s = sum(a == b for a, b in zip(pm['blk'], ym['blk'])) / len(ym['blk'])
         if not best or s > best[0]: best = (s, pm)
-    if not best or best[0] < 0.5: continue
+    if not best or best[0] < 0.8: continue
     pm = best[1]; YG = ygrid(ym); PG, pw = pgrid(pm)
     diff = [(x, y, YG[y][x], PG[y][x]) for y in range(len(YG)) for x in range(len(YG[0]))
-            if YG[y][x] != PG[y][x] and not (YG[y][x] == 'D' and PG[y][x] in 'WD') and not (YG[y][x] == 'W' and PG[y][x] == 'D' and (x, y) in pw)]
+            if (YG[y][x] in 'WD') != (PG[y][x] in 'WD')]
     extra = [(x, y) for y in range(len(PG)) for x in range(len(PG[0])) if PG[y][x] == 'D' and (x, y) not in pw]
     wy = sorted(set(ym['warps'])); wp = sorted(set(pw))
-    if diff or extra or wy != wp:
+    if diff or wy != wp:
         nd += 1
         out.append('== %s → %s（一致 %.0f%%）' % (name, '%d.%d' % pm['id'], best[0] * 100))
         if wy != wp: out.append('  出入口：黄 %s / 移植 %s' % (wy, wp))
-        if extra: out.append('  出入口でないのに出入口の当たり：%s' % extra)
+        if False: out.append('  出入口でないのに出入口の当たり：%s' % extra)
         if diff: out.append('  ちがう マス（x,y 黄→移植）：%s' % ' '.join('%d,%d %s→%s' % d for d in diff[:40]) + (' …ほか%d' % (len(diff) - 40) if len(diff) > 40 else ''))
 print('\n'.join(out)); print('ちがいの ある マップ：%d' % nd, file=sys.stderr)
