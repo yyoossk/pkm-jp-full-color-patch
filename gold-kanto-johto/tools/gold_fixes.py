@@ -346,6 +346,19 @@ def fix_quads(g, log):
         g[co + 4 * b + q] = new; log.append('当たり：' + what)
 
 
+
+def fix_follow_tiles(g, log):
+    """連れ歩き（追加機能パッチ）：人の 絵を 読みなおした（LoadUsedSpritesGFX）あと、出て いる 人の タイルの 番号も なおす。
+       研究所で はじめての ポケモンを もらうと、連れ歩きの 絵（タイル $0C〜）が 読まれるのに オーキドの タイルが $0C の まま で、
+       オーキドが 連れ歩きの 絵に、ライバルが オーキドの 絵に なっていた（クリスタル版は ReloadSpriteIndex で なおる）。"""
+    B = 0x79; o = fo(B, 0x401D + 0x1B)
+    assert bytes(g[o:o + 3]) == bytes([0xC3, 0x29, 0x48]) and g[fo(B, 0x4574)] == 0x3E
+    at = 0x7D60; assert not any(g[fo(B, at):fo(B, at) + 16])
+    g[fo(B, at):fo(B, at) + 6] = bytes([0xCD, 0x29, 0x48, 0xC3, 0x74, 0x45])     # call Fw_ReloadMask / jp Fw_RefreshTiles
+    g[o + 1] = at & 0xFF; g[o + 2] = at >> 8
+    log.append('連れ歩き：人の 絵を 読みなおした あと 人の タイルも なおす（79:%04X）' % at)
+
+
 def apply(g, E, M, log):
     from maps import GMGP
     from cmaps import maplist
@@ -354,4 +367,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log)

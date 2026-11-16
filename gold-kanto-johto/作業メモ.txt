@@ -428,4 +428,12 @@
   ・お店（marts_vs_red.py）：赤と 同じ。ちがうのは クリスタル版と 同じ 所だけ（わざマシンは 赤と 同じ 番号の クリスタルの わざマシン、
     タマムシ 5F に マックスアップ なし、セキエイは 金の 品ぞろえ）。
   ・人（redmap.py で 入口を たどって 対応）：移植版は クリスタル版と 同じ 位置（ジョウトの 金の マップを のぞく）。
+■ 通しテスト（tools/check/walker.py・walker_red.py・walk_stages.py）
+  ・歩かせる 道具：当たりを ROM から 読んで 道を さがす（人に ふさがれたら さがしなおす）。移植版（金の RAM）・クリスタル版
+    （wMapGroup $DC7B・人 $D4C9、WRAM バンク1）・赤フルカラー（$D2DD・$D2E0・$D2E1）で 同じ 手順を 動かし 写真を 並べる。
+    赤フルカラー：/home/claude/work/ref/akafc/akafc.gbc（CRC 52621D3F）、ピカチュウフルカラー pkfc.gbc（CRC 60C018DB）。
+  ・見つけて 直した：研究所で はじめての ポケモンを もらうと オーキドが 連れ歩きの 絵（ピカチュウの ような 絵）に、ライバルが
+    オーキドの 絵に なる。連れ歩きの 絵（タイル $0C〜）を 読んだ のに 人の タイルの 番号が そのまま（金の RefreshSprites は
+    人の タイルを なおさない）。gold_fixes.fix_follow_tiles：Fw_LoadUsedSpritesGFX の さいごで Fw_RefreshTiles も よぶ。
+    クリスタル版と 並べて 同じに なった。
 
