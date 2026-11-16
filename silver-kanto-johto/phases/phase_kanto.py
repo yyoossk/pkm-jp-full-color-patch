@@ -53,7 +53,7 @@ def apply(rom, ctx):
 
     # ---- マップの シーンの 表（第21・70弾 など）。$25:$4000 → $E1:$4400
     C_EV, C_EXT, S_EXT = 0xDA65, 0xD901, EXT_FLAGS
-    free = list(range(0xD771, 0xD78D))
+    free = list(range(0xD771, 0xD785))   # $D770 まで クリスタルの $DA64 まで、$D785 は ムサシと コジロウ、$D786〜$D78C は 連れ歩き、$D78D〜 は クリスタルだけの フラグ
     def scene_tab(r, b, a):
         q = fo(b, a); out = []
         while r[q] != 0xFF: out.append((r[q], r[q + 1], r16(r, q + 2))); q += 4
@@ -84,6 +84,7 @@ def apply(rom, ctx):
     x_addr(0xDACE, None)
     amap[0xD836] = free.pop(0)
     amap[0xD837] = free.pop(0)        # 御三家・セレビィキットの wEdFlags（ジョウトの 御三家）
+    assert amap[0xDACE] == 0xD773     # phase_dex・phase_postgame など が 使う
     blob = b''.join(bytes([g, m, a & 0xff, a >> 8]) for g, m, a in newtab) + b'\xff'
     o = fo(TS_BANK, 0x4400); rom[o:o + len(blob)] = blob
     rom[0x1F47] = TS_BANK; w16(rom, 0x1F4A, 0x4400)
@@ -200,8 +201,11 @@ def apply(rom, ctx):
     assert rom[0x2EEB:0x2EF2] == bytes([0x21, 0xAA, 0xD7, 0xCD, 0xF2, 0x2E, 0xC9]) and rom[0x18] == 0xFF and not any(rom[0x19:0x20]) and rom[0x20] == 0xFF and not any(rom[0x21:0x28])
     rom[0x2EEB:0x2EF2] = bytes([0xC3, 0x18, 0x00, 0, 0, 0, 0])
     rom[0x18:0x27] = bytes([0x21, 0xAA, 0xD7, 0x7A, 0xFE, 0x08, 0xDA, 0xF2, 0x2E, 0x21, EXT_FLAGS & 0xff, EXT_FLAGS >> 8, 0xC3, 0xF2, 0x2E])
-    assert max([0x800] + list(P.ext_flags.values())) < 0x800 + (0xD7AA - 0xD70D) * 8
+    assert len(P.ext_flags) <= port.EXT_FLAG_N
     log.append('クリスタルだけの フラグ %d を $%03X〜 に' % (len(P.ext_flags), port.EXT_FLAG_BASE + 0x400))
+    mx = max(port.MODFLAGS | {0x800})              # この MOD の フラグ $800〜 は $D70D〜（$D740〜 は キットの 一時の 所だったので 動かした）
+    assert EXT_FLAGS + mx // 8 < 0xD768, hex(mx)
+    log.append('MOD の フラグ %d（$800〜$%03X、$D70D〜$%04X）' % (len(port.MODFLAGS), mx, EXT_FLAGS + mx // 8))
 
     # ---- 人の絵の 2つめの 表（$67〜$7A。第14弾 など）：銀の バンク5 の もとの タイルセットの 表の 所（もう 使わない）へ
     ct2 = fo(5, 0x7F34); n2 = 0x7A - 0x66

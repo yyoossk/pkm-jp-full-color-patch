@@ -4,7 +4,7 @@
    いなく なると きえる。
    その マップの スクリプトの バンクを まるごと あいて いる バンク（$E9〜$EB）に 写して、マップの 属性の バンクを かえ、写しの
    中の ほかの マップの 所に あたらしい MapScripts（OBJECTS の callback を 足す）・イベントの 表（2人を 足す）・スクリプト・ことばを 置く。
-   しるしは フラグ $BF8〜$BFA（$D78C。あいて いる バイト）。"""
+   しるしは フラグ $BC0〜$BC2（$D785。あいて いる バイト。$D786〜$D78C は 連れ歩き）。"""
 import os, sys
 H = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(H, 'tools'))
@@ -15,9 +15,9 @@ Q = '“'
 JJ, SPR_JAMES, SPR_JESSIE = 72, 0x76, 0x75
 FACE = {'DOWN': 6, 'UP': 7, 'LEFT': 8, 'RIGHT': 9}
 # マップ（グループ, 番号）, ロケットだんの フラグ, ムサシ (x, y, むき), コジロウ, 新しい バンク, しるし
-SCENES = [((3, 32), 0x6FC, (15, 12, 'RIGHT'), (14, 12, 'RIGHT'), 0xE9, 0xBF8),
-          ((3, 41), 0x6DA, (26, 2, 'RIGHT'), (26, 3, 'RIGHT'), 0xEA, 0xBF9),
-          ((3, 18), 0x6CE, (13, 1, 'RIGHT'), (13, 2, 'RIGHT'), 0xEB, 0xBFA)]
+SCENES = [((3, 32), 0x6FC, (15, 12, 'RIGHT'), (14, 12, 'RIGHT'), 0xE9, 0xBC0),
+          ((3, 41), 0x6DA, (26, 2, 'RIGHT'), (26, 3, 'RIGHT'), 0xEA, 0xBC1),
+          ((3, 18), 0x6CE, (13, 1, 'RIGHT'), (13, 2, 'RIGHT'), 0xEB, 0xBC2)]
 TEXTS = [
     ('ムサシ' + Q + 'ちょっと　まったー！<PARA>コジロウ' + Q + 'ジョウトの　ヤドンの　シッポは<LINE>ロケットだんが　いただくぜ！<PARA>'
      'ムサシ' + Q + 'じゃまする　やつは<LINE>ここで　やっつけて　やるわ！',

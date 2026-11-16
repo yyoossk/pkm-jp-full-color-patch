@@ -16,7 +16,9 @@ from gsc import fo, r16
 MOD_LO, MOD_HI = 0x60, 0x7C
 KIT_MAP = {0x8F: 0xE6}                 # クリスタルの 追加機能キットの バンクで カントーが 使う もの（四天王の あとの わざマシン売り）→ 銀の 空き
 EXT_FLAG_BASE = 0x800                  # 銀で 足す イベントフラグ（クリスタルに しか ない もの）
-CR_HOME = {}                           # クリスタルの ホーム（バンク0）の スクリプト → 銀の アドレス（あとで 足す）
+CR_HOME = {}
+EXT_FLAG_N = 152 + 40
+MODFLAGS = set()                       # 使った MOD の フラグ（$800〜。しらべる 用）                           # クリスタルの ホーム（バンク0）の スクリプト → 銀の アドレス（あとで 足す）
 
 
 def cb(b):
@@ -75,10 +77,11 @@ class Port:
         if v in s.force: return s.force[v]
         n = xlat.inv(s.T.c_ev).get(v)
         if v >= 0x800:                                     # この MOD が 足した フラグ（第15弾）
-            return v
+            MODFLAGS.add(v); return v
         if n and n in s.T.g_ev: return s.T.g_ev[n]
         if v not in s.ext_flags:
-            s.ext_flags[v] = EXT_FLAG_BASE + 0x400 + len(s.ext_flags)   # $C00〜（クリスタルだけの フラグ）
+            n = len(s.ext_flags)                           # クリスタルだけの フラグ：$C00〜$C97（$D78D〜$D79F）、$CC0〜$CE7（$D7A5〜$D7A9）
+            s.ext_flags[v] = (0xC00 + n) if n < 152 else (0xCC0 + n - 152)   # $D7A0〜$D7A4 は 追加機能キット（ガンテツ・伝説・どうぐ・連れ歩き・wEdFlags）
         return s.ext_flags[v]
 
     def x_named(s, cd, gd, v, kind):
