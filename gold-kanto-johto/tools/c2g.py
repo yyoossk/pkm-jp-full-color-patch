@@ -31,6 +31,9 @@ for gi, (gn, ms) in enumerate(groups('pokegold')):
     for mi, mn in enumerate(ms): GMAP[mn] = (gi + 1, mi + 1)
 # クリスタルにしかない マップ名 → 金の かわりの マップ（必要になったら 足す）
 MAPALIAS = {}
+# クリスタル版で 2マスの 入口の 片方だけに warp が ある 所（赤・黄では 2マスとも 入口）。
+# マップ名 → [(足す マスの y, x, まねる warp の 番号（0から）)]。当たりは gold_fixes.fix_twin_doors
+EXTRA_WARPS = {'Route2': [(35, 17, 3)]}          # ひでんマシン05の ゲートの 北の 入口（16,35 と 17,35）
 # ホームの住所（クリスタル → 金）
 HOMEMAP = {0x26B2: 0x27BF}   # ObjectEvent（jumptextfaceplayer ObjectEventText）
 # RAM（日本版クリスタル → 日本版金）
@@ -206,8 +209,12 @@ def emit_map(E, W, at, cname, chdr, crom, grom, gmaps, cmaps_by_name):
     for t, p in at['callbacks']: sh += bytes([t]) + E.ptr(cb, p, cname + ' cb')[1].to_bytes(2, 'little')
     sa = alloc(len(sh), gb); grom[gb * 0x4000 + sa - 0x4000:gb * 0x4000 + sa - 0x4000 + len(sh)] = sh
     # イベント
-    ev = bytearray(at['ev0']); ev.append(len(at['warps']))
-    for wv in at['warps']:
+    warps = list(at['warps'])
+    for y, x, src in EXTRA_WARPS.get(cname, []):
+        assert warps[src][1] == x - 1 and warps[src][0] == y, (cname, warps[src].hex())
+        warps.append(bytes([y, x]) + bytes(warps[src][2:]))
+    ev = bytearray(at['ev0']); ev.append(len(warps))
+    for wv in warps:
         g, n = X.mapid((wv[3], wv[4]), cname + ' warp'); ev += wv[:3] + bytes([g, n])
     ev.append(len(at['coords']))
     for c in at['coords']: ev += c[:4] + E.ptr(cb, w(c, 4), cname + ' coord')[1].to_bytes(2, 'little') + c[6:8]

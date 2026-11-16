@@ -318,6 +318,34 @@ def fix_fishnest(g, log):
                (nj, len(pairs) - nj, len(mons), 0x7A2B + len(out)))
 
 
+
+def fix_twin_doors(g, log):
+    """c2g.EXTRA_WARPS で 足した 入口の マスに、となりの 入口と 同じ 当たりを つける（その ブロックが ほかで 使われない ときだけ）"""
+    from c2g import EXTRA_WARPS, GMAP
+    mg = fo(0x25, 0x40ED); tb, ta = ts_table(g); TS = fo(tb, ta)
+    for name, L in EXTRA_WARPS.items():
+        gi, mi = GMAP[name]; h = fo(0x25, r16(g, mg + 2 * (gi - 1))) + 9 * (mi - 1)
+        ao = fo(g[h], r16(g, h + 3)); H, W = g[ao + 1], g[ao + 2]; bo = fo(g[ao + 3], r16(g, ao + 4))
+        t = TS + 15 * g[h + 1]; co = fo(g[t + 6], r16(g, t + 7))
+        for y, x, _ in L:
+            b = g[bo + (y // 2) * W + x // 2]; q = (y % 2) * 2 + x % 2; qn = (y % 2) * 2 + (x - 1) % 2
+            assert x % 2 == 1 and g[bo:bo + W * H].count(b) == 1, (name, hex(b))
+            g[co + 4 * b + q] = g[co + 4 * b + qn]
+            log.append('2マスの 入口：%s (%d,%d) ブロック %02X → %02X' % (name, x, y, b, g[co + 4 * b + q]))
+
+
+
+# タイルセットの 当たりの なおし：(金の タイルセット番号, ブロック, 4分の1, いまの 値, なおす 値, 説明)
+QUAD_FIX = [(34, 0x3D, 3, 0x90, 0x00, 'ハナダの バッジの家・セキチクの つりざおの家：上の かべの 下の マス（1,1）（5,1）（7,1）が カウンターで 歩けない（赤・黄では 歩ける）')]
+
+def fix_quads(g, log):
+    tb, ta = ts_table(g); TS = fo(tb, ta)
+    for ts, b, q, old, new, what in QUAD_FIX:
+        t = TS + 15 * ts; co = fo(g[t + 6], r16(g, t + 7))
+        assert g[co + 4 * b + q] == old, (ts, hex(b), hex(g[co + 4 * b + q]))
+        g[co + 4 * b + q] = new; log.append('当たり：' + what)
+
+
 def apply(g, E, M, log):
     from maps import GMGP
     from cmaps import maplist
@@ -326,4 +354,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log)
