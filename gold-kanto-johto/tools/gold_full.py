@@ -182,6 +182,8 @@ import gold_opening
 _lo = []; gold_opening.apply(g, MOD, E, _lo); print('\n'.join(_lo))
 import gold_hof
 _lh = []; gold_hof.apply(g, MOD, E, _lh); print('\n'.join(_lh))
+import gold_player
+_lp = []; gold_player.apply(g, MOD, E, _lp); print('\n'.join(_lp))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
 open('/home/claude/work/out/gold_full.gbc', 'wb').write(g)
 print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.bankmap.items()})
