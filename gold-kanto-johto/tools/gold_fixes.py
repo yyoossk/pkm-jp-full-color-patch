@@ -369,6 +369,28 @@ def fix_follow_tiles(g, log):
     log.append('連れ歩き：人の 絵を 読みなおした あと 人の タイルも なおす（79:%04X）' % at)
 
 
+
+def fix_waitsfx(g, log):
+    """赤の 音の しくみ（第98弾 シゲルの 曲・第68弾）が 鳴って いる 間（$C000 ≥ $A5）は 金の 効果音が すすまないのに、
+       WaitSFX（00:3D77）は 金の チャンネル5〜8の フラグ（赤の 音の RAM と 重なる）を 待ちつづけて 止まっていた
+       （オーキド研究所で 図鑑を もらった ところで 止まる）。赤の 音の 間は 待たない。"""
+    import gold_hfi
+    o = 0x3D77
+    assert bytes(g[o:o + 0x1F]) == bytes.fromhex('e521ccc0cb4620f921fec0cb4620f22130c1cb4620eb2162c1cb4620e4e1c9')
+    body = bytearray([0xE5])                                     # push hl
+    loop = len(body)
+    body += bytes([0xFA, 0x00, 0xC0, 0xFE, 0xA5, 0x30, 0])         # ld a,[$C000] ; cp $A5 ; jr nc,.done
+    jdone = len(body) - 1
+    for a in (0xC0CC, 0xC0FE, 0xC130, 0xC162):
+        body += bytes([0x21, a & 0xFF, a >> 8, 0xCB, 0x46, 0x20, 0])  # ld hl,a ; bit 0,[hl] ; jr nz,.wait
+        body[-1] = (loop - len(body)) & 0xFF
+    body[jdone] = len(body) - (jdone + 1)
+    body += bytes([0xE1, 0xC9])                                   # .done: pop hl ; ret
+    b = gold_hfi.put(g, bytes(body))
+    g[o:o + 6] = bytes([0xCD, gold_hfi.HFI & 0xFF, gold_hfi.HFI >> 8, b & 0xFF, b >> 8, 0xC9])
+    log.append('WaitSFX：赤の 音の 間は 待たない（7E:%04X）' % b)
+
+
 def apply(g, E, M, log):
     from maps import GMGP
     from cmaps import maplist
@@ -377,4 +399,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log)
