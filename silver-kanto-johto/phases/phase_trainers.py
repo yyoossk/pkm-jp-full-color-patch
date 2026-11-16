@@ -66,6 +66,33 @@ def apply(rom, ctx):
             elif i < len(slist): res.append(slist[i])
             elif i < len(clist): res.append(fix_items(T, clist[i], P)); nk += 1
         out[gi] = res
+    # クリスタル版が 足した 赤の トレーナーの 名前は、男・女を 見ずに つけて あった（ふなのりが「ユミ」、ミニスカートが
+    # 「ヒロシ」など）。クラスの 男・女と 名前が 合わない ものを 合う 名前に かえる
+    import jptext
+    MALE_C = {20, 22, 23, 24, 27, 30, 32, 36, 37, 38, 40, 41, 43, 44, 45, 47, 48, 49, 50, 52, 54, 56, 59, 65, 74, 75, 76, 77, 78, 79}
+    FEMALE_C = {25, 28, 29, 33, 34, 39, 53, 57, 60, 62, 73}
+    FEM = set('ユキ ナナ マイ カナ ミホ ノゾミ ユミ アヤ エミ サキ りナ サオり ユり アイ エり イズミ ミユキ ミキ ハルカ マユミ ナツキ '
+              'ミナミ サトミ ミスズ カオり ミズホ チサト ユミコ チアキ アユミ'.split())
+    MAS = set('ショウタ ヒロシ ケンジ ユウジ タケシ カズオ ヨシオ ノボル ミツル タカシ ゴロウ ジョウジ ケンタ ダイスケ カズヤ タロウ '
+              'アキラ ナオキ りョウ ジロウ サブロウ ユウタ タクヤ ツヨシ ケント ナオト マイク カズマ マコト タダシ マサオ'.split())
+    POOL_M = 'ゴロウ ノボル ヒデキ マサル ススム ケイゴ トオル ヨシキ カツミ テツオ イサオ シゲオ ミノル ヤスオ リキヤ'.split()
+    POOL_F = 'ミドリ アキコ ヨシエ トモミ クミ ハルミ シズカ ミサキ レイコ エりコ ヒロミ マキ ナオミ ノりコ ユカ サヤカ りエ'.split()
+    KINV = {}
+    for kk, v in jptext.CM.items():
+        if len(kk) == 1 and ord(kk) > 0x3000: KINV.setdefault(v, kk)
+    kdec = lambda bb: ''.join(KINV.get(x, '?') for x in bb)
+    nren = 0
+    for c in MALE_C | FEMALE_C:
+        bad, pool = (FEM, POOL_M) if c in MALE_C else (MAS, POOL_F)
+        names = [kdec(b[:b.index(0x50)]) for b in out.get(c, [])]
+        k = 0
+        for i, b in enumerate(out.get(c, [])):
+            j = b.index(0x50); nm = names[i]
+            if nm not in bad: continue
+            while pool[k % len(pool)].replace('リ', 'り') in names: k += 1
+            nn = pool[k % len(pool)].replace('リ', 'り'); k += 1
+            names[i] = nn; out[c][i] = jptext.enc(nn) + b[j:]; nren += 1
+    log.append('トレーナーの 名前：クラスの 男・女と 合わない %d 人を かえた' % nren)
     # クラス 63（レッド）は ゴールド（第47弾：シロガネやま。手持ちは クリスタル版の ヒビキと 同じ）
     mv = lambda lv, sp_, *ms: bytes([lv, sp_, *ms])
     import jptext
