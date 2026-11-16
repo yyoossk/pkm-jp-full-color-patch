@@ -149,12 +149,25 @@ def classes(rom, cmod, P, log):
     tab = bytearray(rom[fo(0x0E, S_ATTR):fo(0x0E, S_ATTR) + 7 * N0])
     for i in range(N0, N):
         e = bytearray(cmod[C_ATTR + 7 * i:C_ATTR + 7 * i + 7]); e[0] = P.x_item(e[0]); e[1] = P.x_item(e[1]); tab += e
-    for b in (0x0E, TB): rom[fo(b, NA):fo(b, NA) + len(tab)] = tab
-    for off, d in ((0x3956A, 0), (0x38023, 5), (0x38110, 5), (0x4413C, 3)):
-        assert rom[off] == 0x21 and r16(rom, off + 1) == S_ATTR + d, hex(off)
-        rom[off + 1:off + 3] = w(NA + d)
+    # 表は $E2:$7C00 だけに 置く（$0E:$7C00〜 は 銀の 戦いの ことば。前は ここに 書いて いて、ことばが こわれ、
+    # 「○○は ×× を つかった」の あとなどで 文の 命令で ない 所を 読んで とまった）。
+    # $0E・$11 の 読む 所は、その クラスの 7 バイトを WRAM の BUF に 写す 小さな 処理を よんで、hl ＝ BUF + d に する。
+    rom[fo(TB, NA):fo(TB, NA) + len(tab)] = tab
+    BUF, HELP, STUB = 0xD77B, 0x7F00, 0x7FF0             # BUF：セーブの すき間の あき（phase_kanto の free の 後ろ）
+    help_ = (bytes([0xC5, 0x7B, 0x21]) + w(NA) + bytes([0x01, 7, 0, 0xCD, 0x5F, 0x31, 0x11]) + w(BUF) +
+             bytes([0x06, 7, 0x2A, 0x12, 0x13, 0x05, 0x20, 0xFA, 0xC1, 0x21]) + w(BUF) + bytes([0x06, 0, 0x09, 0x01, 7, 0, 0xC9]))
+    assert not any(rom[fo(TB, HELP):fo(TB, HELP) + len(help_)]); rom[fo(TB, HELP):fo(TB, HELP) + len(help_)] = help_
+    stub = bytes([0xD5, 0x5F, 0x3E, TB, 0x21]) + w(HELP) + bytes([0xCF, 0xD1, 0xC9])   # push de / ld e,a / farcall / pop de / ret
+    for b in (0x0E, 0x11):
+        assert not any(rom[fo(b, STUB):fo(b, STUB) + len(stub)]); rom[fo(b, STUB):fo(b, STUB) + len(stub)] = stub
+    for off, d in ((0x3956A, 0), (0x38023, 5), (0x38110, 5)):    # ld hl,表+d / ld bc,7 / call AddNTimes → ld c,d / call STUB
+        assert rom[off:off + 9] == bytes([0x21]) + w(S_ATTR + d) + bytes([0x01, 7, 0, 0xCD, 0x5F, 0x31]), hex(off)
+        rom[off:off + 9] = bytes([0x0E, d, 0xCD]) + w(STUB) + bytes(4)
         if fo(0x0E, S_CODE) <= off < fo(0x0E, S_TAB):
             e2 = off - fo(0x0E, 0x4000) + fo(TB, 0x4000); rom[e2 + 1:e2 + 3] = w(NA + d)
+    off = 0x4413C                                             # バンク11：ld hl,表+3 / ld a,[$D10F] / dec a / ld bc,7 / call AddNTimes
+    assert rom[off:off + 13] == bytes([0x21]) + w(S_ATTR + 3) + bytes([0xFA, 0x0F, 0xD1, 0x3D, 0x01, 7, 0, 0xCD, 0x5F, 0x31])
+    rom[off:off + 13] = bytes([0xFA, 0x0F, 0xD1, 0x3D, 0x0E, 3, 0xCD]) + w(STUB) + bytes(4)
     # DV（2 バイト）：$E2:$7E40 に 79 クラス分、バンク9 の 読む 所は 終わりの 14 バイトへ（GetFarHalfword）
     S_DVS = 0x75E1; ND = 0x7E40
     dv = bytes(rom[fo(9, S_DVS):fo(9, S_DVS) + 2 * N0]) + bytes(cmod[fo(9, 0x7DD8) + 2 * N0:fo(9, 0x7DD8) + 2 * N])

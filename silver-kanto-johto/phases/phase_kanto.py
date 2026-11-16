@@ -53,7 +53,7 @@ def apply(rom, ctx):
 
     # ---- マップの シーンの 表（第21・70弾 など）。$25:$4000 → $E1:$4400
     C_EV, C_EXT, S_EXT = 0xDA65, 0xD901, EXT_FLAGS
-    free = list(range(0xD771, 0xD785))   # $D770 まで クリスタルの $DA64 まで、$D785 は ムサシと コジロウ、$D786〜$D78C は 連れ歩き、$D78D〜 は クリスタルだけの フラグ
+    free = list(range(0xD771, 0xD77B))   # $D770 まで クリスタルの $DA64 まで、$D77B〜$D781 は トレーナーの 表の 写し（phase_trainers）、$D785 は ムサシと コジロウ、$D786〜$D78C は 連れ歩き、$D78D〜 は クリスタルだけの フラグ
     def scene_tab(r, b, a):
         q = fo(b, a); out = []
         while r[q] != 0xFF: out.append((r[q], r[q + 1], r16(r, q + 2))); q += 4
