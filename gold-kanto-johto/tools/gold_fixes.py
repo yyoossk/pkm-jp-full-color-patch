@@ -86,7 +86,17 @@ def fix97(g, E, M, log):
     tab += b'\xff'
     DB = E.fix_bank[0]
     W_ENV, W_TS, W_TOD, BGP1, FCB = 0xD075, 0xD074, 0xD55B, 0xC200, 0x0DB6
-    code = bytearray([0xFA, W_ENV & 0xFF, W_ENV >> 8, 0x3D, 0xFE, 0x02, 0xD0,              # 町・道路 だけ
+    # 町・道路 でない（家の 中など）ときは 8つめの 色（MOD の タイルセットの 表の 8つめ）を 字の 色に する。
+    # クリスタル版は 中では 8つめが 字の 色（白・$7268・$40A5・黒）。写した ままだと 字の 黒が うすく なっていた
+    tpb, tpa = put(g, E, bytes.fromhex('ff7f6872a5400000'))
+    outs = [ci - 4 for ci, _, _ in ents]          # 外の タイルセット（朝・夜の 色が ある もの）
+    pre = bytearray([0xFA, W_TS & 0xFF, W_TS >> 8])
+    for t in outs: pre += bytes([0xFE, t, 0x28, 0])  # cp t ; jr z,外
+    ind = bytes([0x21, tpa & 0xFF, tpa >> 8, 0x11, (BGP1 + 0x38) & 0xFF, (BGP1 + 0x38) >> 8,
+                 0x01, 0x08, 0x00, 0x3E, tpb, 0xC3, FCB & 0xFF, FCB >> 8])
+    for i in range(len(outs)): pre[3 + 4 * i + 3] = len(pre) - (3 + 4 * i + 4) + len(ind)
+    pre += ind
+    code = bytearray(pre) + bytearray([0xFA, W_ENV & 0xFF, W_ENV >> 8, 0x3D, 0xFE, 0x02, 0xD0,              # 町・道路 だけ
                       0xFA, W_TOD & 0xFF, W_TOD >> 8, 0xE6, 0x03, 0x1E, 0x01, 0xA7, 0x28, 0x05, # 朝：e=1
                       0x1E, 0x03, 0xFE, 0x02, 0xC0,                                           # 夜：e=3（昼は そのまま）
                       0xFA, W_TS & 0xFF, W_TS >> 8, 0x47, 0x21, 0, 0,                         # ld hl,表
@@ -94,7 +104,7 @@ def fix97(g, E, M, log):
                       0x16, 0x00, 0x19, 0x2A, 0x66, 0x6F,
                       0x11, BGP1 & 0xFF, BGP1 >> 8, 0x01, 0x38, 0x00, 0x3E, DB, 0xCD, FCB & 0xFF, FCB >> 8, 0xC9])
     base = gold_hfi.here(); ta = base + len(code)
-    code[27] = ta & 0xFF; code[28] = ta >> 8
+    code[27 + len(pre)] = ta & 0xFF; code[28 + len(pre)] = ta >> 8
     assert gold_hfi.put(g, bytes(code) + bytes(tab)) == base
     hk = fo(2, 0x7BE0); end = hk + bytes(g[hk:hk + 0x30]).find(bytes([0xC3, 0x26, 0x76]))
     assert end > hk and not any(g[end + 3:end + 8])
