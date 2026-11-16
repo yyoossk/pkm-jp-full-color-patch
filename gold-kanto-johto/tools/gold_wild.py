@@ -12,7 +12,8 @@ CODE_LO, CODE_HI = 0x65EF, 0x6C1B
 G_KG, G_KW = 0x78A6, 0x7E29
 G_JG, G_JW = 0x6C1B, 0x774F                      # 金の ジョウトの 表（第60弾：MOD の ジョウトの 表＝第2世代だけ に かえる）
 M_JG, M_JW = (0x0A, 0x660C), (0x0A, 0x7E3F)
-FARCALLS = [0x5E17, 0x507E6, 0x507F0, 0x91EC4, 0x97B26, 0x97B7F, 0x97BC5, 0x97BCB]   # 3e 0a 21 lo hi cf
+FARCALLS = [0x5E17, 0x507E6, 0x507F0, 0x91EC4, 0x97B26, 0x97B7F, 0x97BC5, 0x97BCB,   # 3e 0a 21 lo hi cf
+            0xFF901]                                                              # 追加機能パッチの つりの ぶんぷ（3F:7901 farcall FindNest）
 FARCALLS2 = [0x3F742]                                                                  # 21 lo hi 3e 0a cf
 DBAS = [0xC347, 0xC34A, 0xC34D, 0xC371, 0x15501, 0x1553D, 0x15540]
 M_KG, M_KW = (0x0A, 0x7140), (0x0A, 0x7D05)
