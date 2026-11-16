@@ -178,6 +178,8 @@ import gold_engine
 _le = []; gold_engine.apply(g, _le, MOD, TB); print('\n'.join(_le))
 import gold_sprites
 _lsp = []; gold_sprites.apply(g, E.next_bank, _lsp); E.next_bank += 1; print('\n'.join(_lsp))
+import gold_opening
+_lo = []; gold_opening.apply(g, MOD, E, _lo); print('\n'.join(_lo))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
 open('/home/claude/work/out/gold_full.gbc', 'wb').write(g)
 print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.bankmap.items()})
