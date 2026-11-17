@@ -17,7 +17,7 @@ SITES = [  # (アドレス, 銀の フラグ, 新しい フラグ, なに)
 
 
 def apply(rom, ctx):
-    log = ctx['log'] if isinstance(ctx, dict) and 'log' in ctx else []
+    log = ctx.setdefault('log', [])
     for a, old, new, what in SITES:
         assert rom[a] == 0x11 and rom[a + 1] == old and rom[a + 2] == 0 and rom[a + 3] == 0xCD, (hex(a), rom[a:a + 6].hex())
         rom[a + 1] = new
