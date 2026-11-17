@@ -54,6 +54,23 @@ def apply(rom, ctx):
         if (w[0], w[3], w[4]) == (0,) + ROUTE2:
             nw = i + 1 + (1 if w[1] == 5 else 0)          # 1 から 数える ワープの 番号
             rom[go + 5 * j + 2] = nw
+    # 2ばんどうろに ワープを 1つ 足したので、それより 後ろの 番号（1 から 数えて i+2 以上）を 指す ワープを 1つ ずらす
+    #（ゲートの 南の 出入口・トキワのもりの 南の ゲート など。前は ゲートの 南から 出ると 北の 入口に もどされた）
+    shifted = []
+    for k in list(SM.hdr) + [(26, m) for m in range(1, 200)]:
+        try:
+            hpk = fo(0x25, r16(rom, gt + 2 * (k[0] - 1))) + 9 * (k[1] - 1)
+            aok = fo(rom[hpk], r16(rom, hpk + 3)); eo = fo(rom[aok + 6], r16(rom, aok + 9)) + 2
+        except Exception: continue
+        if not (0 < eo < len(rom) - 1): continue
+        n = rom[eo]
+        if n > 64: continue
+        for j in range(n):
+            q = eo + 1 + 5 * j
+            if (rom[q + 3], rom[q + 4]) == ROUTE2 and rom[q + 2] >= i + 2 and not (k == GATE and rom[q] == 0):
+                if (k, j) in [s_[:2] for s_ in shifted]: continue
+                rom[q + 2] += 1; shifted.append((k, j, rom[q + 2]))
+    log.append('  2ばんどうろの ワープ番号を ずらした: %s' % shifted)
     # 右の マス（ブロック $86 の 右下、2ばんどうろ だけで 使う）の 当たりも 左と 同じ ワープの じゅうたん（$70）に
     hp2 = fo(0x25, r16(rom, gt + 2 * (ROUTE2[0] - 1))) + 9 * (ROUTE2[1] - 1); ts = rom[hp2 + 1]
     te = fo(0xE1, 0x4000) + 15 * ts; c = fo(rom[te + 6], r16(rom, te + 7))
