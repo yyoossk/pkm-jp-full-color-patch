@@ -154,7 +154,7 @@ class Walk:
         s.notes.append('raw データ %02X:%04X（%s）大きさ不明' % (b, a, ctx)); s.put('raw', b, a, 0, [])
     def w_mart(s, b, a, ctx): s.put('raw', b, a, 0, [])
     def w_elevator(s, b, a, ctx):
-        o = fo(b, a); n = s.r[o]; s.put('elevator', b, a, 1 + 4 * n, [])
+        o = fo(b, a); n = s.r[o]; s.put('elevator', b, a, 2 + 4 * n, [])   # さいごの -1 も
     def w_menu(s, b, a, ctx):
         s.notes.append('menu %02X:%04X（%s）' % (b, a, ctx)); s.put('raw', b, a, 0, [])
 

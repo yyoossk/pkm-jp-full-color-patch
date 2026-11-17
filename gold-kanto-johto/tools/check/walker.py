@@ -15,6 +15,7 @@ class W:
         r16 = lambda o: s.rom[o] | s.rom[o + 1] << 8
         s.TS = fo(s.rom[0x2DB8 + 19], r16(0x2DB9)); s.CP = fo(0x3E, 0x734A); s.r16 = r16
         s.log = []
+        import spins; s.jumps = spins.all_jumps()
     def rd(s, a, n=1):
         if s.WBANK and a >= 0xD000: return s.g.wpeek(s.WBANK, a, n)
         return s.g.peek(a, n)
@@ -62,11 +63,51 @@ class W:
                 elif not s.passable(c(*n), p, d): 
                     if n != (tx, ty): continue
                 if n in prev or n in blocked and n != (tx, ty): continue
+                j = s.jumps.get(((gi, mi), p, d))
+                if j is not None:                                # 回る 床：ふむと べつの 所へ（ためして おぼえた）
+                    if j in prev: continue
+                    n = j
                 prev[n] = (p, d); q.append(n)
         if (tx, ty) not in prev: return None
-        out = []; p = (tx, ty)
-        while prev[p]: p, d = prev[p]; out.append(d)
+        out = []; p = (tx, ty); s._exp = []
+        while prev[p]: s._exp.append(p); p, d = prev[p]; out.append(d)
+        s._exp.reverse()
         return out[::-1]
+    def explore_to(s, tx, ty, tries=40):
+        """回る 床の マップで (tx, ty) へ：知らない 回る 床を 1つずつ ためして おぼえる（jumps は ファイルに のこす）"""
+        import pickle, os
+        jf = '/home/claude/work/wt/jumps.pkl'
+        if os.path.exists(jf): s.jumps.update(pickle.load(open(jf, 'rb')))
+        mid = s.pos()[:2]
+        for _ in range(tries):
+            if s.pos()[:2] != mid or s.pos()[2:] == (tx, ty): break
+            if s.path(tx, ty) is not None:
+                s.goto(tx, ty, tries=2); pickle.dump(s.jumps, open(jf, 'wb')); continue
+            spins = s.spin_tiles(mid); c = s.coll(mid); _, _, x, y = s.pos()
+            seen = {(x, y)}; q = collections.deque([(x, y)]); cand = None
+            blocked = s.npcs()
+            while q and cand is None:
+                p = q.popleft()
+                for d, (dx, dy) in DIRS.items():
+                    n = (p[0] + dx, p[1] + dy)
+                    if not s.passable(c(*n), p, d) or n in blocked: continue
+                    j = s.jumps.get((mid, p, d))
+                    if n in spins and j is None: cand = (p, d); break
+                    if j is not None: n = j
+                    if n not in seen: seen.add(n); q.append(n)
+            if cand is None: s.log.append('回る 床：もう ためす 所が ない'); break
+            (px, py), d = cand
+            if (px, py) != s.pos()[2:] and not s.goto(px, py, tries=2): continue
+            if s.pos()[2:] != (px, py): continue
+            s.step(d)
+            for _ in range(30):
+                a1 = s.pos(); s.g.wait(8)
+                if s.pos() == a1: break
+            s.jumps[(mid, (px, py), d)] = s.pos()[2:]; pickle.dump(s.jumps, open(jf, 'wb'))
+        return s.pos()[2:] == (tx, ty)
+    def spin_tiles(s, mid):
+        cs = s.maps[mid]['attr'].get('coords', [])
+        return {(e[2], e[1]) for e in cs} if len(cs) >= 6 else set()
     def tcheck(s):
         import time
         if getattr(s, 'budget', None) and time.time() - s.t0 > s.budget: raise TimeoutError
@@ -88,16 +129,33 @@ class W:
                 s.log.append('いあいぎり %s' % ((x + dx, y + dy),))
                 return s.step(d)
         return s.pos() != before
+    def settle(s):
+        """うごきが おわるまで（階段に 着いた あとの ひとりでの 1歩 など）"""
+        same = 0
+        for _ in range(30):
+            a1 = s.pos(); s.g.wait(10)
+            same = same + 1 if s.pos() == a1 else 0
+            if same >= 4: return
     def goto(s, tx, ty, tries=8):
         for _ in range(tries):
-            gi, mi, x, y = s.pos()
+            s.settle(); gi, mi, x, y = s.pos()
             if (x, y) == (tx, ty): return True
             p = s.path(tx, ty)
             if p is None: s.log.append('道が ない %s → %s' % ((gi, mi, x, y), (tx, ty))); return False
-            for d in p:
+            spins = s.spin_tiles((gi, mi)); exp = list(s._exp)
+            for k, d in enumerate(p):
+                frm = s.pos()[2:]
                 if not s.step(d):
                     s.g.press('B', 4, 20); break
                 if s.pos()[:2] != (gi, mi): return True        # マップが かわった（入口・つながり）
+                if spins:
+                    for _ in range(30):                           # 回る 床の うごきが おわるまで
+                        a1 = s.pos(); s.g.wait(8)
+                        if s.pos() == a1: break
+                    dx, dy = DIRS[d]
+                    if (frm[0] + dx, frm[1] + dy) in spins and s.pos()[2:] != exp[k]:
+                        s.jumps[((gi, mi), frm, d)] = s.pos()[2:]; break
+                    if s.pos()[2:] != exp[k]: break
         return s.pos()[2:] == (tx, ty)
     def face(s, d): s.g.press(d, 2, 10)
     def talk(s, d=None, n=12, key='A'):
@@ -196,8 +254,22 @@ class W:
         s.goto_safe(x, y, shot=shot)
         if s.pos()[:2] != mid: return True
         return s.hold(d)
-    def objs(s):
-        a = s.maps[s.pos()[:2]]['attr']; return [(o[2] - 4, o[1] - 4, o[0]) for o in a['objs']]
+    def objs(s, all=False):
+        """マップの 人（イベントフラグで 消えている 人は のぞく）"""
+        a = s.maps[s.pos()[:2]]['attr']
+        return [(o[2] - 4, o[1] - 4, o[0]) for o in a['objs']
+                if all or len(o) < 13 or (o[11] | o[12] << 8) == 0xFFFF or not s.flag(o[11] | o[12] << 8)]
+    # ---- ゲームの 中の 記録（済んだ ことを とばす）
+    def flag(s, n):
+        """イベントフラグ n（gold_flags：$800〜$997 は $D70D〜、$998〜 は $D790〜、それより 前は wEventFlags $D7AA）"""
+        if n < 0x800: a, k = 0xD7AA, n
+        elif n < 0x998: a, k = 0xD70D, n - 0x800
+        else: a, k = 0xD790, n - 0x998
+        return bool(s.rd(a + k // 8)[0] >> (k % 8) & 1)
+    def badges(s): return s.rd(0xD570)[0]
+    def has_key(s, item):
+        n = s.rd(0xD5D4)[0]
+        return n <= 25 and item in s.rd(0xD5D5, n)
     def talk_to(s, ox, oy, shot=None, counter=True):
         """(ox, oy) の 人に となりから 話しかける（カウンターごしも ためす）"""
         cand = []
