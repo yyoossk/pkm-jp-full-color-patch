@@ -226,6 +226,44 @@ class W:
         if k(66, 120) and k(68, 120) and k(2, 120): return 'main'
         if k(2, 110) and k(2, 130): return 'text'
         return None
+    # ---- どうぐ（戦いの リュック）
+    def pocket_is(s, name):
+        from PIL import Image
+        ref = Image.open('/home/claude/repo/gold-kanto-johto/tools/check/pocket_%s.png' % name).convert('RGB')
+        cur = s.screen().crop((0, 56, 48, 72))
+        return sum(a != b for a, b in zip(ref.getdata(), cur.getdata())) < 10
+    def bag_use(s, pocket, idx=0, party=None):
+        """戦いの 一番 上の メニューから リュック → pocket の idx 番めを つかう（party：だれに）"""
+        for k in 'UL': s.g.press(k, 2, 6)
+        s.g.press('R', 2, 6); s.g.press('A', 4, 40)
+        for _ in range(5):
+            if s.pocket_is(pocket): break
+            s.g.press('R', 2, 20)
+        else:
+            s.g.press('B', 4, 30); return False
+        for _ in range(12): s.g.press('U', 2, 4)
+        for _ in range(idx): s.g.press('D', 2, 6)
+        s.g.press('A', 4, 30); s.g.press('A', 4, 40)
+        if party is not None:
+            s.g.wait(30)
+            for _ in range(party): s.g.press('D', 2, 6)
+            s.g.press('A', 4, 40)
+        return True
+    def count_item(s, item):
+        """どうぐの ポケット（$D5B7〜：数, (番号, 個数)…）・ボールの ポケットの 数"""
+        for base in s.POCKETS:
+            n = s.rd(base)[0]
+            if n > 40: continue
+            b = s.rd(base + 1, 2 * n)
+            for i in range(n):
+                if b[2 * i] == item: return b[2 * i + 1]
+        return 0
+    POCKETS = (0xD5AA, 0xD5EF)      # どうぐ・ボール（金 日本版。キーアイテムは $D5D4）
+    def item_index(s, base, item):
+        n = s.rd(base)[0]; b = s.rd(base + 1, 2 * n)
+        for i in range(n):
+            if b[2 * i] == item: return i
+        return None
     def learn_ctx(s):
         """わざを おぼえる はい/いいえ の 中か（スタックに 01:689F／01:68BE の もどり先）"""
         sp = int(s.g.pc().split('sp=')[1], 16); st = s.rd(sp, 0x30)
@@ -238,13 +276,19 @@ class W:
             if kind == 'main':
                 if shot and n % 4 == 1: shot('戦い')
                 wild = s.rd(0xD108)[0] == 1
+                want = getattr(s, 'want', None)
+                if wild and want and want(s.rd(s.W_EMON)[0]) and s.count_item(5):
+                    s.bag_use('ball', s.item_index(0xD5EF, 5)); s.log.append('ボール %d' % s.rd(s.W_EMON)[0]); continue
+                bm = s.rd(s.W_BMON, 0x14); hp, mx = bm[0x10] << 8 | bm[0x11], bm[0x12] << 8 | bm[0x13]
+                if not wild and hp * 3 < mx and s.count_item(0x12):
+                    s.bag_use('item', s.item_index(0xD5AA, 0x12), party=0); s.log.append('キズぐすり'); continue
                 for k in 'UL': s.g.press(k, 2, 6)
                 if run and wild: s.g.press('D', 2, 6); s.g.press('R', 2, 6)
                 s.g.press('A', 4, 30)
             elif kind == 'yesno':
                 # わざを おぼえる ときの「わすれさせますか」「あきらめますか」（追加機能パッチで はじめが いいえ）は はい
-                if s.learn_ctx(): s.g.press('U', 2, 6)
-                s.g.press('A', 4, 40)
+                if s.learn_ctx(): s.g.press('U', 2, 6); s.g.press('A', 4, 40)
+                else: s.g.press('B', 4, 40)      # ニックネーム・いれかえ などは いいえ
             elif kind == 'forget':
                 b = s.rd(s.W_BMON, 0x20); pw = []
                 for i in range(4):
