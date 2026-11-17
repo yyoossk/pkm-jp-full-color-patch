@@ -109,7 +109,9 @@ class W:
                 if shot: shot('文')
                 s.g.press('A', 4, 40); continue
             s.g.wait(30)
-            if not s.textbox() and not s.in_battle(): return i
+            if not s.textbox() and not s.in_battle():
+                s.g.wait(50)       # 戦いの 前の 間（リーダーの「かかって こい!」の あと など）
+                if not s.textbox() and not s.in_battle(): return i
 
     def reach(s):
         """今 いる 所から 歩いて 行ける マス"""
@@ -163,9 +165,9 @@ class W:
         cand = []
         for d, (dx, dy) in DIRS.items():
             for k in ((1, 2) if counter else (1,)):
-                cand.append(((ox - dx * k, oy - dy * k), d))
+                cand.append(((ox - dx * k, oy - dy * k), d, k))
         r = s.reach(); _, _, x, y = s.pos()
-        cand = [c for c in cand if c[0] in r]; cand.sort(key=lambda c: abs(c[0][0] - x) + abs(c[0][1] - y))
+        cand = [c[:2] for c in sorted((c for c in cand if c[0] in r), key=lambda c: (c[2], abs(c[0][0] - x) + abs(c[0][1] - y)))]
         if not cand: return False
         (tx, ty), d = cand[0]; s.goto_safe(tx, ty, shot=shot); s.face(d); s.g.press('A', 4, 40)
         if shot: shot('話す')
@@ -209,10 +211,16 @@ class W:
         p = '/tmp/_walker_sc.ppm'; s.g.cmd('shot ' + p); s.g.sync(); return Image.open(p).convert('RGB')
     def menu_kind(s):
         im = s.screen(); k = lambda x, y: im.getpixel((x, y)) == (0, 0, 0)
+        if all(k(x, y) for x in (114, 156) for y in (70, 80)) and not k(112, 70): return 'yesno'
+        if all(k(x, y) for x in (82, 84) for y in (90, 110, 130)) and k(100, 66) and k(150, 66) and not k(84, 62): return 'forget'
         if k(70, 66) and k(70, 68) and k(2, 120): return 'move'
         if k(66, 120) and k(68, 120) and k(2, 120): return 'main'
         if k(2, 110) and k(2, 130): return 'text'
         return None
+    def learn_ctx(s):
+        """わざを おぼえる はい/いいえ の 中か（スタックに 01:689F／01:68BE の もどり先）"""
+        sp = int(s.g.pc().split('sp=')[1], 16); st = s.rd(sp, 0x30)
+        return any(st[i + 1] == 0x68 and st[i] in (0x9F, 0xBE) for i in range(0, 0x2F))
     def fight(s, run=False, shot=None, maxn=600):
         """戦いを 終わりまで。run=True なら 野生は にげる"""
         n = 0
@@ -224,6 +232,18 @@ class W:
                 for k in 'UL': s.g.press(k, 2, 6)
                 if run and wild: s.g.press('D', 2, 6); s.g.press('R', 2, 6)
                 s.g.press('A', 4, 30)
+            elif kind == 'yesno':
+                # わざを おぼえる ときの「わすれさせますか」「あきらめますか」（追加機能パッチで はじめが いいえ）は はい
+                if s.learn_ctx(): s.g.press('U', 2, 6)
+                s.g.press('A', 4, 40)
+            elif kind == 'forget':
+                b = s.rd(s.W_BMON, 0x20); pw = []
+                for i in range(4):
+                    m = b[2 + i]
+                    pw.append(s.rom[fo(*s.MOVES) + (m - 1) * 7 + 2] if m else 999)
+                i = pw.index(min(pw)); cur = s.rd(s.W_CURSOR)[0] - 1
+                for _ in range((i - cur) % 4): s.g.press('D', 2, 6)
+                s.log.append('わすれる わざ %d' % b[2 + i]); s.g.press('A', 4, 40)
             elif kind == 'move':
                 i = s.best_move(); cur = s.rd(s.W_CURSOR)[0] - 1
                 for _ in range((i - cur) % 4): s.g.press('D', 2, 6)
