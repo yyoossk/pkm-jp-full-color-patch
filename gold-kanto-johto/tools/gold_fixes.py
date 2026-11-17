@@ -393,6 +393,15 @@ def fix_waitsfx(g, log):
     log.append('WaitSFX：赤の 音の 間は 待たない（ホーム 3D77・3FD5）')
 
 
+def fix_sidewalls(g, log):
+    """横の かべ（コリジョン b0〜b7）：金の GetMovementPermissions は となりの マスの かべを 見ても いつも「下」を ふさぐ（金の バグ）。
+    クリスタル版と 同じく 下・上・右・左 を ふさぐ ように（set 3 → 3/2/0/1）。
+    これが ないと おつきみやま 1F の かべの すきまに 横から 入れて、出られなく なる"""
+    for a, bit in ((0x2A4C, 3), (0x2A66, 2), (0x2A80, 0), (0x2A9A, 1)):
+        assert g[a + 3:a + 6] == b'\xcb\xde\xc9' and g[a] == 0x21, hex(a)
+        g[a + 4] = 0xC6 | bit << 3
+    log.append('sidewalls')
+
 def apply(g, E, M, log):
     from maps import GMGP
     from cmaps import maplist
@@ -401,4 +410,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log)

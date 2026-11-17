@@ -25,15 +25,24 @@ class W:
         def c(x, y):
             if not (0 <= x < m['w'] * 2 and 0 <= y < m['h'] * 2): return None
             return s.rom[co + m['blk'][(y // 2) * m['w'] + x // 2] * 4 + (y % 2) * 2 + (x % 2)]
+        s._lastc = c
         return c
     def npcs(s):
         out = set()
         for i in range(1, 13):
             b = s.rd(s.PS + OSZ * i, 0x14)
+            if b[1] == 0x13 and s.WMAP == WRAM_MAP: continue   # 連れ歩きの ポケモン（すりぬけて 入れかわれる）
             if b[0] and b[0x10] >= 4 and b[0x11] >= 4: out.add((b[0x10] - 4, b[0x11] - 4))
         return out
+    SIDE = {0xB0: 'R', 0xB1: 'L', 0xB2: 'U', 0xB3: 'D', 0xB4: 'DR', 0xB5: 'DL', 0xB6: 'UR', 0xB7: 'UL'}
+    OPP = {'U': 'D', 'D': 'U', 'L': 'R', 'R': 'L'}
     def passable(s, c, frm, d):
         if c is None: return False
+        lc = getattr(s, '_lastc', None)
+        if lc:                                        # 横の かべ（b0〜b7）：今 いる マスの かべの 向きへは 出られない・となりの かべの 向きからは 入れない
+            f = lc(*frm)
+            if f is not None and d in s.SIDE.get(f, ''): return False
+            if s.OPP[d] in s.SIDE.get(c, ''): return False
         pm = s.rom[s.CP + c] & 0x0F
         if 0xA0 <= c <= 0xA7:                         # 段差：その 向きだけ
             return {0xA0: 'R', 0xA1: 'L', 0xA2: 'U', 0xA3: 'D', 0xA4: 'D', 0xA5: 'D', 0xA6: 'U', 0xA7: 'U'}.get(c) == d
@@ -258,25 +267,75 @@ class W:
         for bit, d in ((8, 'U'), (4, 'D'), (2, 'L'), (1, 'R')):
             if f & bit: out[d] = (c[i], c[i + 1]); i += 12
         return out
-    def route(s, dest, avoid=()):
-        start = s.pos()[:2]; prev = {start: None}; q = collections.deque([start])
+    def _reach(s, mid, x, y):
+        """マップ mid の (x, y) から 歩いて 行ける マス（人は 考えない）"""
+        key = (mid, x, y)
+        if not hasattr(s, '_rc'): s._rc = {}
+        if key in s._rc: return s._rc[key]
+        c = s.coll(mid); seen = {(x, y)}; q = collections.deque([(x, y)])
         while q:
-            m = q.popleft()
-            if m == dest: break
-            if m not in s.maps: continue
-            nb = [(d, ('c', k)) for k, d in s.conns(m).items()] + [(d, ('w', d)) for x, y, d in s.maps[m]['warps']]
-            for n, how in nb:
-                if n not in prev and n not in avoid: prev[n] = (m, how); q.append(n)
-        if dest not in prev: return None
-        out = []; m = dest
-        while prev[m]: pm, how = prev[m]; out.append((how, m)); m = pm
+            p = q.popleft()
+            for d, (dx, dy) in DIRS.items():
+                n = (p[0] + dx, p[1] + dy)
+                if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
+                elif not s.passable(c(*n), p, d): continue
+                if n not in seen: seen.add(n); q.append(n)
+        fs = frozenset(seen)
+        for p in seen: s._rc[(mid,) + p] = fs
+        return fs
+    def _hops(s, mid, comp):
+        """つながる 先：(how, 次の マップ, 次の 入った 所)"""
+        m = s.maps[mid]; W2, H2 = m['w'] * 2, m['h'] * 2; out = []
+        for raw in m['attr']['warps']:
+            y, x, wi, gg, mm = raw[0], raw[1], raw[2], raw[3], raw[4]
+            if not ((x, y) in comp or any((x + dx, y + dy) in comp for dx, dy in DIRS.values())): continue
+            dm = (gg, mm)
+            if dm not in s.maps: continue
+            dw = s.maps[dm]['attr']['warps']
+            if not (1 <= wi <= len(dw)): continue
+            out.append((('w', (x, y)), dm, (dw[wi - 1][1], dw[wi - 1][0])))
+        a = m['attr']; f = a['conn']; c = a['connections']; i = 0
+        for bit, d in ((8, 'U'), (4, 'D'), (2, 'L'), (1, 'R')):
+            if not f & bit: continue
+            e = c[i:i + 12]; i += 12; dm = (e[0], e[1])
+            if dm not in s.maps: continue
+            yo, xo = (e[8] ^ 0x80) - 0x80, (e[9] ^ 0x80) - 0x80
+            edge = [p for p in comp if (d == 'U' and p[1] == 0) or (d == 'D' and p[1] == H2 - 1) or
+                    (d == 'L' and p[0] == 0) or (d == 'R' and p[0] == W2 - 1)]
+            for (x, y) in edge[:1] if False else edge:
+                nx, ny = (x + xo, yo) if d in 'UD' else (xo, y + yo)
+                out.append((('c', d), dm, (nx, ny))); break
+        return out
+    def _comp(s, mid, x, y):
+        c = s.coll(mid)
+        if s.passable(c(x, y), (x, y), 'U') or True:
+            r = s._reach(mid, x, y)
+        return r
+    def route(s, dest, avoid=()):
+        gi, mi, x, y = s.pos(); start = ((gi, mi), s._reach((gi, mi), x, y))
+        prev = {start: None}; q = collections.deque([start]); goal = None
+        while q:
+            node = q.popleft(); mid, comp = node
+            if mid == dest: goal = node; break
+            if mid not in s.maps or mid in avoid: continue
+            for how, dm, (nx, ny) in s._hops(mid, comp):
+                if dm not in s.maps: continue
+                n = (dm, s._reach(dm, nx, ny))
+                if n not in prev: prev[n] = (node, how); q.append(n)
+        if goal is None: return None
+        out = []; node = goal
+        while prev[node]: pn, how = prev[node]; out.append((how, node[0])); node = pn
         return out[::-1]
     def travel(s, dest, shot=None, tries=3):
         for _ in range(tries):
             r = s.route(dest)
             if r is None: s.log.append('行けない %s' % (dest,)); return False
             for (kind, v), m in r:
-                ok = s.leave(v, shot) if kind == 'c' else s.warp_to(m)
+                if kind == 'c': s.leave(v, shot)
+                else:
+                    x, y = v; c = s.coll(s.pos()[:2])(x, y)
+                    d = {0x70: 'D', 0x76: 'L', 0x78: 'U', 0x7E: 'R'}.get(c, 'U')
+                    s.door(x, y, d, shot)
                 s.g.wait(30); s.advance(shot)
                 if s.pos()[:2] != m: break
             if s.pos()[:2] == dest: return True
