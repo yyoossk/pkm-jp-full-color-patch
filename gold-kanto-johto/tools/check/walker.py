@@ -20,12 +20,19 @@ class W:
         if s.WBANK and a >= 0xD000: return s.g.wpeek(s.WBANK, a, n)
         return s.g.peek(a, n)
     def pos(s):
+        r = s._pos(); s._cur = r[:2]; return r
+    def _pos(s):
         a = s.rd(s.WMAP, 4); return (a[0], a[1], a[3], a[2])
     def coll(s, mid):
         m = s.maps[mid]; t = s.TS + 15 * m['ts']; co = fo(s.rom[t + 6], s.r16(t + 7))
+        blk = m['blk']
+        if s.WMAP == WRAM_MAP and getattr(s, '_cur', None) == mid:   # 今の マップは RAM の ブロック（とびら・スイッチ・いあいぎり の あと）
+            st = m['w'] + 6; raw = s.rd(0xC700, st * (m['h'] + 6))
+            rb = bytes(raw[(3 + yy) * st + 3 + xx] for yy in range(m['h']) for xx in range(m['w']))
+            if sum(a != b for a, b in zip(rb, m['blk'])) * 4 < len(rb): blk = rb   # 戦い中 など RAM が ちがう ときは ROM
         def c(x, y):
             if not (0 <= x < m['w'] * 2 and 0 <= y < m['h'] * 2): return None
-            return s.rom[co + m['blk'][(y // 2) * m['w'] + x // 2] * 4 + (y % 2) * 2 + (x % 2)]
+            return s.rom[co + blk[(y // 2) * m['w'] + x // 2] * 4 + (y % 2) * 2 + (x % 2)]
         s._lastc = c
         return c
     def npcs(s):
@@ -41,6 +48,7 @@ class W:
     def passable(s, c, frm, d):
         if c is None: return False
         if c == 0x12 and getattr(s, 'can_cut', False): return True
+        if c == 0x29 and getattr(s, 'can_surf', False): return True
         lc = getattr(s, '_lastc', None)
         if lc:                                        # 横の かべ（b0〜b7）：今 いる マスの かべの 向きへは 出られない・となりの かべの 向きからは 入れない
             f = lc(*frm)
@@ -50,15 +58,17 @@ class W:
         if 0xA0 <= c <= 0xA7:                         # 段差：その 向きだけ
             return {0xA0: 'R', 0xA1: 'L', 0xA2: 'U', 0xA3: 'D', 0xA4: 'D', 0xA5: 'D', 0xA6: 'U', 0xA7: 'U'}.get(c) == d
         return pm == 0
-    def path(s, tx, ty, avoid=()):
-        gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); blocked = set(avoid) | s.npcs()
-        blocked |= {(wx, wy) for wx, wy, _ in s.maps[(gi, mi)]['warps'] if c(wx, wy) not in s.CARPET}    # ほかの 入口（ドア・階段）を ふまない
+    def path(s, tx, ty, avoid=(), ignore_npcs=False):
+        gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); blocked = set(avoid) | (set() if ignore_npcs else s.npcs())
+        wps = {(wx, wy) for wx, wy, _ in s.maps[(gi, mi)]['warps']}
+        blocked |= {(wx, wy) for wx, wy in wps if c(wx, wy) not in s.CARPET}    # ほかの 入口（ドア・階段）を ふまない
         prev = {(x, y): None}; q = collections.deque([(x, y)])
         while q:
             p = q.popleft()
             if p == (tx, ty): break
             for d, (dx, dy) in DIRS.items():
                 n = (p[0] + dx, p[1] + dy)
+                if p in wps and {0x70: 'D', 0x76: 'L', 0x78: 'U', 0x7E: 'R'}.get(c(*p)) == d and n != (tx, ty) and p != (tx, ty): continue   # じゅうたんの 入口から 外へ 出ない
                 if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)   # 段差は とびこえる
                 elif not s.passable(c(*n), p, d): 
                     if n != (tx, ty): continue
@@ -117,6 +127,16 @@ class W:
             s.g.wait(2)
             if s.pos() != before: break
         s.g.up(d); s.g.wait(10)
+        if s.pos() == before and getattr(s, 'can_surf', False):
+            gi, mi, x, y = before; dx, dy = DIRS[d]
+            if s.coll((gi, mi))(x + dx, y + dy) == 0x29:      # なみのり
+                s.g.press('A', 4, 60)
+                for _ in range(8):
+                    if s.menu_kind() == 'yesno': s.g.press('A', 4, 60); break
+                    if s.textbox(): s.g.press('A', 4, 40)
+                    else: s.g.wait(20)
+                s.g.wait(90); s.advance(); s.settle()
+                if s.pos() != before: return True
         if s.pos() == before and getattr(s, 'can_cut', False):
             gi, mi, x, y = before; dx, dy = DIRS[d]
             if s.coll((gi, mi))(x + dx, y + dy) == 0x12:     # いあいぎりで きれる 木
@@ -129,6 +149,8 @@ class W:
                 s.log.append('いあいぎり %s' % ((x + dx, y + dy),))
                 return s.step(d)
         return s.pos() != before
+    def moving(s):
+        a1 = s.pos(); s.g.wait(4); return s.pos() != a1
     def settle(s):
         """うごきが おわるまで（階段に 着いた あとの ひとりでの 1歩 など）"""
         same = 0
@@ -141,6 +163,19 @@ class W:
             s.settle(); gi, mi, x, y = s.pos()
             if (x, y) == (tx, ty): return True
             p = s.path(tx, ty)
+            if p is None and not getattr(s, '_clearing', False):
+                p2 = s.path(tx, ty, ignore_npcs=True)          # 人・ボールが ふさいでいる → 話す・ひろう（トレーナーなら 戦う）
+                if p2:
+                    cx, cy = x, y; nb = s.npcs(); hit = None
+                    for k, d in enumerate(p2):
+                        dx, dy = DIRS[d]; nx, ny = (s._exp[k] if k < len(s._exp) else (cx + dx, cy + dy))
+                        if (nx, ny) in nb: hit = (nx, ny); break
+                        cx, cy = nx, ny
+                    if hit:
+                        s._clearing = True
+                        try: s.talk_to(*hit, counter=False); s.advance(n=100)
+                        finally: s._clearing = False
+                        s.log.append('ふさいでいた 人・もの %s' % (hit,)); continue
             if p is None: s.log.append('道が ない %s → %s' % ((gi, mi, x, y), (tx, ty))); return False
             spins = s.spin_tiles((gi, mi)); exp = list(s._exp)
             for k, d in enumerate(p):
@@ -185,14 +220,27 @@ class W:
         """文・戦いが おわるまで すすめる"""
         for i in range(n):
             s.tcheck()
-            if s.in_battle(): s.fight(run=getattr(s, 'run_wild', False), shot=shot); continue
+            if s.in_battle():
+                gi, mi, x, y = s.pos()
+                ev = (x, y) in {(e[2], e[1]) for e in s.maps[(gi, mi)]['attr'].get('coords', [])}   # しかけの 戦い（ゆうれい など）は にげない
+                s.fight(run=getattr(s, 'run_wild', False) and not ev, shot=shot); continue
             if s.textbox():
                 if shot: shot('文')
                 s.g.press('A', 4, 40); continue
             s.g.wait(30)
             if not s.textbox() and not s.in_battle():
                 s.g.wait(50)       # 戦いの 前の 間（リーダーの「かかって こい!」の あと など）
-                if not s.textbox() and not s.in_battle(): return i
+                if not s.textbox() and not s.in_battle():
+                    gi, mi, x, y = s.pos()
+                    if (x, y) in {(e[2], e[1]) for e in s.maps[(gi, mi)]['attr'].get('coords', [])}:
+                        for _ in range(20):                       # 足もとの しかけ（ゆうれい など）の あとは 長く 待つ
+                            s.g.wait(20)
+                            if s.textbox() or s.in_battle(): break
+                        if s.textbox() or s.in_battle(): continue
+                    a1 = s.screen().tobytes(); s.g.wait(20)
+                    if s.screen().tobytes() != a1 and not s.moving():   # 画面が うごいている（戦いに 入る 前の 点滅 など）
+                        continue
+                    return i
 
     def reach(s):
         """今 いる 所から 歩いて 行ける マス"""
@@ -365,6 +413,11 @@ class W:
         for i in range(n):
             if b[2 * i] == item: return i
         return None
+    def active_index(s):
+        sp = s.rd(s.W_BMON)[0]
+        for i, p in enumerate(s.party()):
+            if p['sp'] == sp and p['hp'] > 0: return i
+        return 0
     def switch_to(s, i):
         """戦いの 一番 上の メニューから i ばんめに いれかえる"""
         for k in 'UL': s.g.press(k, 2, 6)
@@ -393,11 +446,13 @@ class W:
                         s._sw = s._bn; s.switch_to(i); continue
                     s._sw = s._bn
                 want = getattr(s, 'want', None)
-                if wild and want and want(s.rd(s.W_EMON)[0]) and s.count_item(5):
-                    s.bag_use('ball', s.item_index(0xD5EF, 5)); s.log.append('ボール %d' % s.rd(s.W_EMON)[0]); continue
+                ball = next((b_ for b_ in (2, 3, 4, 5) if s.count_item(b_)), None)   # ハイパー・スーパー・モンスター
+                if wild and want and want(s.rd(s.W_EMON)[0]) and ball:
+                    s.bag_use('ball', s.item_index(0xD5EF, ball)); s.log.append('ボール %d' % s.rd(s.W_EMON)[0]); continue
                 bm = s.rd(s.W_BMON, 0x14); hp, mx = bm[0x10] << 8 | bm[0x11], bm[0x12] << 8 | bm[0x13]
-                if not wild and hp * 2 < mx and s.count_item(0x12):
-                    s.bag_use('item', s.item_index(0xD5AA, 0x12), party=0); s.log.append('キズぐすり'); continue
+                med = next((m_ for m_ in (0x10, 0x11, 0x0F, 0x0E, 0x12) if s.count_item(m_)), None)
+                if not wild and hp * 2 < mx and med:
+                    s.bag_use('item', s.item_index(0xD5AA, med), party=s.active_index()); s.log.append('くすり %02x' % med); continue
                 for k in 'UL': s.g.press(k, 2, 6)
                 if run and wild: s.g.press('D', 2, 6); s.g.press('R', 2, 6)
                 s.g.press('A', 4, 30)
@@ -472,14 +527,13 @@ class W:
             yo, xo = (e[8] ^ 0x80) - 0x80, (e[9] ^ 0x80) - 0x80
             edge = [p for p in comp if (d == 'U' and p[1] == 0) or (d == 'D' and p[1] == H2 - 1) or
                     (d == 'L' and p[0] == 0) or (d == 'R' and p[0] == W2 - 1)]
-            for (x, y) in edge[:1] if False else edge:
+            c2 = s.coll(dm); s.coll(mid); seen_c = set()
+            for (x, y) in edge:                                   # こえた 先が 歩ける はしを ぜんぶ（べつの 部分に つながる ことも）
                 nx, ny = (x + xo, yo) if d in 'UD' else (xo, y + yo)
-                c2 = s.coll(dm); s.coll(mid)
-                if not s.passable(c2(nx, ny), (nx, ny), 'U'):
-                    for k in (1, -1, 2, -2, 3, -3, 4, -4):
-                        tx, ty = (nx + k, ny) if d in 'UD' else (nx, ny + k)
-                        if s.passable(c2(tx, ty), (tx, ty), 'U'): nx, ny = tx, ty; break
-                out.append((('c', d), dm, (nx, ny))); break
+                if not s.passable(c2(nx, ny), (nx, ny), 'U'): continue
+                k = s._reach(dm, nx, ny); s.coll(mid)
+                if k in seen_c: continue
+                seen_c.add(k); out.append((('c', d), dm, (nx, ny)))
         return out
     def _comp(s, mid, x, y):
         c = s.coll(mid)
@@ -518,9 +572,9 @@ class W:
         return s.pos()[:2] == dest
     # ---- 手持ち
     def party(s):
-        n = s.rd(0xD9E8)[0] if False else None
+        n = min(s.rd(0xD9E8)[0], 6)
         out = []
-        for i in range(6):
+        for i in range(n):
             b = s.rd(0xD9F0 + 0x30 * i, 0x30)
             if not b[0] or b[0] == 0xFF: break
             out.append(dict(sp=b[0], lv=b[0x1F], hp=b[0x22] << 8 | b[0x23], mx=b[0x24] << 8 | b[0x25]))
