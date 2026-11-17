@@ -419,12 +419,15 @@ class W:
             s.g.press('R', 2, 20)
         else:
             s.g.press('B', 4, 30); return False
-        for _ in range(12): s.g.press('U', 2, 4)
-        for _ in range(idx): s.g.press('D', 2, 6)
+        for _ in range(12): s.g.press('U', 4, 10)
+        for _ in range(idx): s.g.press('D', 4, 12)
         s.g.press('A', 4, 30); s.g.press('A', 4, 40)
         if party is not None:
             s.g.wait(30)
-            for _ in range(party): s.g.press('D', 2, 6)
+            for _ in range(8):                                  # カーソルは 戦って いる ポケモンから はじまる（wMenuCursorY $CF14）
+                cy = s.rd(0xCF14)[0] - 1
+                if cy == party: break
+                s.g.press('D' if cy < party else 'U', 2, 8)
             s.g.press('A', 4, 40)
         return True
     def count_item(s, item):
@@ -443,6 +446,8 @@ class W:
             if b[2 * i] == item: return i
         return None
     def active_index(s):
+        i = s.rd(0xCFC0)[0]                                   # wCurBattleMon
+        if i < len(s.party()): return i
         sp = s.rd(s.W_BMON)[0]
         for i, p in enumerate(s.party()):
             if p['sp'] == sp and p['hp'] > 0: return i
