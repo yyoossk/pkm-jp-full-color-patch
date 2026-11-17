@@ -34,10 +34,12 @@ class W:
             if b[1] == 0x13 and s.WMAP == WRAM_MAP: continue   # 連れ歩きの ポケモン（すりぬけて 入れかわれる）
             if b[0] and b[0x10] >= 4 and b[0x11] >= 4: out.add((b[0x10] - 4, b[0x11] - 4))
         return out
+    CARPET = (0x70, 0x76, 0x78, 0x7E)      # その 向きに 押した ときだけの 入口（上を 歩ける）
     SIDE = {0xB0: 'R', 0xB1: 'L', 0xB2: 'U', 0xB3: 'D', 0xB4: 'DR', 0xB5: 'DL', 0xB6: 'UR', 0xB7: 'UL'}
     OPP = {'U': 'D', 'D': 'U', 'L': 'R', 'R': 'L'}
     def passable(s, c, frm, d):
         if c is None: return False
+        if c == 0x12 and getattr(s, 'can_cut', False): return True
         lc = getattr(s, '_lastc', None)
         if lc:                                        # 横の かべ（b0〜b7）：今 いる マスの かべの 向きへは 出られない・となりの かべの 向きからは 入れない
             f = lc(*frm)
@@ -49,7 +51,7 @@ class W:
         return pm == 0
     def path(s, tx, ty, avoid=()):
         gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); blocked = set(avoid) | s.npcs()
-        blocked |= {(wx, wy) for wx, wy, _ in s.maps[(gi, mi)]['warps']}    # ほかの 入口を ふまない
+        blocked |= {(wx, wy) for wx, wy, _ in s.maps[(gi, mi)]['warps'] if c(wx, wy) not in s.CARPET}    # ほかの 入口（ドア・階段）を ふまない
         prev = {(x, y): None}; q = collections.deque([(x, y)])
         while q:
             p = q.popleft()
@@ -74,6 +76,17 @@ class W:
             s.g.wait(2)
             if s.pos() != before: break
         s.g.up(d); s.g.wait(10)
+        if s.pos() == before and getattr(s, 'can_cut', False):
+            gi, mi, x, y = before; dx, dy = DIRS[d]
+            if s.coll((gi, mi))(x + dx, y + dy) == 0x12:     # いあいぎりで きれる 木
+                s.g.press('A', 4, 60)
+                for _ in range(6):
+                    if s.menu_kind() == 'yesno': s.g.press('A', 4, 60); break
+                    if s.textbox(): s.g.press('A', 4, 40)
+                    else: s.g.wait(20)
+                s.g.wait(120); s.advance()
+                s.log.append('いあいぎり %s' % ((x + dx, y + dy),))
+                return s.step(d)
         return s.pos() != before
     def goto(s, tx, ty, tries=8):
         for _ in range(tries):
@@ -105,7 +118,7 @@ class W:
     def in_battle(s): return bool(s.WB) and s.rd(s.WB)[0] != 0
     def battle(s, shot=None, maxn=400):
         """A を 押しつづけて 戦う（たたかう → 1番めの わざ）。shot(tag) が あれば 場面ごとに 写真"""
-        n = 0; s._bn = getattr(s, '_bn', 0) + 1
+        n = 0
         while s.in_battle() and n < maxn:
             s.g.press('A', 4, 30); n += 1
             if shot and n % 15 == 1: shot('戦い')
@@ -134,6 +147,19 @@ class W:
                 elif not s.passable(c(*n), p, d): continue
                 if n not in seen: seen.add(n); q.append(n)
         return seen
+    def cross_ok(s, mid, d, x, y):
+        """(x, y) から d へ つながりを こえた 先が 歩けるか"""
+        a = s.maps[mid]['attr']; f = a['conn']; c = a['connections']; i = 0
+        for bit, dd in ((8, 'U'), (4, 'D'), (2, 'L'), (1, 'R')):
+            if not f & bit: continue
+            e = c[i:i + 12]; i += 12
+            if dd != d: continue
+            dm = (e[0], e[1])
+            if dm not in s.maps: return False
+            yo, xo = (e[8] ^ 0x80) - 0x80, (e[9] ^ 0x80) - 0x80
+            nx, ny = (x + xo, yo) if d in 'UD' else (xo, y + yo)
+            ok = s.passable(s.coll(dm)(nx, ny), (nx, ny), 'U'); s.coll(mid); return ok
+        return False
     def leave(s, d, shot=None, tries=4):
         """マップの はしから d の 向きへ 出る（つながり）。戦い・文は すすめる"""
         for _ in range(tries):
@@ -141,6 +167,8 @@ class W:
             edge = [p for p in s.reach() if (d == 'U' and p[1] == 0) or (d == 'D' and p[1] == H2 - 1) or
                     (d == 'L' and p[0] == 0) or (d == 'R' and p[0] == W2 - 1)]
             if not edge: s.log.append('はしが ない %s %s' % (mid, d)); return False
+            ok = [p for p in edge if s.cross_ok(mid, d, *p)]
+            if ok: edge = ok
             _, _, x, y = s.pos(); edge.sort(key=lambda p: abs(p[0] - x) + abs(p[1] - y))
             s.goto_safe(*edge[0], shot=shot)
             if s.pos()[:2] != mid: return True
@@ -279,7 +307,7 @@ class W:
         return any(st[i + 1] == 0x68 and st[i] in (0x9F, 0xBE) for i in range(0, 0x2F))
     def fight(s, run=False, shot=None, maxn=600):
         """戦いを 終わりまで。run=True なら 野生は にげる"""
-        n = 0
+        n = 0; s._bn = getattr(s, '_bn', 0) + 1
         while s.in_battle() and n < maxn:
             n += 1; s.tcheck(); s._lastk = getattr(s, '_curk', None); kind = s.menu_kind(); s._curk = kind
             if kind == 'main':
@@ -340,7 +368,7 @@ class W:
         if not hasattr(s, '_rc'): s._rc = {}
         if key in s._rc: return s._rc[key]
         c = s.coll(mid); seen = {(x, y)}; q = collections.deque([(x, y)])
-        wp = {(wx, wy) for wx, wy, _ in s.maps[mid]['warps']}
+        wp = {(wx, wy) for wx, wy, _ in s.maps[mid]['warps'] if c(wx, wy) not in s.CARPET}
         while q:
             p = q.popleft()
             if p in wp and p != (x, y): continue      # 入口の マスからは 先へ 行かない
@@ -374,6 +402,11 @@ class W:
                     (d == 'L' and p[0] == 0) or (d == 'R' and p[0] == W2 - 1)]
             for (x, y) in edge[:1] if False else edge:
                 nx, ny = (x + xo, yo) if d in 'UD' else (xo, y + yo)
+                c2 = s.coll(dm); s.coll(mid)
+                if not s.passable(c2(nx, ny), (nx, ny), 'U'):
+                    for k in (1, -1, 2, -2, 3, -3, 4, -4):
+                        tx, ty = (nx + k, ny) if d in 'UD' else (nx, ny + k)
+                        if s.passable(c2(tx, ty), (tx, ty), 'U'): nx, ny = tx, ty; break
                 out.append((('c', d), dm, (nx, ny))); break
         return out
     def _comp(s, mid, x, y):
@@ -382,6 +415,7 @@ class W:
             r = s._reach(mid, x, y)
         return r
     def route(s, dest, avoid=()):
+        avoid = set(avoid) | set(getattr(s, 'avoid', ()))
         gi, mi, x, y = s.pos(); start = ((gi, mi), s._reach((gi, mi), x, y))
         prev = {start: None}; q = collections.deque([start]); goal = None
         while q:
