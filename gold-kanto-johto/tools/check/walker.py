@@ -41,6 +41,16 @@ class W:
             b = s.rd(s.PS + OSZ * i, 0x14)
             if b[1] == 0x13 and s.WMAP == WRAM_MAP: continue   # 連れ歩きの ポケモン（すりぬけて 入れかわれる）
             if b[0] and b[0x10] >= 4 and b[0x11] >= 4: out.add((b[0x10] - 4, b[0x11] - 4))
+        try: out |= s.still(s.pos()[:2])                    # 画面の 外でも 動かない 人は ふさいでいる
+        except Exception: pass
+        return out
+    def still(s, mid):
+        """マップ mid の 動かない 人の マス（イベントフラグで 消えて いる 人は のぞく）"""
+        out = set()
+        for o in s.maps[mid]['attr']['objs']:
+            if len(o) > 3 and o[3] in (1, 6, 7, 8, 9) and \
+               (len(o) < 13 or (o[11] | o[12] << 8) == 0xFFFF or not s.flag(o[11] | o[12] << 8)):
+                out.add((o[2] - 4, o[1] - 4))
         return out
     CARPET = (0x70, 0x76, 0x78, 0x7E)      # その 向きに 押した ときだけの 入口（上を 歩ける）
     SIDE = {0xB0: 'R', 0xB1: 'L', 0xB2: 'U', 0xB3: 'D', 0xB4: 'DR', 0xB5: 'DL', 0xB6: 'UR', 0xB7: 'UL'}
@@ -175,6 +185,10 @@ class W:
                         dx, dy = DIRS[d]; nx, ny = (s._exp[k] if k < len(s._exp) else (cx + dx, cy + dy))
                         if (nx, ny) in nb: hit = (nx, ny); break
                         cx, cy = nx, ny
+                    key = (gi, mi) + hit
+                    tried_c = getattr(s, '_cleared', {}); s._cleared = tried_c
+                    tried_c[key] = tried_c.get(key, 0) + 1
+                    if hit and tried_c[key] > 2: hit = None           # 話しても どかない 人は あきらめる
                     if hit:
                         s._clearing = True
                         try: s.talk_to(*hit, counter=False); s.advance(n=100)
@@ -185,7 +199,17 @@ class W:
             for k, d in enumerate(p):
                 frm = s.pos()[2:]
                 if not s.step(d):
-                    s.g.press('B', 4, 20); break
+                    s.g.press('B', 4, 20)
+                    dx, dy = DIRS[d]; hc = (frm[0] + dx, frm[1] + dy)
+                    if hc in s.npcs() and not getattr(s, '_clearing', False):   # 画面の 外に いた 人に ぶつかった → 話す（トレーナーなら 戦う）
+                        tc = getattr(s, '_cleared', {}); s._cleared = tc; key = (gi, mi) + hc
+                        tc[key] = tc.get(key, 0) + 1
+                        if tc[key] <= 2:
+                            s._clearing = True
+                            try: s.talk_to(*hc, counter=False); s.advance(n=100)
+                            finally: s._clearing = False
+                            s.log.append('ふさいでいた 人 %s' % (hc,))
+                    break
                 if s.pos()[:2] != (gi, mi): return True        # マップが かわった（入口・つながり）
                 if spins:
                     for _ in range(30):                           # 回る 床の うごきが おわるまで
@@ -248,13 +272,14 @@ class W:
 
     def reach(s):
         """今 いる 所から 歩いて 行ける マス"""
-        gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); seen = {(x, y)}; q = collections.deque([(x, y)])
+        gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); seen = {(x, y)}; q = collections.deque([(x, y)]); st = s.still((gi, mi))
         while q:
             p = q.popleft()
             for d, (dx, dy) in DIRS.items():
                 n = (p[0] + dx, p[1] + dy)
                 if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
                 elif not s.passable(c(*n), p, d): continue
+                if n in st: continue
                 if n not in seen: seen.add(n); q.append(n)
         return seen
     def cross_ok(s, mid, d, x, y):
@@ -499,6 +524,8 @@ class W:
         if not hasattr(s, '_rc'): s._rc = {}
         if key in s._rc: return s._rc[key]
         c = s.coll(mid); seen = {(x, y)}; q = collections.deque([(x, y)])
+        try: st = s.still(mid)
+        except Exception: st = set()
         wp = {(wx, wy) for wx, wy, _ in s.maps[mid]['warps'] if c(wx, wy) not in s.CARPET}
         while q:
             p = q.popleft()
@@ -507,6 +534,7 @@ class W:
                 n = (p[0] + dx, p[1] + dy)
                 if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
                 elif not s.passable(c(*n), p, d): continue
+                if n in st: continue
                 if n not in seen: seen.add(n); q.append(n)
         fs = frozenset(seen)
         for p in seen:
