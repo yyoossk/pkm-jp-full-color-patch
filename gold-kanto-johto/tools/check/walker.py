@@ -129,7 +129,7 @@ class W:
         s.g.up(d); s.g.wait(10)
         if s.pos() == before and getattr(s, 'can_surf', False):
             gi, mi, x, y = before; dx, dy = DIRS[d]
-            if s.coll((gi, mi))(x + dx, y + dy) == 0x29:      # なみのり
+            if s.coll((gi, mi))(x + dx, y + dy) in (0x29, None) and not getattr(s, '_surf_try', False):      # なみのり（つながりの 先の 水も）
                 s.g.press('A', 4, 60)
                 for _ in range(8):
                     if s.menu_kind() == 'yesno': s.g.press('A', 4, 60); break
@@ -137,6 +137,10 @@ class W:
                     else: s.g.wait(20)
                 s.g.wait(90); s.advance(); s.settle()
                 if s.pos() != before: return True
+                s._surf_try = True
+                try: r = s.step(d)
+                finally: s._surf_try = False
+                if r: return True
         if s.pos() == before and getattr(s, 'can_cut', False):
             gi, mi, x, y = before; dx, dy = DIRS[d]
             if s.coll((gi, mi))(x + dx, y + dy) == 0x12:     # いあいぎりで きれる 木

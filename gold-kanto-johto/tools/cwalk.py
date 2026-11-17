@@ -156,7 +156,18 @@ class Walk:
     def w_elevator(s, b, a, ctx):
         o = fo(b, a); n = s.r[o]; s.put('elevator', b, a, 2 + 4 * n, [])   # さいごの -1 も
     def w_menu(s, b, a, ctx):
-        s.notes.append('menu %02X:%04X（%s）' % (b, a, ctx)); s.put('raw', b, a, 0, [])
+        """loadmenu の わく（8バイト：flags・わく4・dw データ・はじめの カーソル）＋ すぐ あとの データ（flags・数・文字×数）"""
+        o = fo(b, a); d = s.r[o + 5] | s.r[o + 6] << 8
+        if d != a + 8:
+            s.notes.append('menu %02X:%04X（%s）データが はなれている' % (b, a, ctx)); s.put('raw', b, a, 0, []); return
+        p = o + 10; n = s.r[o + 9]
+        for _ in range(n):
+            while s.r[p] != 0x50: p += 1
+            p += 1
+        if n > 10 or p - o > 160:
+            s.notes.append('menu %02X:%04X（%s）形が ちがう' % (b, a, ctx)); s.put('raw', b, a, 0, []); return
+        s.notes.append('menu %02X:%04X（%s）%d バイト' % (b, a, ctx, p - o))
+        s.put('menu', b, a, p - o, [(5, 'dw', 'menu_self', 'menu')])
 
     # ---------- マップ
     def map(s, attr_off, name):

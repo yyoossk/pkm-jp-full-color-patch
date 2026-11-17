@@ -169,6 +169,9 @@ class Emit:
                         if nv is None:
                             gv, nm = asmx.RX.x(v)
                             nv = gv if gv is not None else X._m('RAM %s' % nm, v, ctx)
+                elif sem == 'menu_self': nv = ga + (v - b['addr'])                 # わくの 中の データ（すぐ あと）
+                elif sem == 'menu_header':
+                    if v not in (0, 0xFFFF): nv = s.ptr(b['bank'], v, ctx)[1]
                 elif 'pointer' in sem or sem == 'data':
                     if v not in (0, 0xFFFF): nv = s.ptr(b['bank'], v, ctx)[1]
                 data[off] = nv & 0xFF; data[off + 1] = nv >> 8
