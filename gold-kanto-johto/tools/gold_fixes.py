@@ -422,6 +422,19 @@ def fix_statuscolor_item(g, log):
     g[F + 24] = 0xC9
     log.append('statuscolor_item')
 
+def fix_movepower_disabled(g, log):
+    """追加機能パッチの わざの 威力の 表示（movepower）：MoveInfoBox の さいごを 0F:65E4 から farcall に した ため、
+    「かなしばり」で つかえない わざに カーソルを 合わせた ときの jr .done（0F:6571 → 65E7）が 命令の 途中（ld hl, $6400 の 2バイトめ）に
+    とび、こわれた farcall で 止まる（コンパンの かなしばり のあと「たたかう」で 止まった）。とび先を farcall の あとの ret（65EA）に"""
+    o = fo(0x0F, 0x6571)
+    assert g[o:o + 2] == b'\x18\x74' and g[fo(0x0F, 0x65E4):fo(0x0F, 0x65EB)] == bytes.fromhex('3e45210064cfc9')
+    g[o + 1] = 0x77
+    # 「ふうじられている!」の 文字の はじめ 3つ（65E8〜）も farcall で こわれた → 金の もとの 文字を 0F の あき（7FB8）に 置いて そこを 指す
+    S, d = fo(0x0F, 0x7FB8), fo(0x0F, 0x656B)
+    assert g[d:d + 3] == b'\x11\xe8\x65' and not any(g[S:S + 10])
+    g[S:S + 10] = bytes.fromhex('ccb32cd7dac3b2d9e750')
+    g[d + 1:d + 3] = bytes([0xB8, 0x7F])
+
 def apply(g, E, M, log):
     from maps import GMGP
     from cmaps import maplist
@@ -430,4 +443,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log); fix_statuscolor_item(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log); fix_statuscolor_item(g, log); fix_movepower_disabled(g, log)

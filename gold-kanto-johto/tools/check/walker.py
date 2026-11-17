@@ -1,6 +1,6 @@
 """移植版を 歩いて 進める ための 道具（ワープ・メモリの 書きかえ なし）。
    W(g).goto(x, y) で 今の マップの 中を 歩く（当たりは ROM の マップから、ふさがれたら 道を さがしなおす）"""
-import sys, collections
+import sys, os, collections
 sys.path.insert(0, '/home/claude/repo/gold-kanto-johto/tools/check')
 from redmap import port_maps, fo
 WRAM_MAP = 0xD9C6          # グループ, 番号, Y, X
@@ -49,6 +49,7 @@ class W:
         return pm == 0
     def path(s, tx, ty, avoid=()):
         gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); blocked = set(avoid) | s.npcs()
+        blocked |= {(wx, wy) for wx, wy, _ in s.maps[(gi, mi)]['warps']}    # ほかの 入口を ふまない
         prev = {(x, y): None}; q = collections.deque([(x, y)])
         while q:
             p = q.popleft()
@@ -104,7 +105,7 @@ class W:
     def in_battle(s): return bool(s.WB) and s.rd(s.WB)[0] != 0
     def battle(s, shot=None, maxn=400):
         """A を 押しつづけて 戦う（たたかう → 1番めの わざ）。shot(tag) が あれば 場面ごとに 写真"""
-        n = 0
+        n = 0; s._bn = getattr(s, '_bn', 0) + 1
         while s.in_battle() and n < maxn:
             s.g.press('A', 4, 30); n += 1
             if shot and n % 15 == 1: shot('戦い')
@@ -205,19 +206,19 @@ class W:
         return e
     def types(s, sp):
         o = fo(*s.BASE) + (sp - 1) * 0x20; return {s.rom[o + 7], s.rom[o + 8]}
-    def best_move(s):
+    def best_move(s, ex=()):
         b = s.rd(s.W_BMON, 0x20); e = s.rd(s.W_EMON, 2)
         mine, theirs = s.types(b[0]), s.types(e[0]); best = (-1, 0)
         for i in range(4):
             m = b[2 + i]; pp = b[8 + i] & 0x3F
-            if not m or not pp: continue
+            if not m or not pp or i in ex: continue
             o = fo(*s.MOVES) + (m - 1) * 7; pw, t, acc = s.rom[o + 2], s.rom[o + 3], s.rom[o + 4]
             sc = pw * s.eff(t, theirs) * (1.5 if t in mine else 1) * (acc / 255) if pw else 0.1
             if sc > best[0]: best = (sc, i)
         return best[1]
     def screen(s):
         from PIL import Image
-        p = '/tmp/_walker_sc.ppm'; s.g.cmd('shot ' + p); s.g.sync(); return Image.open(p).convert('RGB')
+        p = '/tmp/_walker_sc_%d.ppm' % os.getpid(); s.g.cmd('shot ' + p); s.g.sync(); return Image.open(p).convert('RGB')
     def menu_kind(s):
         im = s.screen(); k = lambda x, y: im.getpixel((x, y)) == (0, 0, 0)
         if all(k(x, y) for x in (114, 156) for y in (70, 80)) and not k(112, 70): return 'yesno'
@@ -264,6 +265,14 @@ class W:
         for i in range(n):
             if b[2 * i] == item: return i
         return None
+    def switch_to(s, i):
+        """戦いの 一番 上の メニューから i ばんめに いれかえる"""
+        for k in 'UL': s.g.press(k, 2, 6)
+        s.g.press('D', 2, 6); s.g.press('A', 8, 60)
+        for _ in range(6): s.g.press('U', 2, 6)
+        for _ in range(i): s.g.press('D', 2, 6)
+        s.g.press('A', 8, 60); s.g.press('A', 8, 60)
+        s.log.append('いれかえ %d' % i)
     def learn_ctx(s):
         """わざを おぼえる はい/いいえ の 中か（スタックに 01:689F／01:68BE の もどり先）"""
         sp = int(s.g.pc().split('sp=')[1], 16); st = s.rd(sp, 0x30)
@@ -272,15 +281,22 @@ class W:
         """戦いを 終わりまで。run=True なら 野生は にげる"""
         n = 0
         while s.in_battle() and n < maxn:
-            n += 1; s.tcheck(); kind = s.menu_kind()
+            n += 1; s.tcheck(); s._lastk = getattr(s, '_curk', None); kind = s.menu_kind(); s._curk = kind
             if kind == 'main':
                 if shot and n % 4 == 1: shot('戦い')
                 wild = s.rd(0xD108)[0] == 1
+                lf = getattr(s, 'lead_for', None)
+                if lf and getattr(s, '_sw', None) != s._bn:
+                    i = lf(s.rd(s.W_EMON)[0], wild)
+                    pt = s.party()
+                    if i is not None and i < len(pt) and pt[i]['hp'] > 0 and pt[i]['sp'] != s.rd(s.W_BMON)[0]:
+                        s._sw = s._bn; s.switch_to(i); continue
+                    s._sw = s._bn
                 want = getattr(s, 'want', None)
                 if wild and want and want(s.rd(s.W_EMON)[0]) and s.count_item(5):
                     s.bag_use('ball', s.item_index(0xD5EF, 5)); s.log.append('ボール %d' % s.rd(s.W_EMON)[0]); continue
                 bm = s.rd(s.W_BMON, 0x14); hp, mx = bm[0x10] << 8 | bm[0x11], bm[0x12] << 8 | bm[0x13]
-                if not wild and hp * 3 < mx and s.count_item(0x12):
+                if not wild and hp * 2 < mx and s.count_item(0x12):
                     s.bag_use('item', s.item_index(0xD5AA, 0x12), party=0); s.log.append('キズぐすり'); continue
                 for k in 'UL': s.g.press(k, 2, 6)
                 if run and wild: s.g.press('D', 2, 6); s.g.press('R', 2, 6)
@@ -298,11 +314,18 @@ class W:
                 for _ in range((i - cur) % 4): s.g.press('D', 2, 6)
                 s.log.append('わすれる わざ %d' % b[2 + i]); s.g.press('A', 4, 40)
             elif kind == 'move':
-                i = s.best_move(); cur = s.rd(s.W_CURSOR)[0] - 1
+                ex = s._mex if getattr(s, '_lastk', None) == 'move' else set()
+                i = s.best_move(ex)
+                s._mex = ex | {i}; cur = s.rd(s.W_CURSOR)[0] - 1
                 for _ in range((i - cur) % 4): s.g.press('D', 2, 6)
                 s.g.press('A', 4, 40)
             else:
-                s.g.press('A', 4, 30)
+                unk = getattr(s, '_unk', 0) + 1; s._unk = unk
+                if unk % 13 == 0: s.g.press('B', 4, 30)              # 手持ちの 画面 などで 止まったら B
+                elif unk % 4 == 0: s.g.press('D', 4, 20); s.g.press('A', 4, 30)   # ひんしの ポケモンに カーソルが あるとき
+                else: s.g.press('A', 4, 30)
+                continue
+            s._unk = 0
         return n
 
     # ---- マップを またいで 行く
@@ -317,15 +340,18 @@ class W:
         if not hasattr(s, '_rc'): s._rc = {}
         if key in s._rc: return s._rc[key]
         c = s.coll(mid); seen = {(x, y)}; q = collections.deque([(x, y)])
+        wp = {(wx, wy) for wx, wy, _ in s.maps[mid]['warps']}
         while q:
             p = q.popleft()
+            if p in wp and p != (x, y): continue      # 入口の マスからは 先へ 行かない
             for d, (dx, dy) in DIRS.items():
                 n = (p[0] + dx, p[1] + dy)
                 if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
                 elif not s.passable(c(*n), p, d): continue
                 if n not in seen: seen.add(n); q.append(n)
         fs = frozenset(seen)
-        for p in seen: s._rc[(mid,) + p] = fs
+        for p in seen:
+            if p not in wp: s._rc[(mid,) + p] = fs
         return fs
     def _hops(s, mid, comp):
         """つながる 先：(how, 次の マップ, 次の 入った 所)"""
