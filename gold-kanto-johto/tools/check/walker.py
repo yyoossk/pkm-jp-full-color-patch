@@ -221,8 +221,8 @@ class W:
     def menu_kind(s):
         im = s.screen(); k = lambda x, y: im.getpixel((x, y)) == (0, 0, 0)
         if all(k(x, y) for x in (114, 156) for y in (70, 80)) and not k(112, 70): return 'yesno'
-        if all(k(x, y) for x in (82, 84) for y in (90, 110, 130)) and k(100, 66) and k(150, 66) and not k(84, 62): return 'forget'
         if k(70, 66) and k(70, 68) and k(2, 120): return 'move'
+        if all(k(x, y) for x in (82, 84) for y in (90, 110, 130)) and k(100, 66) and k(150, 66) and not k(84, 62) and not k(70, 66): return 'forget'
         if k(66, 120) and k(68, 120) and k(2, 120): return 'main'
         if k(2, 110) and k(2, 130): return 'text'
         return None

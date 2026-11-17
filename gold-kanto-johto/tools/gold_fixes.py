@@ -402,6 +402,26 @@ def fix_sidewalls(g, log):
         g[a + 4] = 0xC6 | bit << 3
     log.append('sidewalls')
 
+def fix_statuscolor_item(g, log):
+    """追加機能パッチの 状態異常の 色（49:StatusColor_BattleLayout）：戦いで どうぐを 使うと、画面の 色わけを 作る 時に
+    まだ 自分の HP の わくが 消えて いて（$7f）、状態異常の 文字の ますが ふつうの 色・バンク0 に もどる
+    → わくが もどった あと「どく」などが べつの 絵（Ⅱ など）に なる。
+    ますが 空白（$7f）でも 自分の ポケモンが 状態異常なら 色1 の 文字（バンク1・6本目）に する（バンク1 の $7f は 空白）"""
+    a, F = fo(0x49, 0x4150), fo(0x49, 0x7F00)
+    assert g[a:a + 11] == bytes.fromhex('fa50c4fe7c3e0e28023e03'), g[a:a + 11].hex()
+    assert not any(g[F:F + 24])
+    g[a:a + 11] = bytes([0xCD, 0x00, 0x7F]) + bytes(8)
+    g[F:F + 24] = bytes([0xFA, 0x50, 0xC4,      # ld a,[ます]
+                         0xFE, 0x7C, 0x28, 0x0C,  # cp $7c / jr z,.b1
+                         0xFE, 0x7F, 0x20, 0x0B,  # cp $7f / jr nz,.plain
+                         0xFA, 0x10, 0xCB,      # ld a,[wBattleMonStatus]
+                         0xA7, 0x28, 0x05,      # and a / jr z,.plain
+                         0x00, 0x00,
+                         0x3E, 0x0E, 0xC9,      # .b1: ld a,$0e / ret
+                         0x3E, 0x03]) + b''     # .plain: ld a,$03
+    g[F + 24] = 0xC9
+    log.append('statuscolor_item')
+
 def apply(g, E, M, log):
     from maps import GMGP
     from cmaps import maplist
@@ -410,4 +430,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log); fix_statuscolor_item(g, log)
