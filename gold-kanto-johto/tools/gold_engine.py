@@ -14,8 +14,10 @@ def p54_winloss(g, log):
     """第54弾：トレーナーの 負けた／勝った ときの セリフを、スクリプトの バンク（wScriptBank）から 読む。
        金の 追加機能パッチの PrintWinLossText の フック（ホーム $00F6：再戦の バンク $42 だけ）を すべての バンクに"""
     o = 0x00F6; assert bytes(g[o:o + 10]) == bytes.fromhex('fa52d1fe42c8c3ec2c00')
-    g[o:o + 4] = bytes([0xFA, 0x52, 0xD1, 0xC9])
-    log.append('第54弾 winlosstext：ホーム 00F6（wScriptBank）')
+    # 見つかって 戦う トレーナー（StartBattleWithMapTrainerScript は バンク $25 の スクリプト）は マップの スクリプトの
+    # バンク（GetMapScriptsBank 2CEC）。でないと トキワの もりの むしとりに 勝った あと $25 の ゴミを 読んで 止まった
+    g[o:o + 10] = bytes([0xFA, 0x52, 0xD1, 0xFE, 0x25, 0xCA, 0xEC, 0x2C, 0xC9, 0x00])
+    log.append('第54弾 winlosstext：ホーム 00F6（wScriptBank、$25 なら マップの バンク）')
 
 def p69_ledges(g, log):
     """第69弾：赤の マップ（クリスタル タイルセット 40 → 金 36）の 段差を 赤と 同じに（手前から とびこえる・ほかは かべ）。

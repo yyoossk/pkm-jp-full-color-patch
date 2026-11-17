@@ -55,8 +55,11 @@ class W:
         out = []; p = (tx, ty)
         while prev[p]: p, d = prev[p]; out.append(d)
         return out[::-1]
+    def tcheck(s):
+        import time
+        if getattr(s, 'budget', None) and time.time() - s.t0 > s.budget: raise TimeoutError
     def step(s, d):
-        before = s.pos(); s.g.down(d)
+        s.tcheck(); before = s.pos(); s.g.down(d)
         for _ in range(40):
             s.g.wait(2)
             if s.pos() != before: break
@@ -100,7 +103,8 @@ class W:
     def advance(s, shot=None, n=60):
         """文・戦いが おわるまで すすめる"""
         for i in range(n):
-            if s.in_battle(): s.battle(shot); continue
+            s.tcheck()
+            if s.in_battle(): s.fight(run=getattr(s, 'run_wild', False), shot=shot); continue
             if s.textbox():
                 if shot: shot('文')
                 s.g.press('A', 4, 40); continue
@@ -174,4 +178,126 @@ class W:
                 c = s.coll(s.pos()[:2])(x, y)
                 d = {0x70: 'D', 0x76: 'L', 0x78: 'U', 0x7E: 'R'}.get(c, 'U')
                 return s.door(x, y, d)
+        return False
+
+    # ---- 戦い（わざを えらぶ）
+    MOVES = (0x10, 0x5C6C); BASE = (0x14, 0x5AA9); TCHART = (0x0D, 0x4CFD)
+    W_BMON, W_EMON, W_CURSOR = 0xCB02, 0xD0E1, 0xCF14
+    def _rom(s, ba, i=0): return s.rom[fo(ba[0], ba[1]) + i]
+    def eff(s, t, defs):
+        e = 1.0; o = fo(*s.TCHART)
+        while s.rom[o] != 0xFF:
+            if s.rom[o] == 0xFE: o += 1; continue
+            a, d, x = s.rom[o:o + 3]
+            if a == t and d in defs: e *= x / 10
+            o += 3
+        return e
+    def types(s, sp):
+        o = fo(*s.BASE) + (sp - 1) * 0x20; return {s.rom[o + 7], s.rom[o + 8]}
+    def best_move(s):
+        b = s.rd(s.W_BMON, 0x20); e = s.rd(s.W_EMON, 2)
+        mine, theirs = s.types(b[0]), s.types(e[0]); best = (-1, 0)
+        for i in range(4):
+            m = b[2 + i]; pp = b[8 + i] & 0x3F
+            if not m or not pp: continue
+            o = fo(*s.MOVES) + (m - 1) * 7; pw, t, acc = s.rom[o + 2], s.rom[o + 3], s.rom[o + 4]
+            sc = pw * s.eff(t, theirs) * (1.5 if t in mine else 1) * (acc / 255) if pw else 0.1
+            if sc > best[0]: best = (sc, i)
+        return best[1]
+    def screen(s):
+        from PIL import Image
+        p = '/tmp/_walker_sc.ppm'; s.g.cmd('shot ' + p); s.g.sync(); return Image.open(p).convert('RGB')
+    def menu_kind(s):
+        im = s.screen(); k = lambda x, y: im.getpixel((x, y)) == (0, 0, 0)
+        if k(70, 66) and k(70, 68) and k(2, 120): return 'move'
+        if k(66, 120) and k(68, 120) and k(2, 120): return 'main'
+        if k(2, 110) and k(2, 130): return 'text'
+        return None
+    def fight(s, run=False, shot=None, maxn=600):
+        """戦いを 終わりまで。run=True なら 野生は にげる"""
+        n = 0
+        while s.in_battle() and n < maxn:
+            n += 1; s.tcheck(); kind = s.menu_kind()
+            if kind == 'main':
+                if shot and n % 4 == 1: shot('戦い')
+                wild = s.rd(0xD108)[0] == 1
+                for k in 'UL': s.g.press(k, 2, 6)
+                if run and wild: s.g.press('D', 2, 6); s.g.press('R', 2, 6)
+                s.g.press('A', 4, 30)
+            elif kind == 'move':
+                i = s.best_move(); cur = s.rd(s.W_CURSOR)[0] - 1
+                for _ in range((i - cur) % 4): s.g.press('D', 2, 6)
+                s.g.press('A', 4, 40)
+            else:
+                s.g.press('A', 4, 30)
+        return n
+
+    # ---- マップを またいで 行く
+    def conns(s, mid):
+        a = s.maps[mid]['attr']; f = a['conn']; c = a['connections']; out = {}; i = 0
+        for bit, d in ((8, 'U'), (4, 'D'), (2, 'L'), (1, 'R')):
+            if f & bit: out[d] = (c[i], c[i + 1]); i += 12
+        return out
+    def route(s, dest, avoid=()):
+        start = s.pos()[:2]; prev = {start: None}; q = collections.deque([start])
+        while q:
+            m = q.popleft()
+            if m == dest: break
+            if m not in s.maps: continue
+            nb = [(d, ('c', k)) for k, d in s.conns(m).items()] + [(d, ('w', d)) for x, y, d in s.maps[m]['warps']]
+            for n, how in nb:
+                if n not in prev and n not in avoid: prev[n] = (m, how); q.append(n)
+        if dest not in prev: return None
+        out = []; m = dest
+        while prev[m]: pm, how = prev[m]; out.append((how, m)); m = pm
+        return out[::-1]
+    def travel(s, dest, shot=None, tries=3):
+        for _ in range(tries):
+            r = s.route(dest)
+            if r is None: s.log.append('行けない %s' % (dest,)); return False
+            for (kind, v), m in r:
+                ok = s.leave(v, shot) if kind == 'c' else s.warp_to(m)
+                s.g.wait(30); s.advance(shot)
+                if s.pos()[:2] != m: break
+            if s.pos()[:2] == dest: return True
+        return s.pos()[:2] == dest
+    # ---- 手持ち
+    def party(s):
+        n = s.rd(0xD9E8)[0] if False else None
+        out = []
+        for i in range(6):
+            b = s.rd(0xD9F0 + 0x30 * i, 0x30)
+            if not b[0] or b[0] == 0xFF: break
+            out.append(dict(sp=b[0], lv=b[0x1F], hp=b[0x22] << 8 | b[0x23], mx=b[0x24] << 8 | b[0x25]))
+        return out
+    def heal(s, center, shot=None):
+        """center（ポケモンセンターの マップ）へ 行って 回復"""
+        if not s.travel(center, shot): return False
+        nurse = [o for o in s.objs()][0]
+        s.talk_to(nurse[0], nurse[1], shot)
+        for _ in range(6): s.advance(shot); s.g.wait(20)
+        return True
+    def grass(s):
+        mid = s.pos()[:2]; c = s.coll(mid); r = s.reach()
+        return [p for p in r if c(*p) in (0x14, 0x18)]
+    def grind(s, center, lv, shot=None, maxb=200, hp_min=0.4):
+        """草むらで 戦って 先頭を lv まで。HP が へったら center で 回復"""
+        home = s.pos()[:2]; b = 0
+        while b < maxb:
+            p = s.party()
+            if p[0]['lv'] >= lv: return True
+            if p[0]['hp'] < p[0]['mx'] * hp_min:
+                s.heal(center, shot); s.travel(home, shot); continue
+            gr = s.grass()
+            if not gr: s.log.append('草むらが ない'); return False
+            _, _, x, y = s.pos()
+            if (x, y) not in gr: s.goto_safe(*min(gr, key=lambda q: abs(q[0] - x) + abs(q[1] - y)), shot=shot)
+            for d in 'UDLR':
+                _, _, x, y = s.pos(); dx, dy = DIRS[d]
+                if (x + dx, y + dy) in gr:
+                    s.step(d)
+                    if s.in_battle():
+                        b += 1; s.fight(run=False, shot=shot); s.advance(shot)
+                    break
+            if s.pos()[:2] != home: s.travel(home, shot)
         return False

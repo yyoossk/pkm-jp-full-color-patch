@@ -373,22 +373,24 @@ def fix_follow_tiles(g, log):
 def fix_waitsfx(g, log):
     """赤の 音の しくみ（第98弾 シゲルの 曲・第68弾）が 鳴って いる 間（$C000 ≥ $A5）は 金の 効果音が すすまないのに、
        WaitSFX（00:3D77）は 金の チャンネル5〜8の フラグ（赤の 音の RAM と 重なる）を 待ちつづけて 止まっていた
-       （オーキド研究所で 図鑑を もらった ところで 止まる）。赤の 音の 間は 待たない。"""
-    import gold_hfi
+       （オーキド研究所で 図鑑を もらった ところで 止まる）。赤の 音の 間は 待たない。
+       バンクを かえずに ホームだけで 書く（3D77〜3D95 と HFI の うしろの あき 3FD5〜3FDF）。
+       バンクを かえる 書きかた（HFI・rst $08）では hROMBank が ずれた 所で よばれた とき（トキワの もりで
+       むしとりに 勝った あと）に もどる バンクが ちがい、止まった。"""
     o = 0x3D77
     assert bytes(g[o:o + 0x1F]) == bytes.fromhex('e521ccc0cb4620f921fec0cb4620f22130c1cb4620eb2162c1cb4620e4e1c9')
-    body = bytearray([0xE5])                                     # push hl
-    loop = len(body)
-    body += bytes([0xFA, 0x00, 0xC0, 0xFE, 0xA5, 0x30, 0])         # ld a,[$C000] ; cp $A5 ; jr nc,.done
-    jdone = len(body) - 1
-    for a in (0xC0CC, 0xC0FE, 0xC130, 0xC162):
-        body += bytes([0x21, a & 0xFF, a >> 8, 0xCB, 0x46, 0x20, 0])  # ld hl,a ; bit 0,[hl] ; jr nz,.wait
-        body[-1] = (loop - len(body)) & 0xFF
-    body[jdone] = len(body) - (jdone + 1)
-    body += bytes([0xE1, 0xC9])                                   # .done: pop hl ; ret
-    b = gold_hfi.put(g, bytes(body))
-    g[o:o + 6] = bytes([0xCD, gold_hfi.HFI & 0xFF, gold_hfi.HFI >> 8, b & 0xFF, b >> 8, 0xC9])
-    log.append('WaitSFX：赤の 音の 間は 待たない（7E:%04X）' % b)
+    assert not any(g[0x3FD5:0x3FE0])
+    A = bytes([0xE5,                               # 3D77 push hl
+               0x21, 0x00, 0xC0, 0xCB, 0x7E, 0x20, 0x15,   # 3D78 .wait: ld hl,$C000 / bit 7,[hl] / jr nz,.done（3D94）
+               0x2E, 0xCC, 0xCB, 0x46, 0x20, 0xF3,         # 3D7F ld l,$CC / bit 0,[hl] / jr nz,.wait
+               0x2E, 0xFE, 0xCB, 0x46, 0x20, 0xED,         # 3D85 ld l,$FE / bit 0,[hl] / jr nz,.wait
+               0xC3, 0xD5, 0x3F,                           # 3D8B jp 3FD5
+               0x2E, 0x62, 0xCB, 0x46, 0x20, 0xE4,         # 3D8E ld l,$62 / bit 0,[hl] / jr nz,.wait
+               0xE1, 0xC9])                                # 3D94 .done: pop hl / ret
+    assert len(A) == 0x1F
+    B = bytes([0x24, 0x2E, 0x30, 0xCB, 0x46, 0xC2, 0x78, 0x3D, 0xC3, 0x8E, 0x3D])   # inc h / ld l,$30 / bit 0 / jp nz,.wait / jp 3D8E
+    g[o:o + 0x1F] = A; g[0x3FD5:0x3FE0] = B
+    log.append('WaitSFX：赤の 音の 間は 待たない（ホーム 3D77・3FD5）')
 
 
 def apply(g, E, M, log):
