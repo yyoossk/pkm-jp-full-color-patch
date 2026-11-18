@@ -228,7 +228,7 @@ class W:
     def textbox(s):
         from PIL import Image
         p = '/tmp/_walker_tb.ppm'; s.g.cmd('shot ' + p); s.g.sync(); im = Image.open(p).convert('RGB')
-        return im.getpixel((2, 110)) == (0, 0, 0) and im.getpixel((2, 130)) == (0, 0, 0)
+        return max(im.getpixel((2, 110))) < 40 and max(im.getpixel((2, 130))) < 40 and min(im.getpixel((5, 105))) > 150
     def clear(s, key='A', n=40, wait=40):
         """文が 出て いる あいだ key を 押す（押した 数を かえす）"""
         for i in range(n):
@@ -397,7 +397,7 @@ class W:
         from PIL import Image
         p = '/tmp/_walker_sc_%d.ppm' % os.getpid(); s.g.cmd('shot ' + p); s.g.sync(); return Image.open(p).convert('RGB')
     def menu_kind(s):
-        im = s.screen(); k = lambda x, y: im.getpixel((x, y)) == (0, 0, 0)
+        im = s.screen(); k = lambda x, y: max(im.getpixel((x, y))) < 40
         if all(k(x, y) for x in (114, 156) for y in (70, 80)) and not k(112, 70): return 'yesno'
         if k(70, 66) and k(70, 68) and k(2, 120): return 'move'
         if all(k(x, y) for x in (82, 84) for y in (90, 110, 130)) and k(100, 66) and k(150, 66) and not k(84, 62) and not k(70, 66): return 'forget'

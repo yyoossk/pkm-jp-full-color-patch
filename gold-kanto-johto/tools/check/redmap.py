@@ -33,7 +33,7 @@ def port_maps(g):
             h = fo(0x25, p) + 9 * (mi - 1)
             try:
                 a = Walk(g).map(fo(g[h], r16(h + 3)), 'x'); w, hh = a['w'], a['h']
-                if not (0 < w <= 60 and 0 < hh <= 60): continue
+                if not (0 < w <= 80 and 0 < hh <= 80): continue
                 blk = bytes(g[fo(a['blkbank'], a['blk']):][:w * hh])
             except Exception: continue
             out[(gi, mi)] = dict(id=(gi, mi), hdr=h, w=w, h=hh, blk=blk, ts=g[h + 1], attr=a,
