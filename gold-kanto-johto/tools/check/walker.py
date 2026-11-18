@@ -39,7 +39,7 @@ class W:
         out = set()
         for i in range(1, 13):
             b = s.rd(s.PS + OSZ * i, 0x14)
-            if b[1] == 0x13 and s.WMAP == WRAM_MAP: continue   # 連れ歩きの ポケモン（すりぬけて 入れかわれる）
+            if (b[1] == 0x13 or b[0] == 0xE2) and s.WMAP == WRAM_MAP: continue   # 連れ歩きの ポケモン（すりぬけて 入れかわれる）
             if b[0] and b[0x10] >= 4 and b[0x11] >= 4: out.add((b[0x10] - 4, b[0x11] - 4))
         if not getattr(s, 'no_still', False):
           try: out |= s.still(s.pos()[:2])                    # 画面の 外でも 動かない 人は ふさいでいる
@@ -53,6 +53,10 @@ class W:
                (len(o) < 13 or (o[11] | o[12] << 8) == 0xFFFF or not s.flag(o[11] | o[12] << 8)):
                 out.add((o[2] - 4, o[1] - 4))
         return out
+    @staticmethod
+    def warp_tile(c):
+        """入口が はたらく マス（穴 $60・とびら／階段 $70〜$7F など）。ふつうの 床の 上の 入口（エンジュジムの 見えない 床 など）は はたらかない"""
+        return c is None or c >= 0x60
     CARPET = (0x70, 0x76, 0x78, 0x7E)      # その 向きに 押した ときだけの 入口（上を 歩ける）
     SIDE = {0xB0: 'R', 0xB1: 'L', 0xB2: 'U', 0xB3: 'D', 0xB4: 'DR', 0xB5: 'DL', 0xB6: 'UR', 0xB7: 'UL'}
     OPP = {'U': 'D', 'D': 'U', 'L': 'R', 'R': 'L'}
@@ -76,7 +80,7 @@ class W:
     def path(s, tx, ty, avoid=(), ignore_npcs=False):
         gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); blocked = set(avoid) | (set() if ignore_npcs else s.npcs())
         wps = {(wx, wy) for wx, wy, _ in s.maps[(gi, mi)]['warps']}
-        blocked |= {(wx, wy) for wx, wy in wps if c(wx, wy) not in s.CARPET}    # ほかの 入口（ドア・階段）を ふまない
+        blocked |= {(wx, wy) for wx, wy in wps if c(wx, wy) not in s.CARPET and s.warp_tile(c(wx, wy))}    # ほかの 入口（ドア・階段）を ふまない
         prev = {(x, y): None}; q = collections.deque([(x, y)])
         while q:
             p = q.popleft()
@@ -543,7 +547,7 @@ class W:
         c = s.coll(mid); seen = {(x, y)}; q = collections.deque([(x, y)])
         try: st = s.still(mid)
         except Exception: st = set()
-        wp = {(wx, wy) for wx, wy, _ in s.maps[mid]['warps'] if c(wx, wy) not in s.CARPET}
+        wp = {(wx, wy) for wx, wy, _ in s.maps[mid]['warps'] if c(wx, wy) not in s.CARPET and s.warp_tile(c(wx, wy))}
         while q:
             p = q.popleft()
             if p in wp and p != (x, y): continue      # 入口の マスからは 先へ 行かない

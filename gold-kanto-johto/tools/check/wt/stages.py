@@ -1041,3 +1041,27 @@ def burned2(w, s):
     for i in range(6): w.advance(s, n=300); w.settle()
     w.log.append('B1F 後 %s %s' % (w.pos(), w.objs()))
     return True
+def burned3(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.goto_safe(10, 6, shot=s); w.log.append('上 %s' % (w.pos(),))
+    w.door(10, 7, 'D', s); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('穴 %s' % (w.pos(),))
+    w.goto_safe(9, 5, shot=s)
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('B1F 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def bt_smash(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not visit_talk((10,3), (44,9))(w, s): return False
+    if not go((3,13))(w, s): return False
+    w.settle(); w.talk_to(4, 3, shot=s)
+    for i in range(3): w.advance(s, n=200); w.settle()
+    w.log.append('いわ 後 %s %s' % (w.pos(), w.objs()))
+    w.goto_safe(10, 6, shot=s); w.log.append('上 %s' % (w.pos(),))
+    w.door(10, 7, 'D', s); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('穴 %s' % (w.pos(),))
+    w.goto_safe(9, 5, shot=s)
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('B1F 後 %s %s' % (w.pos(), w.objs()))
+    return True
+lighthouse = visit_talk((3,39), (8,8), 5)
