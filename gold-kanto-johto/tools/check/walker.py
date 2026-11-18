@@ -55,6 +55,9 @@ class W:
     CARPET = (0x70, 0x76, 0x78, 0x7E)      # その 向きに 押した ときだけの 入口（上を 歩ける）
     SIDE = {0xB0: 'R', 0xB1: 'L', 0xB2: 'U', 0xB3: 'D', 0xB4: 'DR', 0xB5: 'DL', 0xB6: 'UR', 0xB7: 'UL'}
     OPP = {'U': 'D', 'D': 'U', 'L': 'R', 'R': 'L'}
+    HOP = {0xA0: 'R', 0xA1: 'L', 0xA2: 'U', 0xA3: 'D', 0xA4: 'D', 0xA5: 'D', 0xA6: 'U', 0xA7: 'U'}
+    HOP2 = {0xA4: 'L', 0xA5: 'R', 0xA6: 'L', 0xA7: 'R'}     # ななめの 段差は 横の 向きからも のぼれない
+    def hops(s, c, d): return 0xA0 <= (c or 0) <= 0xA7 and s.HOP.get(c) == d
     def passable(s, c, frm, d):
         if c is None: return False
         if c == 0x12 and getattr(s, 'can_cut', False): return True
@@ -65,8 +68,9 @@ class W:
             if f is not None and d in s.SIDE.get(f, ''): return False
             if s.OPP[d] in s.SIDE.get(c, ''): return False
         pm = s.rom[s.CP + c] & 0x0F
-        if 0xA0 <= c <= 0xA7:                         # 段差：その 向きだけ
-            return {0xA0: 'R', 0xA1: 'L', 0xA2: 'U', 0xA3: 'D', 0xA4: 'D', 0xA5: 'D', 0xA6: 'U', 0xA7: 'U'}.get(c) == d
+        if 0xA0 <= c <= 0xA7:                         # 段差：その 向きは とびこえる・横からは 床と 同じに 入れる（金銀は 段差の マスも 歩ける）。のぼる 向きは だめ
+            h = s.HOP.get(c)
+            return h == d or (h is not None and d != s.OPP[h] and d not in s.HOP2.get(c, ''))
         return pm == 0
     def path(s, tx, ty, avoid=(), ignore_npcs=False):
         gi, mi, x, y = s.pos(); c = s.coll((gi, mi)); blocked = set(avoid) | (set() if ignore_npcs else s.npcs())
@@ -79,7 +83,7 @@ class W:
             for d, (dx, dy) in DIRS.items():
                 n = (p[0] + dx, p[1] + dy)
                 if p in wps and {0x70: 'D', 0x76: 'L', 0x78: 'U', 0x7E: 'R'}.get(c(*p)) == d and n != (tx, ty) and p != (tx, ty): continue   # じゅうたんの 入口から 外へ 出ない
-                if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)   # 段差は とびこえる
+                if s.hops(c(*n), d) and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)   # 段差は とびこえる
                 elif not s.passable(c(*n), p, d): 
                     if n != (tx, ty): continue
                 if n in prev or n in blocked and n != (tx, ty): continue
@@ -277,7 +281,7 @@ class W:
             p = q.popleft()
             for d, (dx, dy) in DIRS.items():
                 n = (p[0] + dx, p[1] + dy)
-                if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
+                if s.hops(c(*n), d) and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
                 elif not s.passable(c(*n), p, d): continue
                 if n in st: continue
                 if n not in seen: seen.add(n); q.append(n)
@@ -537,7 +541,7 @@ class W:
             if p in wp and p != (x, y): continue      # 入口の マスからは 先へ 行かない
             for d, (dx, dy) in DIRS.items():
                 n = (p[0] + dx, p[1] + dy)
-                if 0xA0 <= (c(*n) or 0) <= 0xA7 and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
+                if s.hops(c(*n), d) and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)
                 elif not s.passable(c(*n), p, d): continue
                 if n in st: continue
                 if n not in seen: seen.add(n); q.append(n)

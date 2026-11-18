@@ -718,3 +718,236 @@ def league(w, s):
 
 def league_to7(w, s):
     w.stop7 = True; return league(w, s)
+def oak_ticket(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((13,6))(w, s): return False
+    w.settle(); w.log.append('研究所 %s' % (w.objs(),))
+    oak = [o for o in w.objs() if o[2] in (0x0B, 11)] or w.objs()[:1]
+    w.talk_to(oak[0][0], oak[0][1], shot=s); w.advance(s, n=300)
+    w.log.append('大事な どうぐ %s' % w.rd(0xD5D4, 12))
+    return True
+def to_port(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((26,40))(w, s): return False
+    w.settle(); w.log.append('みなと %s 曜日 %d' % (w.objs(), w.rd(0xD1E5)[0]))
+    return True
+def board(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.log.append('曜日 %d' % w.rd(0xD1E5)[0])
+    if w.pos()[:2] != (15,2):
+        if not go((15,2))(w, s): return False
+    w.settle(); w.goto_safe(7, 16, shot=s); w.face('D'); w.g.press('A', 8, 60); w.advance(s, n=400)
+    w.g.wait(300); w.settle(); w.log.append('いま %s' % (w.pos(),))
+    return True
+def board2(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.log.append('曜日 %d' % w.rd(0xD1E5)[0])
+    w.settle()
+    for d in 'L':
+        w.step(d)
+    w.advance(s, n=400); w.g.wait(200)
+    for _ in range(10):
+        w.settle()
+        if w.pos()[:2] != (15,2): break
+        p = w.pos()[2:]
+        w.goto_safe(7, 16, shot=s); w.advance(s, n=200)
+    w.g.wait(300); w.advance(s, n=400); w.settle(); w.log.append('いま %s' % (w.pos(),))
+    return w.pos()[:2] != (15,2)
+def ship(w, s):
+    w.run_wild = True
+    for i in range(6):
+        w.advance(s, n=300); w.g.wait(120); w.settle(); s('ふね')
+        w.log.append('いま %s %s' % (w.pos(), w.objs()))
+    return True
+def ship_trip(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if w.pos()[:2] == (15,3):
+        w.goto_safe(25, 6, shot=s); w.advance(s, n=300); w.settle()
+        w.log.append('じいさん 後 %s' % (w.pos(),))
+    if not go((15,6))(w, s): return False
+    w.settle()
+    tw = [o for o in w.objs() if (o[0], o[1]) == (2, 25)]
+    w.log.append('船長室 %s' % (w.objs(),))
+    if tw: w.talk_to(2, 25, shot=s); w.advance(s, n=400)
+    w.settle(); w.log.append('むすめ 後 %s' % (w.pos(),))
+    if not go((15,5))(w, s): return False
+    w.settle(); w.goto_safe(6, 1, shot=s); w.face('R'); w.g.press('A', 8, 60); w.advance(s, n=500)
+    w.settle(); w.log.append('ベッド 後 %s' % (w.pos(),))
+    return True
+def ship_girl(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((15,7))(w, s): return False
+    w.settle(); w.goto_safe(5, 11, shot=s); w.g.wait(60); w.settle(); w.log.append('1F 左 %s' % (w.pos(),))
+    w.goto_safe(3, 13, shot=s); w.g.wait(60); w.settle()
+    w.log.append('へや %s %s' % (w.pos(), w.objs()))
+    w.talk_to(2, 25, shot=s); w.advance(s, n=500); w.settle()
+    w.log.append('むすめ 後 %s' % (w.pos(),))
+    if not go((15,5))(w, s): return False
+    w.settle(); w.goto_safe(6, 1, shot=s); w.face('R'); w.g.press('A', 8, 60); w.advance(s, n=600)
+    w.settle(); w.log.append('ベッド 後 %s' % (w.pos(),))
+    return True
+def ship_sailors(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((15,7))(w, s): return False
+    w.settle(); sl = [o for o in w.objs() if o[1] == 6 and o[0] in (30, 31)]
+    w.log.append('B1F %s' % (sl,))
+    if sl: w.talk_to(sl[0][0], 6, shot=s); w.advance(s, n=200)
+    if not go((15,4))(w, s): return False
+    w.settle(); w.log.append('NNE %s' % (w.objs(),))
+    for o in w.objs():
+        if o[2] == 73:
+            w.talk_to(o[0], o[1], shot=s); w.advance(s, n=300); break
+    return True
+def ship_lazy(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if w.pos()[:2] != (15,3):
+        if not go((15,3))(w, s): return False
+    w.settle(); w.goto_safe(19, 7, shot=s); w.door(19, 8, 'D', s); w.g.wait(60); w.settle()
+    w.log.append('へや %s' % (w.pos(),))
+    w.talk_to(4, 26, shot=s); w.advance(s, n=400); w.settle()
+    w.log.append('後 %s %s' % (w.pos(), w.objs()))
+    return True
+def ship_exit(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((15,3))(w, s): return False
+    w.settle(); w.goto_safe(25, 2, shot=s); w.door(25, 1, 'U', s); w.advance(s, n=300); w.g.wait(120); w.settle()
+    w.log.append('おりた %s' % (w.pos(),))
+    for i in range(3): w.advance(s, n=200); w.settle()
+    w.log.append('いま %s' % (w.pos(),))
+    return True
+def elm(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((24,5))(w, s): return False
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('研究所 %s %s 手持ち %d' % (w.pos(), w.objs(), len(w.party())))
+    return True
+def starter(w, s):
+    w.run_wild = True
+    w.talk_to(7, 3, shot=s); w.advance(s, n=400); w.settle()
+    for i in range(3): w.advance(s, n=200); w.settle()
+    w.log.append('あと %s %s PC? party %d' % (w.pos(), w.objs(), len(w.party())))
+    return True
+def mrpoke(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    for i in range(3): w.advance(s, n=200); w.settle()
+    w.log.append('研究所 %s %s' % (w.pos(), w.objs()))
+    if not go((26,10))(w, s): return False
+    w.settle()
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('ポケモンじいさん %s %s' % (w.pos(), w.objs()))
+    return True
+def story(dest, n=4):
+    def f(w, s):
+        w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+        for i in range(n): w.advance(s, n=300); w.settle()
+        w.log.append('はじめ %s %s' % (w.pos(), w.objs()))
+        if not go(dest)(w, s): return False
+        w.settle()
+        for i in range(n): w.advance(s, n=300); w.settle()
+        w.log.append('着 %s %s' % (w.pos(), w.objs()))
+        return True
+    return f
+back_elm = story((24,5))
+def adv(w, s):
+    w.run_wild = True
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('いま %s %s' % (w.pos(), w.objs()))
+    return True
+def talk_obj(sp):
+    def f(w, s):
+        w.run_wild = True
+        o = [o for o in w.objs() if o[2] == sp]
+        if o: w.talk_to(o[0][0], o[0][1], shot=s)
+        for i in range(4): w.advance(s, n=300); w.settle()
+        w.log.append('いま %s %s' % (w.pos(), w.objs()))
+        return bool(o)
+    return f
+talk_elm = talk_obj(60)
+def lab_in(w, s):
+    w.run_wild = True
+    w.goto_safe(4, 5, shot=s); w.settle()
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('いま %s %s' % (w.pos(), w.objs()))
+    return True
+def elm_egg(w, s):
+    w.run_wild = True; w.can_cut = True; w.can_surf = True; w.avoid = set()
+    for i in range(3): w.advance(s, n=200); w.settle()
+    w.talk_to(5, 2, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('はかせ 後 %s %s' % (w.pos(), w.objs()))
+    w.goto_safe(4, 8, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('助手 後 %s %s どうぐ' % (w.pos(), w.objs()))
+    return True
+def jgym(gmap, leader=None):
+    def f(w, s):
+        w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+        b0 = w.rd(0xD56F)[0]
+        if not go(gmap)(w, s): return False
+        w.settle()
+        lo = leader
+        if lo is None:
+            w.log.append('ジム %s' % (w.objs(),)); return True
+        w.talk_to(*lo, shot=s)
+        for i in range(5): w.advance(s, n=300); w.settle()
+        w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+        return w.rd(0xD56F)[0] != b0
+    return f
+falkner = jgym((10,7), (5,1))
+def talk_all(w, s, sps=None, n=3):
+    for o in list(w.objs()):
+        if sps and o[2] not in sps: continue
+        cur = [x for x in w.objs() if x[:2] == o[:2]]
+        if not cur: continue
+        w.talk_to(o[0], o[1], shot=s)
+        for i in range(n): w.advance(s, n=300); w.settle()
+def kurt(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((8,4))(w, s): return False
+    w.settle(); w.talk_to(3, 2, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('クルト 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def well(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((3,32))(w, s): return False
+    w.settle(); w.log.append('いど %s' % (w.objs(),))
+    if [o for o in w.objs() if o[:2] == (15, 12)]:
+        w.talk_to(15, 12, shot=s)
+        for i in range(4): w.advance(s, n=300); w.settle()
+        w.log.append('ムサシ・コジロウ 後 %s' % (w.objs(),))
+    for k in range(4):
+        r = [o for o in w.objs() if o[1] < 12 and o[2] not in (0x55,)]
+        w.log.append('のこり %s' % (w.objs(),))
+        ro = [o for o in w.objs() if (o[0], o[1]) in ((15,7),(5,2),(5,6),(10,4))]
+        if not ro: break
+        o = ro[0]; w.talk_to(o[0], o[1], shot=s)
+        for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('いど 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def drop6(w, s):
+    w.g.poke(0xD9E8, 5); w.g.poke(0xD9EE, 0xFF); w.g.wait(2)
+    return True
+def aide_egg(w, s):
+    drop6(w, s)
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((10,10))(w, s): return False
+    w.settle()
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('PC %s %s 手持ち %s' % (w.pos(), w.objs(), [p['sp'] for p in w.party()]))
+    return True
+def aide_talk(w, s):
+    w.run_wild = True
+    w.talk_to(4, 3, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('PC %s %s 手持ち %s' % (w.pos(), w.objs(), [p['sp'] for p in w.party()]))
+    return True
+def r32cave(w, s):
+    w.run_wild = True
+    w.goto_safe(7, 81, shot=s); s('x'); w.log.append('いま %s' % (w.pos(),))
+    w.step('U'); w.g.wait(30); s('u'); w.log.append('いま %s' % (w.pos(),))
+    return True
+def r32fence(w, s):
+    w.run_wild = True
+    w.goto_safe(7, 75, shot=s); w.log.append('いま %s' % (w.pos(),))
+    return True
