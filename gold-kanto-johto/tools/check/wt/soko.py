@@ -96,7 +96,7 @@ def run_pushes(w, s, moves):
     for b, st, d in moves:
         w.goto_safe(*st, shot=s); w.face(d)
         if w.pos()[2:] != st: w.log.append('岩の うしろに 行けない %s' % (st,)); return False
-        if not used:
+        if True:
             w.g.press('A', 8, 60)
             for _ in range(10):
                 if w.menu_kind() == 'yesno': w.g.press('A', 8, 60)
