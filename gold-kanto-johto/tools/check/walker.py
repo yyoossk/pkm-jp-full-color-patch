@@ -550,6 +550,7 @@ class W:
         m = s.maps[mid]; W2, H2 = m['w'] * 2, m['h'] * 2; out = []
         for raw in m['attr']['warps']:
             y, x, wi, gg, mm = raw[0], raw[1], raw[2], raw[3], raw[4]
+            if (mid, x, y) in getattr(s, 'dead_warps', ()): continue
             if not ((x, y) in comp or any((x + dx, y + dy) in comp for dx, dy in DIRS.values())): continue
             dm = (gg, mm)
             if dm not in s.maps: continue
@@ -602,7 +603,9 @@ class W:
                 else:
                     x, y = v; c = s.coll(s.pos()[:2])(x, y)
                     d = {0x70: 'D', 0x76: 'L', 0x78: 'U', 0x7E: 'R'}.get(c, 'U')
-                    s.door(x, y, d, shot)
+                    here = s.pos()[:2]; s.door(x, y, d, shot)
+                    if s.pos()[:2] == here and s.pos()[2:] == (x, y):   # 入口の マスに 立っても 出られない → もう つかわない
+                        dw = getattr(s, 'dead_warps', set()); s.dead_warps = dw; dw.add((here, x, y)); s.log.append('使えない 入口 %s %s' % (here, (x, y)))
                 s.g.wait(30); s.advance(shot)
                 if s.pos()[:2] != m: break
             if s.pos()[:2] == dest: return True

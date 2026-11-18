@@ -25,7 +25,7 @@ def jumps(mid, name):
         for d, (dx, dy) in (('U', (0, -1)), ('D', (0, 1)), ('L', (-1, 0)), ('R', (1, 0))):
             J[(mid, (x - dx, y - dy), d)] = f
     return J
-SPIN_MAPS = {(26, 22): 'RocketHideoutB2F', (26, 23): 'RocketHideoutB3F'}
+SPIN_MAPS = {(26, 22): 'RocketHideoutB2F', (26, 23): 'RocketHideoutB3F', (23, 4): 'ViridianGym'}
 def all_jumps(extra=None):
     J = {}
     for mid, n in {**SPIN_MAPS, **(extra or {})}.items(): J.update(jumps(mid, n))
