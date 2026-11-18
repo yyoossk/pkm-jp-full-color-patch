@@ -951,3 +951,8 @@ def r32fence(w, s):
     w.run_wild = True
     w.goto_safe(7, 75, shot=s); w.log.append('いま %s' % (w.pos(),))
     return True
+def rocket2(w, s):
+    w.run_wild = True
+    w.talk_to(15, 12, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    return True

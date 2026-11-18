@@ -190,6 +190,8 @@ import gold_player
 _lp = []; gold_player.apply(g, MOD, E, _lp); print('\n'.join(_lp))
 import gold_fixes
 _lf = []; gold_fixes.apply(g, E, MOD, _lf); print('\n'.join(_lf))
+import gold_textwrap
+_lw = []; gold_textwrap.apply(g, _lw); print('\n'.join(_lw))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
 open('/home/claude/work/out/gold_full.gbc', 'wb').write(g)
 print('maps', len(walks), 'banks', {('%02X' % k): ('%02X' % v) for k, v in E.bankmap.items()})
