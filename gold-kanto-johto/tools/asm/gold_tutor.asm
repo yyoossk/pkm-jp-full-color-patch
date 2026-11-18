@@ -28,31 +28,13 @@ DEF PREDEF_LEARNMOVE   EQU $00
 ; 0B:592A ChooseMonToLearnTMHM・0B:5A2E TMHMNotCompatibleText・03:7F70 KnowsMove・01:7CEC ChangeHappiness
 
 SECTION "tutor", ROMX[TUT_ADDR], BANK[1]
-Tutor0: ld a, 0
-	jr Common
-Tutor1: ld a, 1
-	jr Common
-Tutor2: ld a, 2
-	jr Common
-Tutor3: ld a, 3
-	jr Common
-Tutor4: ld a, 4
-	jr Common
-Tutor5: ld a, 5
-	jr Common
-
-Common:
-	ld [wScriptVar], a               ; つかう 表の 番号（あとで けっかに 上書き）
+Tutor:
+; wScriptVar ＝ 教える わざ（スクリプトの setval）
 	call FadeToMenu
 	call ClearBGPalettes
 	call ClearScreen
 	call DelayFrame
 	ld a, [wScriptVar]
-	ld e, a
-	ld d, 0
-	ld hl, TutorMoves
-	add hl, de
-	ld a, [hl]
 	ld [wNamedObjectIndex], a
 	ld [wPutativeTMHMMove], a
 	call GetMoveName
@@ -77,7 +59,8 @@ Common:
 CheckCanLearn:
 	ld hl, MenuHeader
 	call LoadMenuHeader
-	call Compat                      ; c ＝ 1：おぼえられる
+	ld a, $0e
+	call Predef                      ; CanLearnTMHMMove（CanLearnHook）
 	push bc
 	ld a, [wCurPartyMon]
 	ld hl, wPartyMonNicknames
@@ -92,7 +75,7 @@ CheckCanLearn:
 	pop de
 	ld a, $0b
 	ld hl, $5a2e
-	call FarPrintText                ; ○○は おぼえられない
+	call FarPrintText                ; TMHMNotCompatibleText
 	jr .didnt_learn
 .can_learn
 	ld a, $03
@@ -118,23 +101,24 @@ CheckCanLearn:
 	scf
 	ret
 
-Compat:
-; wPutativeTMHMMove（教え技の わざ）を おぼえられるか：c ＝ 1／0
+CanLearnHook:
+; predef CanLearnTMHMMove（02:4B5B の 表の $0E）の かわり。教え技の わざで、しかも wScriptVar が その わざ
+; （わざを 教える 人から 来た とき）だけ 赤の 表で 答える。ほかは もとの 04:59BF。
 	ld a, [wPutativeTMHMMove]
+	ld b, a
+	ld a, [wScriptVar]
+	cp b
+	jr nz, .orig
 	ld hl, TutorMoves
 	ld c, 0
 .find
-	cp [hl]
+	ld a, [hli]
+	and a
+	jr z, .orig
+	cp b
 	jr z, .found
-	inc hl
 	inc c
-	ld b, a
-	ld a, c
-	cp 6
-	ld a, b
-	jr c, .find
-	ld c, 0
-	ret
+	jr .find
 .found
 	ld a, c
 	swap a                           ; ×16
@@ -166,18 +150,7 @@ Compat:
 	and 1
 	ld c, a
 	ret
-
-CanLearnHook:
-; predef CanLearnTMHMMove（02:4B5B の 表の $0E）の かわり。教え技の わざは この 表で、ほかは もとの 04:59BF へ
-	ld a, [wPutativeTMHMMove]
-	ld hl, TutorMoves
-	ld b, 6
-.chk
-	cp [hl]
-	jr z, Compat
-	inc hl
-	dec b
-	jr nz, .chk
+.orig
 	ld a, $04
 	ld hl, $59bf
 	rst $08

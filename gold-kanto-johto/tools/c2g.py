@@ -209,8 +209,17 @@ def emit_map(E, W, at, cname, chdr, crom, grom, gmaps, cmaps_by_name):
     # スクリプトの見出し
     sh = bytearray([len(at['scenes'])])
     for p in at['scenes']: sh += E.ptr(cb, p, cname + ' scene')[1].to_bytes(2, 'little') + b'\0\0'
-    sh.append(len(at['callbacks']))
-    for t, p in at['callbacks']: sh += bytes([t]) + E.ptr(cb, p, cname + ' cb')[1].to_bytes(2, 'little')
+    cbs = [(t, E.ptr(cb, p, cname + ' cb')[1]) for t, p in at['callbacks']]
+    coords = [bytes(c[:4] + E.ptr(cb, w(c, 4), cname + ' coord')[1].to_bytes(2, 'little') + c[6:8]) for c in at['coords']]
+    objs = []
+    for ob in at['objs']:
+        ob = bytearray(ob); ob[0] = X.sprite(ob[0], cname + ' obj')
+        p = w(ob, 9); ob[9:11] = E.ptr(cb, p, cname + ' obj')[1].to_bytes(2, 'little')
+        fl = w(ob, 11); ob[11:13] = X.event(fl, cname + ' obj').to_bytes(2, 'little')
+        objs.append(ob)
+    if cname in EXTRA_TUTOR: EXTRA_TUTOR[cname](E, gb, alloc, grom, coords, objs, cbs)
+    sh.append(len(cbs))
+    for t, p in cbs: sh += bytes([t]) + p.to_bytes(2, 'little')
     sa = alloc(len(sh), gb); grom[gb * 0x4000 + sa - 0x4000:gb * 0x4000 + sa - 0x4000 + len(sh)] = sh
     # イベント
     warps = list(at['warps'])
@@ -220,14 +229,6 @@ def emit_map(E, W, at, cname, chdr, crom, grom, gmaps, cmaps_by_name):
     ev = bytearray(at['ev0']); ev.append(len(warps))
     for wv in warps:
         g, n = X.mapid((wv[3], wv[4]), cname + ' warp'); ev += wv[:3] + bytes([g, n])
-    coords = [bytes(c[:4] + E.ptr(cb, w(c, 4), cname + ' coord')[1].to_bytes(2, 'little') + c[6:8]) for c in at['coords']]
-    objs = []
-    for ob in at['objs']:
-        ob = bytearray(ob); ob[0] = X.sprite(ob[0], cname + ' obj')
-        p = w(ob, 9); ob[9:11] = E.ptr(cb, p, cname + ' obj')[1].to_bytes(2, 'little')
-        fl = w(ob, 11); ob[11:13] = X.event(fl, cname + ' obj').to_bytes(2, 'little')
-        objs.append(ob)
-    if cname in EXTRA_TUTOR: EXTRA_TUTOR[cname](E, gb, alloc, grom, coords, objs)
     ev.append(len(coords))
     for c in coords: ev += c
     ev.append(len(at['bgs']))

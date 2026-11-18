@@ -113,7 +113,9 @@ def rebuild(E, g, GV, gm, nm, mods, M, MB, log):
     if 'hook' in mods:                               # 第66弾など：イベントを 足す（f(E, バンク, alloc, g, coords, objs)）
         def alloc(n, bank):
             a_ = E.fill[bank]; assert a_ + n <= 0x8000; E.fill[bank] = a_ + n; return a_
-        mods['hook'](E, NB, alloc, g, coords, objs_l)
+        cbs_ = []
+        mods['hook'](E, NB, alloc, g, coords, objs_l, cbs_)
+        assert not cbs_
     ev.append(len(coords))
     for c in coords: ev += c
     ev.append(len(bgs))
