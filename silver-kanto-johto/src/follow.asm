@@ -1215,7 +1215,9 @@ Fw_Update:
 	ld a, [wPlayerMapY]
 	ld h, a
 	ld a, [wPlayerStepDirection]
-	and a
+	inc a
+	jr z, .bput                       ; 止まって いる（$FF。段差を 飛び降りた あと など）→ 主人公の 場所（かくれて 次の 1歩で 後ろから 出る）
+	dec a
 	jr nz, .bup
 	dec h                             ; 下へ 歩いた → 上に
 	jr .bput
