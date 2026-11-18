@@ -99,11 +99,13 @@ class Walk:
 
     # ---------- セリフ
     def w_text(s, b, a, ctx):
-        o = fo(b, a); p = o; fix = []; mode = 'cmd'
+        o = fo(b, a); p = o; fix = []; mode = 'cmd'; ins = []
         while True:
             c = s.r[p]
             if mode == 'str':
                 p += 1
+                if c == 0x14: ins.append(p - o - 1)          # <PLAY_G>（クリスタルだけ）→ <PLAYER>くん
+                elif c in (0x15, 0x16): s.notes.append('クリスタルだけの 文字 %02X at %02X:%04X（%s）' % (c, b, a + p - o - 1, ctx))
                 if c == 0x50: mode = 'cmd'
                 elif c in (0x57, 0x58): break
                 continue
@@ -124,6 +126,11 @@ class Walk:
             else:
                 s.notes.append('不明なセリフ命令 %02X at %02X:%04X（%s）' % (c, b, a + p - o - 1, ctx)); break
         s.put('text', b, a, p - o, fix)
+        if ins:
+            k = (b if a >= 0x4000 else 0, a); bl = s.blobs[k]; d = bytearray(bl['data'])
+            for q in reversed(ins): d[q:q + 1] = bytes([0x52, 0xB8, 0xDE])
+            bl['data'] = bytes(d)
+            bl['fix'] = [(off + 2 * sum(1 for q in ins if q < off), *rest) for off, *rest in bl['fix']]
 
     def w_cmdqueue(s, b, a, ctx):
         # cmdqueue：db 種類 / dw データ / dw 0。種類 2（STONETABLE）の データは stonetable（db 入口, 人 / dw スクリプト）… $FF

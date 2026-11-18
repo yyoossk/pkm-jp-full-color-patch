@@ -60,6 +60,8 @@ for nm in names:
     except Exception as e: print('とばす', nm, e); continue
     if nm not in gm: print('金にない', nm); continue
     walks[nm] = (W, at)
+_cn = [n for W, _ in walks.values() for n in W.notes if 'クリスタルだけ' in n]
+if _cn: print('クリスタルだけの 文字:', len(_cn), _cn[:5])
 # MOD が変えていない カントーのマップで、クリスタルにしかない しくみ（女の子の主人公・モバイル・スイクン など）を
 # 使っているものは 金の マップのまま にする
 CHG = set()   # 完成版では すべて 調べる
