@@ -1065,3 +1065,12 @@ def bt_smash(w, s):
     w.log.append('B1F 後 %s %s' % (w.pos(), w.objs()))
     return True
 lighthouse = visit_talk((3,39), (8,8), 5)
+def r39(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.talk_to(13, 22, shot=s)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w.log.append('後 %s' % (w.pos(),))
+    return lighthouse(w, s)
+pharmacy = visit_talk((22,7), (2,3), 4)
+to_cgym = go((22,5))
+cian = seq(pharmacy, to_cgym)

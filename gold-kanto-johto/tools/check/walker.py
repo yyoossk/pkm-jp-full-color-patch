@@ -88,7 +88,9 @@ class W:
             for d, (dx, dy) in DIRS.items():
                 n = (p[0] + dx, p[1] + dy)
                 if p in wps and {0x70: 'D', 0x76: 'L', 0x78: 'U', 0x7E: 'R'}.get(c(*p)) == d and n != (tx, ty) and p != (tx, ty): continue   # じゅうたんの 入口から 外へ 出ない
-                if s.hops(c(*n), d) and s.passable(c(*n), p, d): n = (n[0] + dx, n[1] + dy)   # 段差は とびこえる
+                if s.hops(c(*n), d) and s.passable(c(*n), p, d):
+                    if n in blocked: continue                    # 段差の マスに 人が いる（金銀は 段差の マスに 立てる）
+                    n = (n[0] + dx, n[1] + dy)   # 段差は とびこえる
                 elif not s.passable(c(*n), p, d): 
                     if n != (tx, ty): continue
                 if n in prev or n in blocked and n != (tx, ty): continue
@@ -567,6 +569,7 @@ class W:
         for raw in m['attr']['warps']:
             y, x, wi, gg, mm = raw[0], raw[1], raw[2], raw[3], raw[4]
             if (mid, x, y) in getattr(s, 'dead_warps', ()): continue
+            if not s.warp_tile(s.coll(mid)(x, y)): continue          # 床の 上の 入口は はたらかない（着く 所だけ）
             if not ((x, y) in comp or any((x + dx, y + dy) in comp for dx, dy in DIRS.values())): continue
             dm = (gg, mm)
             if dm not in s.maps: continue
