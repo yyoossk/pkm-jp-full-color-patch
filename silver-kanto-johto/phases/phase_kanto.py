@@ -45,6 +45,7 @@ def apply(rom, ctx):
         """写す マップ：カントー（ランドマーク マサラ〜セキエイ）と ふね、グループ26 に 足した マップ。
            26・27・28ばんどうろ と トージョウの たき は 銀の 物語（ジョウトの 所で 別に 入れる）"""
         if k[0] == 26 and k[1] in (12, 13): return False
+        if CM.name.get(k) == 'VICTORY_ROAD_GATE': return True     # 22ばんどうろの ゲート：MOD では 北が 23ばんどうろ（カントーの チャンピオンロードへ）。銀の ままだと 北へ 行けない
         if k[0] == 26 and k[1] > cmaps.G26_JP: return True
         lm = P.CM.header(k)['landmark']
         return 0x2F <= lm <= 0x5A or lm == 0x5F
