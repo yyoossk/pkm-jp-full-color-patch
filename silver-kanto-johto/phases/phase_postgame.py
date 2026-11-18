@@ -43,6 +43,7 @@ def apply(rom, ctx):
     wm.update(asmport.WRAM_EXTRA); wm.update(PO.HRAM); wm.update(WRAM)
     for x in range(0xC400, 0xC608): wm[x] = x - 0x100
     for x in range(0xD000, 0xD100): wm[x] = 0xC200 + (x - 0xD000)
+    wm[0xD0C8] = 0xCFFE                       # wCurPartySpecies：殿堂入りで 出す ポケモンの 絵（ここを 作業用に すると 絵と タイプが 1ぴきめの まま）
     for x in range(0xD100, 0xD190): wm[x] = 0xC700 + (x - 0xD100)
     wm[0xC800] = 0xC800
     TR = asmport.Translator(cmod, corig, g1, wm, Hm, log); TR.wm = wm; TR.nosvbk = True
