@@ -33,6 +33,7 @@ for gi, (gn, ms) in enumerate(groups('pokegold')):
 MAPALIAS = {}
 # クリスタル版で 2マスの 入口の 片方だけに warp が ある 所（赤・黄では 2マスとも 入口）。
 # マップ名 → [(足す マスの y, x, まねる warp の 番号（0から）)]。当たりは gold_fixes.fix_twin_doors
+EXTRA_TUTOR = {}       # 第66弾：マップ名 → f(E, gb, alloc, grom, coords, objs)（gold_tutor.py）
 EXTRA_WARPS = {'Route2': [(35, 17, 3)]}          # ひでんマシン05の ゲートの 北の 入口（16,35 と 17,35）
 # ホームの住所（クリスタル → 金）
 HOMEMAP = {0x26B2: 0x27BF}   # ObjectEvent（jumptextfaceplayer ObjectEventText）
@@ -219,16 +220,20 @@ def emit_map(E, W, at, cname, chdr, crom, grom, gmaps, cmaps_by_name):
     ev = bytearray(at['ev0']); ev.append(len(warps))
     for wv in warps:
         g, n = X.mapid((wv[3], wv[4]), cname + ' warp'); ev += wv[:3] + bytes([g, n])
-    ev.append(len(at['coords']))
-    for c in at['coords']: ev += c[:4] + E.ptr(cb, w(c, 4), cname + ' coord')[1].to_bytes(2, 'little') + c[6:8]
-    ev.append(len(at['bgs']))
-    for g_ in at['bgs']: ev += g_[:3] + E.ptr(cb, w(g_, 3), cname + ' bg')[1].to_bytes(2, 'little')
-    ev.append(len(at['objs']))
+    coords = [bytes(c[:4] + E.ptr(cb, w(c, 4), cname + ' coord')[1].to_bytes(2, 'little') + c[6:8]) for c in at['coords']]
+    objs = []
     for ob in at['objs']:
         ob = bytearray(ob); ob[0] = X.sprite(ob[0], cname + ' obj')
         p = w(ob, 9); ob[9:11] = E.ptr(cb, p, cname + ' obj')[1].to_bytes(2, 'little')
         fl = w(ob, 11); ob[11:13] = X.event(fl, cname + ' obj').to_bytes(2, 'little')
-        ev += ob
+        objs.append(ob)
+    if cname in EXTRA_TUTOR: EXTRA_TUTOR[cname](E, gb, alloc, grom, coords, objs)
+    ev.append(len(coords))
+    for c in coords: ev += c
+    ev.append(len(at['bgs']))
+    for g_ in at['bgs']: ev += g_[:3] + E.ptr(cb, w(g_, 3), cname + ' bg')[1].to_bytes(2, 'little')
+    ev.append(len(objs))
+    for ob in objs: ev += ob
     ea = alloc(len(ev), gb); grom[gb * 0x4000 + ea - 0x4000:gb * 0x4000 + ea - 0x4000 + len(ev)] = ev
     E.pending.append((cname, gm, at, gb, sa, ea, bgb, ba, chdr))
 

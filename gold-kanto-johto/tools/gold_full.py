@@ -133,7 +133,9 @@ allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
 _la = []; gold_asm.apply(E, MOD, g, _la, cm); gold_safari.apply(g, MOD, E, _la); gold_specials.apply(g, MOD, E.next_bank, _la); E.next_bank += 1; print('\n'.join(_la))
+import gold_tutor; _ltut = []; gold_tutor.install(E, g, _ltut)    # 第66弾：ジムの 案内の 人の 教え技
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
+gold_tutor.native(E, g, MOD, cm, _ltut); print('\n'.join(_ltut))
 for k, b in allblobs.items(): E.write(k, b)
 gold_johto.patch_attrs(E, g, None)
 import gold_johto2

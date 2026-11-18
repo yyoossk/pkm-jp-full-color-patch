@@ -97,20 +97,29 @@ def rebuild(E, g, GV, gm, nm, mods, M, MB, log):
     # イベント
     ev = bytearray(at['ev0']); ev.append(len(at['warps']))
     for wv in at['warps']: ev += wv
-    ev.append(len(at['coords']))
+    coords = []
     for i, c in enumerate(at['coords']):
-        p = mptr(('coord', i)) if ('coord', i) in trees else rel(w(c, 4)); ev += c[:4] + p.to_bytes(2, 'little') + c[6:8]
-    ev.append(len(at['bgs']))
+        p = mptr(('coord', i)) if ('coord', i) in trees else rel(w(c, 4)); coords.append(bytes(c[:4] + p.to_bytes(2, 'little') + c[6:8]))
+    bgs = []
     for i, b_ in enumerate(at['bgs']):
-        p = mptr(('bg', i)) if ('bg', i) in trees else rel(w(b_, 3)); ev += b_[:3] + p.to_bytes(2, 'little')
-    objs = list(at['objs']); add = mods.get('add_obj', [])
-    ev.append(len(objs) + len(add))
-    for i, ob in enumerate(objs):
-        ob = bytearray(ob); p = mptr(('obj', i)) if ('obj', i) in trees else rel(w(ob, 9)); ob[9:11] = p.to_bytes(2, 'little'); ev += ob
-    for i, ob in enumerate(add):
+        p = mptr(('bg', i)) if ('bg', i) in trees else rel(w(b_, 3)); bgs.append(bytes(b_[:3] + p.to_bytes(2, 'little')))
+    objs_l = []
+    for i, ob in enumerate(list(at['objs'])):
+        ob = bytearray(ob); p = mptr(('obj', i)) if ('obj', i) in trees else rel(w(ob, 9)); ob[9:11] = p.to_bytes(2, 'little'); objs_l.append(ob)
+    for i, ob in enumerate(mods.get('add_obj', [])):
         ob = bytearray(ob); X = E.X
         ob[0] = X.sprite(ob[0], nm); ob[9:11] = (mptr(('add', i)) if (ob[7] & 0xF) != 1 else 0).to_bytes(2, 'little')
-        ob[11:13] = X.event(w(ob, 11), nm).to_bytes(2, 'little'); ev += ob
+        ob[11:13] = X.event(w(ob, 11), nm).to_bytes(2, 'little'); objs_l.append(ob)
+    if 'hook' in mods:                               # 第66弾など：イベントを 足す（f(E, バンク, alloc, g, coords, objs)）
+        def alloc(n, bank):
+            a_ = E.fill[bank]; assert a_ + n <= 0x8000; E.fill[bank] = a_ + n; return a_
+        mods['hook'](E, NB, alloc, g, coords, objs_l)
+    ev.append(len(coords))
+    for c in coords: ev += c
+    ev.append(len(bgs))
+    for b_ in bgs: ev += b_
+    ev.append(len(objs_l))
+    for ob in objs_l: ev += ob
     sa = E.fill[NB]; E.fill[NB] += len(sh); g[fo(NB, sa):fo(NB, sa) + len(sh)] = sh
     ea = E.fill[NB]; E.fill[NB] += len(ev); g[fo(NB, ea):fo(NB, ea) + len(ev)] = ev
     o = gm['attr']; g[o + 6] = NB; g[o + 7:o + 9] = sa.to_bytes(2, 'little'); g[o + 9:o + 11] = ea.to_bytes(2, 'little')
