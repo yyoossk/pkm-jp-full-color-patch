@@ -956,3 +956,88 @@ def rocket2(w, s):
     w.talk_to(15, 12, shot=s)
     for i in range(4): w.advance(s, n=300); w.settle()
     return True
+def well2(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set(); w.no_still = True
+    for xy in ((10,4),(5,6),(5,2)):
+        if not [o for o in w.objs() if o[:2] == xy]: continue
+        w.talk_to(*xy, shot=s)
+        for i in range(4): w.advance(s, n=300); w.settle()
+        w.log.append('%s 後 %s %s' % (xy, w.pos(), w.objs()))
+    for i in range(4): w.advance(s, n=300); w.settle()
+    return not [o for o in w.objs() if o[2] == 53]
+bugsy = jgym((8,5), (5,7))
+to_goldenrod = story((11,2), n=3)
+def whitney(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    b0 = w.rd(0xD56F)[0]
+    if not go((11,3))(w, s): return False
+    w.settle(); w.talk_to(8, 3, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('1回目 %02x %s' % (w.rd(0xD56F)[0], w.pos()))
+    w.goto_safe(8, 6, shot=s); w.goto_safe(8, 5, shot=s)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w.talk_to(8, 3, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return w.rd(0xD56F)[0] != b0
+def visit_talk(mid, xy, n=4):
+    def f(w, s):
+        w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+        if not go(mid)(w, s): return False
+        w.settle()
+        if not [o for o in w.objs() if o[:2] == xy]:
+            w.log.append('いない %s %s' % (xy, w.objs())); return True
+        w.talk_to(*xy, shot=s)
+        for i in range(n): w.advance(s, n=300); w.settle()
+        w.log.append('%s %s 後 %s %s' % (mid, xy, w.pos(), w.objs()))
+        return True
+    return f
+def seq(*fs):
+    def f(w, s):
+        for g in fs:
+            if not g(w, s): return False
+        return True
+    return f
+sudowoodo = seq(visit_talk((10,3), (33,12)), visit_talk((11,8), (2,4)), visit_talk((10,3), (35,9), 6))
+def burned(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((3,13))(w, s): return False
+    w.settle(); w.goto_safe(11, 9, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('ライバル 後 %s' % (w.pos(),))
+    if w.pos()[:2] != (3,14):
+        go((3,14))(w, s)
+    w.settle(); w.goto_safe(10, 6, shot=s)
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('B1F 後 %s %s' % (w.pos(), w.objs()))
+    return True
+morty = jgym((4,7), (5,1))
+to_bt = go((3,13))
+def bt_fight(w, s):
+    w.run_wild = True
+    w.goto_safe(10, 13, shot=s)
+    for i in range(3):
+        w.advance(s, n=300); w.settle()
+    s('end')
+    return True
+def bt_cap(w, s):
+    w.run_wild = True
+    of = w.fight
+    def f2(*a, **k):
+        r = of(*a, **k); w.g.wait(30); w.g.save_state('/home/claude/work/wt/bt_after.st'); s('after'); return r
+    w.fight = f2
+    if not go((3,13))(w, s): return False
+    w.goto_safe(9, 14, shot=s)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    return True
+def burned2(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if w.pos()[:2] != (3,13) and not go((3,13))(w, s): return False
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w.log.append('ライバル 後 %s %s' % (w.pos(), w.objs()))
+    w.goto_safe(10, 6, shot=s); w.step('D'); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('穴 %s' % (w.pos(),))
+    w.goto_safe(9, 5, shot=s)
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('B1F 後 %s %s' % (w.pos(), w.objs()))
+    return True

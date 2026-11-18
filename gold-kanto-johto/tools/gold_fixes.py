@@ -369,6 +369,30 @@ def fix_follow_tiles(g, log):
     log.append('連れ歩き：人の 絵を 読みなおした あと 人の タイルも なおす（79:%04X）' % at)
 
 
+def fix_follow_emote(g, log):
+    """連れ歩き（追加機能パッチ）：主人公に showemote（びっくりマーク）を 出すと、連れ歩きが 主人公の 動きを まねる 列
+       （wFollowMovementQueue）に show_emote（$54）・hide_emote（$53）も 入り、連れ歩きが あとから もう一度 マークを 出して
+       消さない。マークが 残り、つぎに 文字の 絵が 読まれると「２３４５」の 字に なっていた（やけたとうの ライバルの 場面の あと など）。
+       連れ歩きの とき（Fw_NextMove の あと）は この 2つを step_sleep（$3E）に かえる。"""
+    B = 0x79; o = fo(B, 0x403B)
+    assert bytes(g[o:o + 3]) == bytes([0xCD, 0x42, 0x40]) and bytes(g[fo(B, 0x40A1):fo(B, 0x40A1) + 3]) == bytes([0xD5, 0x57, 0x0A])
+    at = 0x7D70; assert not any(g[fo(B, at):fo(B, at) + 32])
+    code = bytes([
+        0xCD, 0x42, 0x40,        # call Fw_NextMove.orig
+        0xF5,                    # push af
+        0xCD, 0xA1, 0x40,        # call Fw_IsFollowerBC（連れ歩きなら z）
+        0x20, 0x0C,              # jr nz, .keep
+        0xF1,                    # pop af
+        0xFE, 0x53, 0x28, 0x03,  # cp $53 / jr z, .sleep
+        0xFE, 0x54, 0xC0,        # cp $54 / ret nz（フラグは $54 以外 なら そのまま… の ために 下で なおす）
+        0x3E, 0x3E, 0xA7, 0xC9,  # .sleep: ld a, $3E / and a / ret
+        0xF1, 0xC9,              # .keep: pop af / ret
+    ])
+    g[fo(B, at):fo(B, at) + len(code)] = code
+    g[o + 1] = at & 0xFF; g[o + 2] = at >> 8
+    log.append('連れ歩き：主人公の びっくりマークを 連れ歩きが まねない（79:%04X）' % at)
+
+
 
 def fix_waitsfx(g, log):
     """赤の 音の しくみ（第98弾 シゲルの 曲・第68弾）が 鳴って いる 間（$C000 ≥ $A5）は 金の 効果音が すすまないのに、
@@ -443,4 +467,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log); fix_statuscolor_item(g, log); fix_movepower_disabled(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_follow_emote(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log); fix_statuscolor_item(g, log); fix_movepower_disabled(g, log)

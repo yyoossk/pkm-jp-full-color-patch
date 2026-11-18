@@ -41,8 +41,9 @@ class W:
             b = s.rd(s.PS + OSZ * i, 0x14)
             if b[1] == 0x13 and s.WMAP == WRAM_MAP: continue   # 連れ歩きの ポケモン（すりぬけて 入れかわれる）
             if b[0] and b[0x10] >= 4 and b[0x11] >= 4: out.add((b[0x10] - 4, b[0x11] - 4))
-        try: out |= s.still(s.pos()[:2])                    # 画面の 外でも 動かない 人は ふさいでいる
-        except Exception: pass
+        if not getattr(s, 'no_still', False):
+          try: out |= s.still(s.pos()[:2])                    # 画面の 外でも 動かない 人は ふさいでいる
+          except Exception: pass
         return out
     def still(s, mid):
         """マップ mid の 動かない 人の マス（イベントフラグで 消えて いる 人は のぞく）"""
@@ -256,6 +257,9 @@ class W:
                 gi, mi, x, y = s.pos()
                 ev = (x, y) in {(e[2], e[1]) for e in s.maps[(gi, mi)]['attr'].get('coords', [])}   # しかけの 戦い（ゆうれい など）は にげない
                 s.fight(run=getattr(s, 'run_wild', False) and not ev, shot=shot); continue
+            if s.naming():                                   # 名前を つける 画面：START で「けってい」へ、A で きめる（そのままの 名前）
+                if shot: shot('名前')
+                s.g.press('S', 4, 20); s.g.press('A', 4, 60); continue
             if s.textbox():
                 if shot: shot('文')
                 s.g.press('A', 4, 40); continue
@@ -400,6 +404,10 @@ class W:
     def screen(s):
         from PIL import Image
         p = '/tmp/_walker_sc_%d.ppm' % os.getpid(); s.g.cmd('shot ' + p); s.g.sync(); return Image.open(p).convert('RGB')
+    def naming(s):
+        im = s.screen(); m = lambda x, y: 100 <= max(im.getpixel((x, y))) < 200
+        w_ = lambda x, y: max(im.getpixel((x, y))) >= 200
+        return all(m(x, y) for x, y in ((1, 1), (9, 1), (17, 1), (4, 4), (1, 9), (4, 12))) and w_(0, 0) and w_(5, 1)
     def menu_kind(s):
         im = s.screen(); k = lambda x, y: max(im.getpixel((x, y))) < 40
         if all(k(x, y) for x in (114, 156) for y in (70, 80)) and not k(112, 70): return 'yesno'
