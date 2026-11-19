@@ -131,4 +131,10 @@ def apply(g, VAN, MOD, TB, NB, log):
         bl = b''.join(cls); a = alloc(len(bl)); tot += len(bl)
         g[fo(TB, a):fo(TB, a) + len(bl)] = bl; w16(g, fo(TB, TBL) + 2 * i, a)
     log.append('手持ち：%d バイト（のこり A %d・B %d）' % (tot, lim['A'] - cur['A'], lim['B'] - cur['B']))
+    # バンク 0E の GetTrainerName（電話の 相手の 名前 など。0E:$595C の 古い 表を 読んでいた → 表が こわれて いて
+    # 電話番号を とうろく すると 止まって リセット）：TB に ある 同じ コード（TB:$5939、表は TB:$595C）を farcall で 呼ぶ
+    o = fo(0x0E, 0x5939); code = bytes(g[o:o + 35])
+    assert code[:7] == bytes.fromhex('0dc50600215c59') and bytes(g[fo(TB, 0x5939):fo(TB, 0x5939) + 35]) == code
+    g[o:o + 7] = bytes([0x3E, TB, 0x21, 0x39, 0x59, 0xCF, 0xC9])
+    log.append('GetTrainerName（0E:5939）→ TB:5939')
     log.append('NB %02X：$%04X まで' % (NB, cur[0]) if False else 'NB %02X 使用' % NB)
