@@ -1074,3 +1074,207 @@ def r39(w, s):
 pharmacy = visit_talk((22,7), (2,3), 4)
 to_cgym = go((22,5))
 cian = seq(pharmacy, to_cgym)
+cgym_push = vroad_solve({}, ((22,5), {(4,2),(3,2),(5,2)}, (22,5)))
+def chuck(w, s):
+    b0 = w.rd(0xD56F)[0]
+    if not cgym_push(w, s): return False
+    w.talk_to(4, 1, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return w.rd(0xD56F)[0] != b0
+def chuck2(w, s):
+    import soko
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    b0 = w.rd(0xD56F)[0]
+    mid = w.pos()[:2]; c = w.coll(mid)
+    bs = [(o[0], o[1]) for o in w.objs() if o[2] == 90]
+    people = {(o[0], o[1]) for o in w.objs() if o[2] != 90}
+    op = w.passable
+    def pas2(cc, frm, d, _op=op):
+        return _op(cc, frm, d)
+    # 人の マスは 通れない
+    orig = soko.solve
+    cw = w.coll
+    def coll2(m, _cw=cw):
+        f = _cw(m)
+        return lambda x, y: (0x07 if (x, y) in people and m == mid else f(x, y))
+    w.coll = coll2
+    mv = soko.solve(w, mid, w.pos()[2:], bs, {(4,2),(3,2)})
+    w.coll = cw
+    w.log.append('押し方 %s' % (mv,))
+    if mv is None: return False
+    if not soko.run_pushes(w, s, mv): return False
+    w._rc = {}
+    w.talk_to(4, 1, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return w.rd(0xD56F)[0] != b0
+jasmine = seq(visit_talk((3,39), (8,8), 6), jgym((1,2), (5,3)))
+def gyarados(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = False; w.avoid = set()
+    if not go((9,6))(w, s): return False
+    w.settle(); w.talk_to(18, 22, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('ギャラドス 後 %s %s' % (w.pos(), w.objs()))
+    w.run_wild = True
+    if [o for o in w.objs() if o[:2] == (21,28)]:
+        w.talk_to(21, 28, shot=s)
+        for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('ワタル 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def gyarados2(w, s):
+    w.can_cut = True; w.can_surf = True; w.avoid = set()
+    w.run_wild = False
+    w.fight(run=False, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('ギャラドス 後 %s %s' % (w.pos(), w.objs()))
+    w.run_wild = True
+    if [o for o in w.objs() if o[:2] == (21,28)]:
+        w.talk_to(21, 28, shot=s)
+        for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('ワタル 後 %s %s' % (w.pos(), w.objs()))
+    return True
+mart_lance = story((3,40), n=3)
+to_rb2 = story((3,42), n=3)
+def rb3(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if w.pos()[:2] == (3,42):
+        w.goto_safe(4, 13, shot=s)
+        for i in range(3): w.advance(s, n=300); w.settle()
+        w.log.append('ワタル 後 %s' % (w.pos(),))
+    if not go((3,43))(w, s): return False
+    w.settle(); w.log.append('B3F %s %s' % (w.pos(), w.objs()))
+    for xy in ((7,2),(5,15),(21,7)):
+        o = [o for o in w.objs() if o[:2] == xy]
+        if not o: continue
+        w.talk_to(*xy, shot=s)
+        for i in range(4): w.advance(s, n=300); w.settle()
+        w.log.append('%s 後 %s' % (xy, w.pos()))
+    w.goto_safe(10, 8, shot=s)
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('扉 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def rb3door(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.goto_safe(10, 10, shot=s); w.face('U'); w.g.press('A', 8, 60)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w.log.append('扉 %s' % (w.pos(),))
+    w._rc = {}
+    w.goto_safe(10, 8, shot=s)
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('ボス 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def rb3door2(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.door(27, 2, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('B2F %s' % (w.pos(),))
+    w.door(3, 2, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('B3F %s' % (w.pos(),))
+    return rb3door(w, s)
+def rb3pw(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.door(3, 2, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    w.door(27, 2, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('B3F 右 %s' % (w.pos(),))
+    for xy in ((5,15),(21,7)):
+        for k in range(2):
+            w.talk_to(*xy, shot=s)
+            for i in range(4): w.advance(s, n=300); w.settle()
+        w.log.append('%s 後 %s' % (xy, w.pos()))
+    w.door(27, 2, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    w.door(3, 2, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    return rb3door(w, s)
+def rb2boss(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    for (x, y) in ((3,2),(27,2),(27,14)):
+        w._rc = {}
+        w.door(x, y, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+        w.log.append('→ %s' % (w.pos(),))
+    w._rc = {}
+    w.goto_safe(14, 13, shot=s); w.log.append('扉前 %s' % (w.pos(),))
+    w.step('U'); w.advance(s); w.settle(); w.step('U')
+    for i in range(6): w.advance(s, n=300); w.settle()
+    w.log.append('B2F ボス 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def rb2door(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.face('U'); w.g.press('A', 8, 60)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w._rc = {}
+    w.step('U'); w.advance(s); w.settle(); w.step('U')
+    for i in range(8): w.advance(s, n=300); w.settle()
+    w.log.append('B2F ボス 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def rb_murkrow(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    for (x, y) in ((27,14),(27,2),(3,2)):
+        w._rc = {}
+        w.door(x, y, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+        w.log.append('→ %s' % (w.pos(),))
+    w._rc = {}
+    w.talk_to(7, 2, shot=s)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w.log.append('ヤミカラス 後 %s' % (w.pos(),))
+    for (x, y) in ((3,2),(27,2),(27,14)):
+        w._rc = {}
+        w.door(x, y, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+        w.log.append('→ %s' % (w.pos(),))
+    w._rc = {}
+    w.goto_safe(14, 13, shot=s)
+    return rb2door(w, s)
+def electrodes(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = False; w.avoid = set()
+    for xy in ((7,5),(7,7),(7,9)):
+        if not [o for o in w.objs() if o[:2] == xy]: continue
+        w.talk_to(*xy, shot=s)
+        w.run_wild = False
+        for i in range(4): w.advance(s, n=300); w.settle()
+        w.log.append('%s 後 %s' % (xy, w.pos()))
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('後 %s %s' % (w.pos(), w.objs()))
+    return True
+to_pgym = go((2,2))
+def ice_bfs(goal_cells, maxn=500):
+    """こおりの 床：エミュレーターで ためして 行ける 所を さがす（ステートを ファイルに）"""
+    def f(w, s):
+        import collections, os
+        w.run_wild = True
+        g = w.g; d0 = '/tmp/ice'; os.makedirs(d0, exist_ok=True)
+        start = w.pos(); g.save_state('%s/s0.st' % d0)
+        seen = {start: ('%s/s0.st' % d0, [])}; q = collections.deque([start]); n = 0
+        while q and n < maxn:
+            p = q.popleft(); st, path = seen[p]
+            if p[2:] in goal_cells and p[:2] == start[:2]:
+                g.load_state(st); g.wait(2); w.log.append('こおり 道 %s' % (path,)); return True
+            for d in 'UDLR':
+                g.load_state(st); g.wait(2)
+                w.step(d)
+                for _ in range(40):
+                    a = w.pos(); g.wait(6)
+                    if w.pos() == a and not w.moving(): break
+                if w.textbox() or w.in_battle():
+                    idle = 0
+                    for _k in range(60):
+                        if w.textbox() or w.in_battle(): w.advance(s, n=200); idle = 0
+                        else:
+                            g.wait(40); idle += 1
+                            if idle >= 4: break
+                    w.settle()
+                    if w.pos() == p:
+                        w.step(d)
+                        for _ in range(40):
+                            a = w.pos(); g.wait(6)
+                            if w.pos() == a and not w.moving(): break
+                np_ = w.pos(); n += 1
+                if np_ in seen or np_[:2] != start[:2]: continue
+                fn = '%s/s%d.st' % (d0, len(seen)); g.save_state(fn)
+                seen[np_] = (fn, path + [d]); q.append(np_)
+        w.log.append('こおり 見つからない %d %s' % (len(seen), sorted(k[2:] for k in seen))); return False
+    return f
+def pryce(w, s):
+    b0 = w.rd(0xD56F)[0]
+    if not ice_bfs({(5,4),(4,3),(6,3)})(w, s): return False
+    w.talk_to(5, 3, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return w.rd(0xD56F)[0] != b0
