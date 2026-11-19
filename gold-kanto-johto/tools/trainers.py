@@ -67,4 +67,5 @@ def fix_gender(out):
         for j, e in enumerate(L):
             k = e.index(0x50) + 1
             if bytes(e[:k]) in enc: L[j] = enc[bytes(e[:k])] + bytes(e[k:])
+            elif bytes(e[:k]) == encode('ヒビキ@'): L[j] = encode('ゴールド@') + bytes(e[k:])   # シロガネやま：金の 主人公（キット 4-2）
     return out

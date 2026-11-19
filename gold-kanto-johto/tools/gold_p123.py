@@ -63,4 +63,27 @@ def apply(g, log):
     h = fo(0x45, 0x6B00)
     expect(g, h + 0x3D, '21 0e 99'); expect(g, h + 0x5B, '21 49 c4'); expect(g, h + 0x80, '21 4e c4')
     g[h + 0x3E] = 0x2E; g[h + 0x5C] = 0x5D; g[h + 0x81] = 0x62
+    gold_hero(g, log)
     log.append('第123弾 10 カントーの そらをとぶ（24:5D5B）・11 ハートを 9行め（45:6B00）')
+
+
+def gold_hero(g, log):
+    """移植キット 4-2：シロガネやまの 相手（クリスタル版の ヒビキ）は 金の 主人公（名前 ゴールド、見た目は 金の 主人公の 絵）。
+       名前は cwalk（文）・trainers（トレーナーの 名前）で ゴールドに。ここは 絵：
+       ・歩く 絵：人の絵 $44（SPRITE_CAL。どの マップも 使って いない）を 金の 主人公の 絵（30:4000、色 0）に して、
+         シロガネやま 3（3,68）の 人（$01 ＝ 主人公の 絵 ＝ サトシに なって いた）を $44 に。
+       ・戦いの 絵：トレーナーの 種類 $3F の 絵を 金の 主人公の 前の 絵（1A:6990）、色を 金の 主人公の 色に。"""
+    import re
+    t = fo(0x05, 0x47B0) + 6 * (0x44 - 1); expect(g, t, 'c0 60 c0 31 01 03')
+    g[t:t + 6] = bytes.fromhex('0040c0300100')
+    hits = [m.start() for m in re.finditer(rb'\x01\x0e\x0d\x07\x00\xff\xff\x80\x00..\x62\x07', bytes(g), re.S)]
+    assert len(hits) == 1, hits
+    g[hits[0]] = 0x44
+    gp = fo(0x14, 0x588A); code = bytes(g[gp:gp + 48])
+    i = code.index(bytes([0xD5, 0x21])); tbl = code[i + 2] | code[i + 3] << 8
+    j = code.index(bytes([0xCD, 0xE4, 0x30])); assert code[j - 2] == 0x3E
+    pt = fo(code[j - 1], tbl) + 3 * (0x3F - 1); expect(g, pt, '1c 08 4a')
+    g[pt:pt + 3] = bytes.fromhex('1a9069')
+    pp = fo(0x02, 0x7EB0) + 4 * 0x3F; expect(g, pp, '5c 46 f6 20')
+    g[pp:pp + 4] = bytes.fromhex('59323615')
+    log.append('移植キット 4-2：シロガネやまの ゴールド（人の絵 $44・トレーナーの 絵と 色）')

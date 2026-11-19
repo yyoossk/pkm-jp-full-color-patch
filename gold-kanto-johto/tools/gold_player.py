@@ -73,7 +73,12 @@ def apply(g, M, E, log):
     # 前の 絵
     raw = M[fo(0x22, 0x48B2):fo(0x22, 0x48B2) + 49 * 16]
     fa = put(lz_literal(raw))
-    pt = fo(0xBA, 0x54FE) + 3 * (CAL - 1)
+    # トレーナーの 絵の 表（第10弾で NB へ。NB は ビルドで かわるので GetTrainerPic 14:588A の ld hl・ld a,NB から 読む）
+    gp = fo(0x14, 0x588A); code = bytes(g[gp:gp + 48])
+    i = code.index(bytes([0xD5, 0x21])); tbl = code[i + 2] | code[i + 3] << 8
+    j = code.index(bytes([0xCD, 0xE4, 0x30])); tb_bank = code[j - 1]; assert code[j - 2] == 0x3E
+    pt = fo(tb_bank, tbl) + 3 * (CAL - 1)
+    assert bytes(g[pt:pt + 3]) == bytes.fromhex('1a9069'), g[pt:pt + 3].hex()   # 金の 主人公の 絵（1A:6990）
     fix = G0[fo(0x14, 0x5862):fo(0x14, 0x5862) + 64]
     assert nb not in fix[:fix.index(0xFF):2]
     g[pt:pt + 3] = bytes([nb, fa & 0xFF, fa >> 8])
