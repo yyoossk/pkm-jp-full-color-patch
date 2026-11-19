@@ -169,7 +169,20 @@ class Walk:
         """loadmenu の わく（8バイト：flags・わく4・dw データ・はじめの カーソル）＋ すぐ あとの データ（flags・数・文字×数）"""
         o = fo(b, a); d = s.r[o + 5] | s.r[o + 6] << 8
         if d != a + 8:
-            s.notes.append('menu %02X:%04X（%s）データが はなれている' % (b, a, ctx)); s.put('raw', b, a, 0, []); return
+            # データが はなれている（サトシMOD の タマムシの けいひんじょ の わざマシン など）：わく 8バイトと データを べつべつに 写す
+            if not (0x4000 <= d < 0x8000):
+                s.notes.append('menu %02X:%04X（%s）データが はなれている' % (b, a, ctx)); s.put('raw', b, a, 0, []); return
+            s.put('menu', b, a, 8, [(5, 'dw', 'data', 'menu')]); s.add('menudata', b, d, ctx); return
+        f2 = s.r[o + 8]; rc = s.r[o + 9]
+        if f2 & 0x80 and rc > 0x10 and 1 <= (rc >> 4) <= 8 and 1 <= (rc & 15) <= 4:
+            # 2D の メニュー（_2DMenu。MenuData：flags・行と列・間・dba 文字の 表・dba 表示の 関数）：
+            # サトシMOD の ハナダの バッジの 家・トキワの じょうたい の 表 など（赤の メニュー）
+            fix = [(5, 'dw', 'menu_self', 'menu'), (11, 'dba', 'menustrings', 'menu')]
+            lb, la = s.r[o + 11], s.r[o + 12] | s.r[o + 13] << 8
+            s.add('menustrings%d' % ((rc >> 4) * (rc & 15)), lb, la, ctx)
+            fb, fa = s.r[o + 14], s.r[o + 15] | s.r[o + 16] << 8
+            assert fa == 0, ('menu の 表示の 関数', hex(b), hex(a), ctx)
+            s.put('menu', b, a, 17, fix); return
         p = o + 10; n = s.r[o + 9]
         for _ in range(n):
             while s.r[p] != 0x50: p += 1
@@ -178,6 +191,26 @@ class Walk:
             s.notes.append('menu %02X:%04X（%s）形が ちがう' % (b, a, ctx)); s.put('raw', b, a, 0, []); return
         s.notes.append('menu %02X:%04X（%s）%d バイト' % (b, a, ctx, p - o))
         s.put('menu', b, a, p - o, [(5, 'dw', 'menu_self', 'menu')])
+
+    def __getattr__(s, nm):
+        if nm.startswith('w_menustrings'):
+            n = int(nm[len('w_menustrings'):])
+            def f(b, a, ctx):
+                o = fo(b, a); p = o
+                for _ in range(n):
+                    while s.r[p] != 0x50: p += 1
+                    p += 1
+                s.put('menustrings', b, a, p - o, [])
+            return f
+        raise AttributeError(nm)
+    def w_menudata(s, b, a, ctx):
+        """loadmenu の データ（flags・数・文字×数）"""
+        o = fo(b, a); p = o + 2; n = s.r[o + 1]
+        assert n <= 10, (hex(b), hex(a), ctx)
+        for _ in range(n):
+            while s.r[p] != 0x50: p += 1
+            p += 1
+        s.put('menudata', b, a, p - o, [])
 
     # ---------- マップ
     def map(s, attr_off, name):
