@@ -1278,3 +1278,15 @@ def pryce(w, s):
     for i in range(5): w.advance(s, n=300); w.settle()
     w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
     return w.rd(0xD56F)[0] != b0
+def rt5(w, s):
+    if not story((3,21), n=3)(w, s): return False
+    w.goto_safe(0, 3, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('ニセ局長 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def exit_ice(w, s):
+    if not ice_bfs({(4,16),(5,16),(4,15),(5,15),(4,14),(5,14)})(w, s): return False
+    w.door(4, 17, 'D', s); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('外 %s' % (w.pos(),))
+    return True
+rt5b = seq(exit_ice, rt5)

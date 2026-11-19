@@ -238,7 +238,7 @@ class W:
 
     def textbox(s):
         from PIL import Image
-        p = '/tmp/_walker_tb.ppm'; s.g.cmd('shot ' + p); s.g.sync(); im = Image.open(p).convert('RGB')
+        p = '/tmp/_walker_tb_%d.ppm' % os.getpid(); s.g.cmd('shot ' + p); s.g.sync(); im = Image.open(p).convert('RGB')
         return max(im.getpixel((2, 110))) < 40 and max(im.getpixel((2, 130))) < 40 and min(im.getpixel((5, 105))) > 150
     def clear(s, key='A', n=40, wait=40):
         """文が 出て いる あいだ key を 押す（押した 数を かえす）"""

@@ -393,6 +393,36 @@ def fix_follow_emote(g, log):
     log.append('連れ歩き：主人公の びっくりマークを 連れ歩きが まねない（79:%04X）' % at)
 
 
+def fix_rocket_badges(g, log):
+    """ジムで バッジを もらった あとの「6つめ → コガネに ロケット団」「7つめ → ラジオ塔を のっとる」は readvar VAR_BADGES
+       （ジョウトと カントーの バッジ 16こを 数える）で 決める。この 移植版は カントーを 先に 回って 8つ 持って いるので
+       6・7 に ならず、ラジオ塔の 事件が 起きなかった（チョウジジムの あとで 気づいた）。
+       MOD（クリスタル版）は 63:761D で ジョウトの バッジ だけを 数えなおして いる。同じ ことを 金の 7つの ジムに する：
+       XxxGymActivateRockets（ifequal 7 / ifequal 6 / end）を farsjump で 新しい 所へ → callasm（ジョウトの バッジだけ 数える）
+       → ifequal 7 / ifequal 6 → 元の ジムの .RadioTowerRockets / .GoldenrodRockets へ farsjump。"""
+    import re
+    B = 0x79; at = 0x7D90
+    assert not any(g[fo(B, at):fo(B, 0x7F00)])
+    asm = bytes([0x21, 0x6F, 0xD5, 0x06, 0x01, 0xCD, 0x04, 0x35,   # ld hl, wJohtoBadges / ld b, 1 / call CountSetBits
+                 0xFA, 0x43, 0xD1, 0xEA, 0x65, 0xD1, 0xC9])          # ld a, [wNumSetBits] / ld [wScriptVar], a / ret
+    assert bytes(g[fo(3, 0x41EB):fo(3, 0x41EB) + 11]) == bytes([0x21, 0x6F, 0xD5, 0x06, 0x02, 0xCD, 0x04, 0x35, 0xFA, 0x43, 0xD1])
+    g[fo(B, at):fo(B, at) + len(asm)] = asm; asm_at = at; at += len(asm)
+    hits = [m.start() for m in re.finditer(rb'\x06\x07..\x06\x06..\x90', bytes(g), re.S) if m.start() < 0x40 * 0x4000]
+    assert len(hits) == 7, len(hits)
+    for o in hits:
+        bank = o // 0x4000; a7 = g[o + 2] | g[o + 3] << 8; a6 = g[o + 6] | g[o + 7] << 8
+        s0 = at
+        sn = bytes([0x0E, B, asm_at & 0xFF, asm_at >> 8,
+                    0x06, 7, (s0 + 13) & 0xFF, (s0 + 13) >> 8,
+                    0x06, 6, (s0 + 17) & 0xFF, (s0 + 17) >> 8,
+                    0x90,
+                    0x04, bank, a7 & 0xFF, a7 >> 8,
+                    0x04, bank, a6 & 0xFF, a6 >> 8])
+        g[fo(B, at):fo(B, at) + len(sn)] = sn; at += len(sn)
+        g[o:o + 9] = bytes([0x04, B, s0 & 0xFF, s0 >> 8, 0x90, 0x90, 0x90, 0x90, 0x90])
+        log.append('ジムの ロケット団の 合図：ジョウトの バッジだけ 数える（%02X:%04X → 79:%04X）' % (bank, o % 0x4000 + 0x4000, s0))
+
+
 
 def fix_waitsfx(g, log):
     """赤の 音の しくみ（第98弾 シゲルの 曲・第68弾）が 鳴って いる 間（$C000 ≥ $A5）は 金の 効果音が すすまないのに、
@@ -467,4 +497,4 @@ def apply(g, E, M, log):
     fix108(g, E, M, log, gmap)
     fix_gold_blocks(g, log, gmap)
     fix97(g, E, M, log)
-    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_follow_emote(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log); fix_statuscolor_item(g, log); fix_movepower_disabled(g, log)
+    fix96(g, log); fix99(g, log); fix105(g, M, log); fix109(g, log); fix110_poison(g, log); fix110_boxfull(g, log); fix110_follow(g, log); fix100(g, log); fix_fishnest(g, log); fix_twin_doors(g, log); fix_quads(g, log); fix_follow_tiles(g, log); fix_follow_emote(g, log); fix_rocket_badges(g, log); fix_waitsfx(g, log); fix_sidewalls(g, log); fix_statuscolor_item(g, log); fix_movepower_disabled(g, log)
