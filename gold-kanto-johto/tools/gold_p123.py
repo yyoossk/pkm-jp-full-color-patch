@@ -18,7 +18,7 @@ def expect(g, o, h):
     b = bytes.fromhex(h.replace(' ', '')); assert bytes(g[o:o + len(b)]) == b, (hex(o), g[o:o + len(b)].hex(' '), h); return b
 
 
-def apply(g, log):
+def apply(g, log, M=None):
     B = 0x79; at = 0x7E40; assert not any(g[fo(B, at):fo(B, 0x7F00)])
     # 1 new game
     o = fo(1, 0x5C2A); expect(g, o, '3e 00 ea 20 cf 3e f1 e0 a1 c3 7a 5e')
@@ -64,6 +64,7 @@ def apply(g, log):
     expect(g, h + 0x3D, '21 0e 99'); expect(g, h + 0x5B, '21 49 c4'); expect(g, h + 0x80, '21 4e c4')
     g[h + 0x3E] = 0x2E; g[h + 0x5C] = 0x5D; g[h + 0x81] = 0x62
     gold_hero(g, log)
+    npc_trades(g, M, log)
     log.append('第123弾 10 カントーの そらをとぶ（24:5D5B）・11 ハートを 9行め（45:6B00）')
 
 
@@ -87,3 +88,20 @@ def gold_hero(g, log):
     pp = fo(0x02, 0x7EB0) + 4 * 0x3F; expect(g, pp, '5c 46 f6 20')
     g[pp:pp + 4] = bytes.fromhex('59323615')
     log.append('移植キット 4-2：シロガネやまの ゴールド（人の絵 $44・トレーナーの 絵と 色）')
+
+
+def npc_trades(g, M, log):
+    """人との 交換（trade の 番号）の 表を MOD（クリスタル版 3F:7A53、15こ）から 写す。
+       金の 表（3F:4C23）は 6こ（0〜5）しか なく、MOD の 発電所（6）と カントーの 交換（7〜14）は 表の うしろの コードを
+       データと して 読んで いた（発電所で 交換すると 止まった。人と 看板に 話しかける テストで 見つけた）。
+       ならびは 金・クリスタルとも 16バイト。会話の 組は クリスタルが 4つ（3＝女の子）、金は 3つ → 3 は 2 に。"""
+    MT = fo(0x3F, 0x7A53); N = 15
+    assert bytes(M[fo(0x3F, 0x4DC2):fo(0x3F, 0x4DC2) + 16]).hex() == '1600d5fa57cfe60fcb375f160021537a'
+    gat = fo(0x3F, 0x4B8E); expect(g, gat, '16 00 d5 fa 57 ce e6 0f cb 37 5f 16 00 21 23 4c')
+    tbl = bytearray(M[MT:MT + 16 * N])
+    for i in range(N):
+        d = tbl[16 * i]; assert d <= 3, (i, d); tbl[16 * i] = min(d, 2)
+    at = 0x6300; o = fo(0x3F, at); assert not any(g[o:o + len(tbl)])
+    g[o:o + len(tbl)] = tbl
+    g[gat + 14] = at & 0xFF; g[gat + 15] = at >> 8
+    log.append('人との 交換の 表：MOD の %d こ → 3F:%04X' % (N, at))

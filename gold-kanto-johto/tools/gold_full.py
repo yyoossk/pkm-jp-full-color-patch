@@ -191,7 +191,7 @@ import gold_player
 _lp = []; gold_player.apply(g, MOD, E, _lp); print('\n'.join(_lp))
 import gold_fixes
 _lf = []; gold_fixes.apply(g, E, MOD, _lf); print('\n'.join(_lf))
-import gold_p123; _l123 = []; gold_p123.apply(g, _l123); print('\n'.join(_l123))
+import gold_p123; _l123 = []; gold_p123.apply(g, _l123, MOD); print('\n'.join(_l123))
 import gold_textwrap
 _lw = []; gold_textwrap.apply(g, _lw); print('\n'.join(_lw))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
