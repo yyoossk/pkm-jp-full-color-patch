@@ -68,7 +68,7 @@ def p32_spawns(g, M, log):
     for i in range(14):                 # カントー（0〜13）だけ。ジョウトは 金の 町の まま
         c = M[cm + 4 * i:cm + 4 * i + 4]
         nm = c2g.CMAP.get((c[0], c[1])); nm = c2g.MAPALIAS.get(nm, nm)
-        if nm not in c2g.GMAP or nm in ('RedsHouse2F',): continue
+        if nm not in c2g.GMAP: continue          # 第123弾：赤の 部屋（ゲーム機の 前 3,6）も
         gg, gn = c2g.GMAP[nm]; new = bytes([gg, gn, c[2], c[3]])
         if bytes(g[gm + 4 * i:gm + 4 * i + 4]) != new: g[gm + 4 * i:gm + 4 * i + 4] = new; n += 1
     o = fo(0x04, 0x6795); assert bytes(g[o:o + 8]) == bytes.fromhex('793801afea20cfc9')

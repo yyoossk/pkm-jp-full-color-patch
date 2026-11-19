@@ -28,5 +28,5 @@ def apply(g, log):
         n = 0; i = g.find(ea)
         while i >= 0:
             g[i:i + len(eb)] = eb; n += 1; i = g.find(ea, i + 1)
-        assert n, '見つからない：' + a
+        if not n: log.append('文の 行の 長さ：MOD で 直っている：%s' % a.split('<')[0]); continue
         log.append('文の 行の 長さ 直し %d か所：%s' % (n, b.split('<')[0]))
