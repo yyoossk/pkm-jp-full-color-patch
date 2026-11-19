@@ -1290,3 +1290,215 @@ def exit_ice(w, s):
     w.log.append('外 %s' % (w.pos(),))
     return True
 rt5b = seq(exit_ice, rt5)
+def to_switch(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((3,45))(w, s): return False
+    w.settle(); w.goto_safe(18, 7, shot=s); w.face('U'); w.g.press('A', 8, 60)
+    for i in range(3): w.advance(s, n=200); w.settle()
+    w._rc = {}
+    w.log.append('扉 %s' % (w.pos(),))
+    w.door(18, 6, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('スイッチの へや %s %s' % (w.pos(), w.objs()))
+    return True
+def into_switch(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.door(22, 27, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w.goto_safe(19, 4, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('スイッチの へや %s %s' % (w.pos(), w.objs()))
+    return True
+def switches(w, s):
+    import itertools
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    g = w.g; base = '/tmp/sw_base_%d.st' % id(w); g.save_state(base)
+    for n in range(0, 4):
+        for combo in itertools.permutations([(16,2),(10,2),(2,2)], n):
+            g.load_state(base); g.wait(2); w._rc = {}
+            for (x, y) in combo:
+                w.goto_safe(x, y, shot=None); w.face('U'); g.press('A', 8, 40)
+                for _ in range(6):
+                    if w.menu_kind() == 'yesno': g.press('A', 8, 40)
+                    elif w.textbox(): g.press('A', 8, 30)
+                    else: break
+                w.advance(None, n=100); w.settle(); w._rc = {}
+            w._rc = {}
+            r = w.reach()
+            ok = (22, 9) in r or (23, 9) in r or (22, 10) in r
+            w.log.append('%s %s' % (combo, ok))
+            if ok:
+                w.goto_safe(22, 9, shot=s); w.door(22, 10, 'D', s); g.wait(60); w.advance(s); w.settle()
+                w.log.append('倉庫 %s' % (w.pos(),)); return True
+    return False
+def cardkey(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.talk_to(12, 8, shot=s)
+    for i in range(4): w.advance(s, n=300); w.settle()
+    w.log.append('局長 後 %s' % (w.pos(),))
+    if not go((3,19))(w, s): return False
+    w.goto_safe(14, 3, shot=s); w.face('U'); w.g.press('A', 8, 60)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w._rc = {}
+    w.log.append('カードキー 後 %s' % (w.pos(),))
+    if not go((3,21))(w, s): return False
+    w.goto_safe(16, 5, shot=s)
+    for i in range(8): w.advance(s, n=300); w.settle()
+    w.log.append('5F 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def cardkey2(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.door(2, 12, 'D', s); w.g.wait(60); w.advance(s); w.settle(); w._rc = {}
+    w.log.append('スイッチの へや %s' % (w.pos(),))
+    r = w.reach()
+    for t in [(4,29),(5,29),(20,29),(21,29),(5,25),(21,25)]:
+        if t in r or any((t[0]+dx, t[1]+dy) in r for dx, dy in ((0,-1),(1,0),(-1,0))):
+            w.log.append('出口 %s' % (t,))
+            d = 'D' if t[1] == 29 else 'U'
+            w.door(t[0], t[1], d, s); w.g.wait(60); w.advance(s); w.settle(); break
+    w._rc = {}
+    w.log.append('出た %s' % (w.pos(),))
+    if not go((3,19))(w, s): return False
+    w.goto_safe(14, 3, shot=s); w.face('U'); w.g.press('A', 8, 60)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w._rc = {}
+    w.log.append('カードキー 後 %s' % (w.pos(),))
+    if not go((3,21))(w, s): return False
+    w.goto_safe(16, 5, shot=s)
+    for i in range(8): w.advance(s, n=300); w.settle()
+    w.log.append('5F 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def emerg(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w.goto_safe(20, 12, shot=s); w.face('U'); w.g.press('A', 8, 60)
+    for _ in range(6):
+        if w.menu_kind() == 'yesno': w.g.press('A', 8, 40)
+        elif w.textbox(): w.g.press('A', 8, 30)
+        else: break
+    w.advance(s); w.settle(); w._rc = {}
+    r = w.reach(); w.log.append('非常 後 %s %d' % (w.pos(), len(r)))
+    for t in [(4,29),(5,29),(20,29),(21,29),(5,25),(21,25)]:
+        if t in r or any((t[0]+dx, t[1]+dy) in r for dx, dy in ((0,-1),(1,0),(-1,0))):
+            w.log.append('出口 %s' % (t,))
+            d = 'D' if t[1] == 29 else 'U'
+            w.door(t[0], t[1], d, s); w.g.wait(60); w.advance(s); w.settle(); break
+    w._rc = {}
+    w.log.append('出た %s' % (w.pos(),))
+    if not go((3,19))(w, s): return False
+    w.goto_safe(14, 3, shot=s); w.face('U'); w.g.press('A', 8, 60)
+    for i in range(3): w.advance(s, n=300); w.settle()
+    w._rc = {}
+    w.log.append('カードキー 後 %s' % (w.pos(),))
+    if not go((3,21))(w, s): return False
+    w.goto_safe(16, 5, shot=s)
+    for i in range(8): w.advance(s, n=300); w.settle()
+    w.log.append('5F 後 %s %s' % (w.pos(), w.objs()))
+    return True
+def rt_boss(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    def hop(x, y):
+        w._rc = {}; w.door(x, y, 'U', s); w.g.wait(60); w.advance(s); w.settle(); w._rc = {}
+        w.log.append('→ %s' % (w.pos(),))
+    hop(0, 0)                      # 5F → 4F
+    if (12, 1) not in w.reach():
+        hop(9, 0)                  # 4F → 3F
+        hop(17, 0)                 # 3F → 4F 右
+    hop(12, 0)                     # 4F → 5F 右
+    w.goto_safe(16, 5, shot=s)
+    for i in range(8): w.advance(s, n=300); w.settle()
+    w.log.append('5F 後 %s %s' % (w.pos(), w.objs()))
+    return True
+to_bt_city = go((5,10))
+def rt_out(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    def hop(x, y):
+        w._rc = {}; w.door(x, y, 'U', s); w.g.wait(60); w.advance(s); w.settle(); w._rc = {}
+        w.log.append('→ %s' % (w.pos(),))
+    hop(12, 0); hop(17, 0)
+    return go((5,10))(w, s)
+def to_bt2(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True
+    w.avoid = set()
+    if w.pos()[:2] in ((5,8),(5,9)):
+        go((24,3))(w, s)
+    w.avoid = {(5,8), (5,9)}
+    r = w.route((5,10)); w.log.append('道 %s' % (None if r is None else [m for _, m in r],))
+    if r is None: return False
+    while tleft(w) > 20:
+        if w.pos()[:2] == (5,10): return True
+        w.travel((5,10), s, tries=1)
+        if w.log and w.log[-1].startswith('行けない'): return False
+    return w.pos()[:2] == (5,10)
+def world_bfs(goal_maps, maxn=3000, tag='wb', allow=None):
+    """エミュレーターで ためして 進む（こおり・かいりきの 岩・穴 も そのまま）。key ＝ マップ・位置・岩の 位置"""
+    def f(w, s):
+        import collections, os
+        w.run_wild = True; g = w.g; d0 = '/tmp/%s_%d' % (tag, os.getpid()); os.makedirs(d0, exist_ok=True)
+        def key():
+            p = w.pos(); bs = []
+            for i in range(1, 13):
+                b = w.rd(0xD1F2 + 0x28 * i, 0x14)
+                if b[0] in (0x5a,): bs.append((b[0x10], b[0x11]))
+            return p + (tuple(sorted(bs)),)
+        def settle_all():
+            idle = 0
+            for _k in range(60):
+                if w.textbox() or w.in_battle():
+                    if w.menu_kind() == 'yesno': g.press('A', 8, 40)
+                    else: w.advance(s, n=200)
+                    idle = 0
+                else:
+                    g.wait(30); idle += 1
+                    if idle >= 3: break
+            w.settle()
+        def move(d):
+            before = w.pos()
+            w.step(d)
+            for _ in range(40):
+                a = w.pos(); g.wait(6)
+                if w.pos() == a and not w.moving(): break
+            settle_all()
+            if w.pos() == before:            # 岩なら かいりき
+                w.face(d); g.press('A', 8, 40)
+                for _ in range(6):
+                    if w.menu_kind() == 'yesno': g.press('A', 8, 40)
+                    elif w.textbox(): g.press('A', 8, 30)
+                    else: break
+                w.step(d); g.wait(40); settle_all()
+        k0 = key(); g.save_state('%s/0.st' % d0)
+        seen = {k0: ('%s/0.st' % d0, [])}; q = collections.deque([k0]); n = 0
+        while q and n < maxn and tleft(w) > 30:
+            k = q.popleft(); st, path = seen[k]
+            if k[:2] in goal_maps:
+                g.load_state(st); g.wait(2); w.log.append('道 %d手 %s' % (len(path), ''.join(path))); return True
+            for d in 'UDLR':
+                g.load_state(st); g.wait(2); g.poke(0xD9B1, 200); move(d); n += 1
+                nk = key()
+                if nk in seen: continue
+                if allow and nk[:2] not in allow and nk[:2] not in goal_maps: continue
+                fn = '%s/%d.st' % (d0, len(seen)); g.save_state(fn)
+                seen[nk] = (fn, path + [d]); q.append(nk)
+                if nk[:2] in goal_maps:
+                    w.log.append('道 %d手 %s' % (len(path) + 1, ''.join(path + [d]))); return True
+        w.log.append('見つからない %d %s' % (len(seen), sorted({k[:2] for k in seen})))
+        return False
+    return f
+def icepath(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((3,53))(w, s): return False
+    return world_bfs({(5,10)}, allow={(3,53),(3,54),(3,55),(3,56),(3,57)})(w, s)
+def icepath2(w, s):
+    w.can_cut = True; w.can_surf = True; w.run_wild = True
+    w.avoid = {(5,8), (5,9)}
+    if w.pos()[:2] != (3,53):
+        while tleft(w) > 20 and w.pos()[:2] != (2,6):
+            w.travel((2,6), s, tries=1)
+            if w.log and w.log[-1].startswith('行けない'): return False
+        w.log.append('44番 %s' % (w.pos(),))
+        w.avoid = set()
+        wp = [x for x in w.maps[(2,6)]['warps'] if x[2] == (3,53)][0]
+        w.door(wp[0], wp[1], 'U', s); w.g.wait(60); w.advance(s); w.settle()
+        w.log.append('こおりの ぬけみち %s' % (w.pos(),))
+    w.g.save_state('/home/claude/work/wt/ice_in.st')
+    w.g.poke(0xD9B1, 200)
+    return world_bfs({(5,10)}, allow={(3,53),(3,54),(3,55),(3,56),(3,57)})(w, s)
