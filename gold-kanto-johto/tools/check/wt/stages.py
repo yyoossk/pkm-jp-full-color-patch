@@ -1436,10 +1436,17 @@ def world_bfs(goal_maps, maxn=3000, tag='wb', allow=None):
         w.run_wild = True; g = w.g; d0 = '/tmp/%s_%d' % (tag, os.getpid()); os.makedirs(d0, exist_ok=True)
         def key():
             p = w.pos(); bs = []
-            for i in range(1, 13):
-                b = w.rd(0xD1F2 + 0x28 * i, 0x14)
-                if b[0] in (0x5a,): bs.append((b[0x10], b[0x11]))
-            return p + (tuple(sorted(bs)),)
+            mo = w.rd(0xD438, 16 * 16)
+            for i in range(1, 16):
+                e = mo[16 * i:16 * i + 16]
+                if e[1] not in (0x5a, 0x78): continue
+                if e[0] != 0xFF and e[0] < 13:
+                    b = w.rd(0xD1F0 + 0x28 * e[0], 0x14); bs.append((i, b[0x10], b[0x11]))
+                else:
+                    fl = e[12] | e[13] << 8
+                    if fl != 0xFFFF and w.flag(fl): bs.append((i, 'x'))
+                    else: bs.append((i, e[3], e[2]))
+            return p + (tuple(bs),)
         def settle_all():
             idle = 0
             for _k in range(60):
@@ -1460,10 +1467,12 @@ def world_bfs(goal_maps, maxn=3000, tag='wb', allow=None):
             settle_all()
             if w.pos() == before:            # 岩なら かいりき
                 w.face(d); g.press('A', 8, 40)
-                for _ in range(6):
+                for _ in range(20):
                     if w.menu_kind() == 'yesno': g.press('A', 8, 40)
                     elif w.textbox(): g.press('A', 8, 30)
-                    else: break
+                    else:
+                        g.wait(20)
+                        if not w.textbox(): break
                 w.step(d); g.wait(40); settle_all()
         k0 = key(); g.save_state('%s/0.st' % d0)
         seen = {k0: ('%s/0.st' % d0, [])}; q = collections.deque([k0]); n = 0
@@ -1502,3 +1511,110 @@ def icepath2(w, s):
     w.g.save_state('/home/claude/work/wt/ice_in.st')
     w.g.poke(0xD9B1, 200)
     return world_bfs({(5,10)}, allow={(3,53),(3,54),(3,55),(3,56),(3,57)})(w, s)
+def ice_b1f(w, s):
+    import soko, itertools
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set(); w.g.poke(0xD9B1, 200)
+    pits = [(17,3),(11,2),(4,7),(5,12),(12,13)]
+    mid = w.pos()[:2]
+    for rnd in range(4):
+        bs = [(o[0], o[1]) for o in w.objs() if o[2] == 90]
+        w.log.append('岩 %s' % (bs,))
+        if not bs: break
+        done = False
+        for b in bs:
+            for t in pits:
+                others = set(bs) - {b}
+                pl = soko.plan(w, mid, w.pos()[2:], b, t, others)
+                if pl is None: continue
+                w.log.append('押す %s→%s %s' % (b, t, pl))
+                if soko.push(w, s, b, t, others):
+                    w.g.wait(60)
+                    for i in range(3): w.advance(s, n=200); w.settle()
+                    w._rc = {}; done = True; break
+            if done: break
+        if not done: w.log.append('押せる 岩が ない'); return False
+    w.log.append('のこり %s' % ([o for o in w.objs() if o[2] == 90],))
+    return True
+to_bgym = go((5,1))
+def boulders(w):
+    mo = w.rd(0xD438, 16 * 16); out = []
+    for i in range(1, 16):
+        e = mo[16 * i:16 * i + 16]
+        if e[1] != 0x5a: continue
+        fl = e[12] | e[13] << 8
+        if fl != 0xFFFF and w.flag(fl): continue
+        if e[0] != 0xFF and e[0] < 13:
+            b = w.rd(0xD1F0 + 0x28 * e[0], 0x14); out.append((b[0x10] - 4, b[0x11] - 4))
+        else: out.append((e[3] - 4, e[2] - 4))
+    return out
+def boulder_pits(pits, goal_map):
+    def f(w, s):
+        import soko
+        w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+        if not go(goal_map)(w, s): return False
+        mid = w.pos()[:2]; left = list(pits)
+        for rnd in range(len(pits)):
+            bs = boulders(w)
+            done = False
+            for t in list(left):
+                for b in sorted(bs, key=lambda b: abs(b[0]-t[0]) + abs(b[1]-t[1])):
+                    others = set(bs) - {b}
+                    pl = soko.plan(w, mid, w.pos()[2:], b, t, others)
+                    if pl is None: continue
+                    w.log.append('押す %s→%s' % (b, t))
+                    if soko.push(w, s, b, t, others):
+                        w.g.wait(60)
+                        for i in range(3): w.advance(s, n=200); w.settle()
+                        w._rc = {}; done = True; left.remove(t); break
+                if done: break
+            if not done: w.log.append('押せる 岩が ない %s' % (left,)); return False
+            if w.pos()[:2] != mid:
+                w.log.append('落ちた %s' % (w.pos(),)); go(mid)(w, s)
+        return True
+    return f
+bgym2 = boulder_pits([(8,3),(8,7),(2,5)], (5,2))
+bgym2b = boulder_pits([(8,3),(8,7)], (5,2))
+def bgym_solve(w, s):
+    import soko
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    mv = soko.solve_pits(w, w.pos()[:2], w.pos()[2:], boulders(w), [(8,3),(8,7),(2,5)], people=frozenset((o[0], o[1]) for o in w.objs() if o[2] != 90))
+    w.log.append('押し方 %d' % (len(mv) if mv else -1))
+    if not mv: return False
+    if not soko.run_pushes(w, s, mv): return False
+    w.log.append('のこり %s %s' % (boulders(w), w.pos()))
+    return True
+def clair(w, s):
+    b0 = w.rd(0xD56F)[0]
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    if not go((5,1))(w, s): return False
+    w.talk_to(5, 3, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return True
+def clair2(w, s):
+    b0 = w.rd(0xD56F)[0]
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set()
+    w._rc = {}; w.door(1, 7, 'U', s); w.g.wait(60); w.advance(s); w.settle(); w._rc = {}
+    w.log.append('2F %s' % (w.pos(),))
+    w.door(7, 9, 'D', s); w.g.wait(60); w.advance(s); w.settle(); w._rc = {}
+    w.log.append('1F %s' % (w.pos(),))
+    w.talk_to(5, 3, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return w.rd(0xD56F)[0] != b0
+def clair3(w, s):
+    b0 = w.rd(0xD56F)[0]
+    w.can_cut = True; w.can_surf = True; w.run_wild = True; w.avoid = set(); w._rc = {}
+    if w.pos()[:2] == (5,2):
+        w.door(7, 9, 'D', s); w.g.wait(60); w.advance(s); w.settle(); w._rc = {}
+    w.log.append('1F %s' % (w.pos(),))
+    w.talk_to(5, 3, shot=s)
+    for i in range(5): w.advance(s, n=300); w.settle()
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return w.rd(0xD56F)[0] != b0
+def fang(w, s):
+    w.can_whirl = True
+    b0 = w.rd(0xD56F)[0]
+    if not visit_talk((3,73), (35,16), 6)(w, s): return False
+    w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
+    return w.rd(0xD56F)[0] != b0

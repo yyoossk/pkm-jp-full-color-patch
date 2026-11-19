@@ -110,3 +110,37 @@ def run_pushes(w, s, moves):
         w.settle()
     s('岩')
     return True
+def solve_pits(w, mid, start, boulders, pits, maxn=300000, people=frozenset()):
+    """穴（pits）に 岩を 全部 おとす 押し方（穴には 人は 入らない・岩は 入ると 消える）。
+       こたえ：[(岩, 立つ マス, 向き), ...]"""
+    c0 = w.coll(mid); pits = frozenset(pits)
+    def reg(p, block):
+        seen = {p}; q = deque([p])
+        while q:
+            a = q.popleft()
+            for d, (dx, dy) in DIRS.items():
+                n = (a[0] + dx, a[1] + dy)
+                if n in block or n in seen or n in pits or n in people or not w.passable(c0(*n), a, d): continue
+                seen.add(n); q.append(n)
+        return seen
+    bs0 = frozenset(boulders); r0 = reg(start, bs0)
+    k0 = (bs0, frozenset(), min(r0)); prev = {k0: None}; q = deque([(bs0, frozenset(), start)])
+    while q and len(prev) < maxn:
+        bs, filled, p = q.popleft(); r = reg(p, bs)
+        if filled == pits:
+            out = []; k = (bs, filled, min(r))
+            while prev[k]: k, mv = prev[k]; out.append(mv)
+            return out[::-1]
+        for b in bs:
+            for d, (dx, dy) in DIRS.items():
+                st = (b[0] - dx, b[1] - dy); nb = (b[0] + dx, b[1] + dy)
+                if st not in r or nb in bs or nb in people: continue
+                if nb in pits:
+                    if nb in filled: continue
+                    nbs = bs - {b}; nf = filled | {nb}
+                else:
+                    if not w.passable(c0(*nb), b, d): continue
+                    nbs = (bs - {b}) | {nb}; nf = filled
+                nr = reg(b, nbs); k = (nbs, nf, min(nr))
+                if k not in prev: prev[k] = ((bs, filled, min(r)), (b, st, d)); q.append((nbs, nf, b))
+    return None
