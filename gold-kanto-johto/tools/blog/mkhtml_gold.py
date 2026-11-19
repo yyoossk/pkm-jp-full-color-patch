@@ -247,6 +247,10 @@ cred = cred.replace('</ul>', '<li>もとにしたパッチ：ポケットモン�
 o.append(cred)
 o.append('</div>')
 html = '\n'.join(o) + '\n'
+DRIVE = 'https://drive.google.com/drive/folders/1F6hFvKp835elROuIJ6M7XStGfC9iq2z6'
+GH = 'https://github.com/yyoossk/pkm-jp-full-color-patch/releases/tag/v2.0'
+html = re.sub(r'https://drive\.google\.com/drive/folders/[A-Za-z0-9_-]+(\?usp=drive_link)?', DRIVE, html)
+html = html.replace('https://github.com/yyoossk/pkm-jp-full-color-patch/releases', GH)
 for k, v in COL.items(): html = html.replace(k, v)
 body = re.sub(r'data:image/[a-z]+;base64,[A-Za-z0-9+/=]+', '', html)
 for bad in ('日本語', '日本版', '海外版', '欧州版', '移植', 'ヒビキ', '『赤』どおり', '赤どおり'):
