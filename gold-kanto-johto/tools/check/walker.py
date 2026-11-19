@@ -68,6 +68,7 @@ class W:
         if c == 0x12 and getattr(s, 'can_cut', False): return True
         if c == 0x29 and getattr(s, 'can_surf', False): return True
         if c == 0x24 and getattr(s, 'can_whirl', False): return True     # うずしお（うずまきで 消える）
+        if c == 0x33 and getattr(s, 'can_surf', False): return True       # たき（のぼりは たきのぼり）
         lc = getattr(s, '_lastc', None)
         if lc:                                        # 横の かべ（b0〜b7）：今 いる マスの かべの 向きへは 出られない・となりの かべの 向きからは 入れない
             f = lc(*frm)
@@ -163,6 +164,17 @@ class W:
                 try: r = s.step(d)
                 finally: s._surf_try = False
                 if r: return True
+        if s.pos() == before and d == 'U':
+            gi, mi, x, y = before; dx, dy = DIRS[d]
+            if s.coll((gi, mi))(x + dx, y + dy) == 0x33 and not getattr(s, '_wf_try', False):   # たきのぼり
+                s.g.press('A', 4, 60)
+                for _ in range(8):
+                    if s.menu_kind() == 'yesno': s.g.press('A', 4, 60); break
+                    if s.textbox(): s.g.press('A', 4, 40)
+                    else: s.g.wait(20)
+                s.g.wait(200); s.advance(); s.settle()
+                s.log.append('たきのぼり %s' % ((x, y),))
+                if s.pos() != before: return True
         if s.pos() == before and getattr(s, 'can_whirl', False):
             gi, mi, x, y = before; dx, dy = DIRS[d]
             if s.coll((gi, mi))(x + dx, y + dy) == 0x24:     # うずまき

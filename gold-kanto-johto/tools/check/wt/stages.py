@@ -1618,3 +1618,48 @@ def fang(w, s):
     if not visit_talk((3,73), (35,16), 6)(w, s): return False
     w.log.append('バッジ %02x -> %02x %s' % (b0, w.rd(0xD56F)[0], w.pos()))
     return w.rd(0xD56F)[0] != b0
+to_indigo = go((16,2))
+def to_indigo2(w, s):
+    w.can_whirl = True
+    return go((16,2))(w, s)
+def to_indigo3(w, s):
+    w.can_whirl = True; w.can_surf = True; w.can_cut = True; w.avoid = set()
+    return go((16,2))(w, s)
+def r27east(w, s):
+    w.can_whirl = True; w.can_surf = True; w.can_cut = True; w.avoid = set()
+    w.leave('R', s); w.log.append('→ %s' % (w.pos(),))
+    return w.pos()[:2] == (24,1)
+def r26(w, s):
+    w.can_whirl = True; w.can_surf = True; w.can_cut = True; w.avoid = set(); w.run_wild = True
+    for k in range(6):
+        if w.pos()[:2] != (24,1): break
+        w.goto_safe(7, 6, shot=s); w.log.append('r26 %s' % (w.pos(),))
+        if w.pos()[2:] == (7, 6): w.door(7, 5, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    w.log.append('→ %s' % (w.pos(),))
+    if w.pos()[:2] == (24,1): return False
+    return go((16,2))(w, s)
+def to_vr(w, s):
+    w.can_whirl = True; w.can_surf = True; w.can_cut = True; w.avoid = set(); w.run_wild = True
+    of = w.fight; cnt = [0]
+    def f2(*a, **k):
+        cnt[0] += 1
+        w.g.save_state('/home/claude/work/wt/vr_b%d.st' % cnt[0])
+        w.log.append('戦い %d %s' % (cnt[0], w.pos()))
+        open('/tmp/vr.log','a').write('戦い %d %s\n' % (cnt[0], w.pos()))
+        return of(*a, **k)
+    w.fight = f2
+    for k in range(6):
+        if w.pos()[:2] != (24,1): break
+        w.goto_safe(7, 6, shot=s)
+        if w.pos()[2:] == (7, 6): w.door(7, 5, 'U', s); w.g.wait(60); w.advance(s); w.settle()
+    while tleft(w) > 30 and cnt[0] < 40:
+        w.travel((16,2), s, tries=1)
+        w.log.append('いま %s' % (w.pos(),))
+        if w.pos()[:2] == (16,2): return True
+    return False
+def vr_fix(w, s):
+    w.can_whirl = True; w.can_surf = True; w.can_cut = True; w.avoid = set(); w.run_wild = True
+    w.fight(run=False); w.advance(s); w.settle()
+    w.log.append('D6DE=%d D7A5=%d いま %s' % (w.rd(0xD6DE)[0], w.rd(0xD7A5)[0], w.pos()))
+    s('after')
+    return True

@@ -6,6 +6,7 @@ from changed import changed_maps
 VAN = open('/home/claude/roms/Pocket Monsters - Crystal Version (Japan).gbc', 'rb').read()
 MOD = open(__import__('os').environ.get('MODROM', '/home/claude/work/ref/crystal_kj2.gbc'), 'rb').read()
 VAN = VAN + bytes(len(MOD) - len(VAN))
+import gold_scenes as _gs; print('シーンの 変数（readmem など）：直した %d' % len(_gs.ram_fix(VAN)))
 import os as _os
 BASE = _os.environ.get('GBASE', '/home/claude/work/ref/kin64.gbc')   # 第64弾：金の 追加機能パッチ（gold_kit.py）
 g = bytearray(open(BASE, 'rb').read())

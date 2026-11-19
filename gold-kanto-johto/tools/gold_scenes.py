@@ -41,3 +41,18 @@ def apply(g, M, V, E, ported, log):
     g[fo(nb, 0x4000):fo(nb, 0x4000) + len(blob)] = blob
     g[0x1F42 + 5] = nb
     log.append('シーンの 表：%d こ（%02X:4000）、足した／かえた %d：%s' % (len(out), nb, len(added), ' '.join(added)))
+
+def ram_fix(VAN):
+    """クリスタル版の シーンの 変数（readmem など で 直に 読む）→ 金の 同じ マップの 変数。
+       RX（英語版の ラベルを 通す）は 日本版で 並びが ずれる 所が あり、チャンピオンロードの $D9AA が 金 $D6E2（別の マップ）に なっていた。"""
+    import c2g
+    C = tab(VAN, fo(0x13, 0x5012))
+    G0 = tab(open('/home/claude/work/ref/kin_late.gbc', 'rb').read(), fo(0x25, 0x4000))
+    gd0 = {(a, b): c for a, b, c in G0}; diff = []
+    for a, b, c in C:
+        nm = c2g.CMAP.get((a, b)); nm = c2g.MAPALIAS.get(nm, nm); gid = c2g.GMAP.get(nm)
+        if gid in gd0 and c not in asmx.RAM_FIX:
+            gv, _ = asmx.RX.x(c)
+            if gv != gd0[gid]: diff.append('%04X:%s→%04X' % (c, None if gv is None else '%04X' % gv, gd0[gid]))
+            asmx.RAM_FIX[c] = gd0[gid]
+    return diff
