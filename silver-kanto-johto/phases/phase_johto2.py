@@ -4,8 +4,9 @@
      ずつき・いわくだき（TreeMons $2E:$6470）、むしとり大会（$25:$7BDC）
    ・人から もらう・止まって いる ポケモン（銀の ジョウトの スクリプトの givepoke・giveegg・loadwildmon。
      いかりのみずうみの 赤い ギャラドスは そのまま）
-   ・交換（クリスタル版の 表 8 つ を 銀の $3F:$7F40 へ。ジョウトの 4 つは 第二世代どうし、カントーは クリスタル版の 番号）
+   ・交換（クリスタル版の 表 15 こ を 銀の $3F:$7D00 へ。ジョウトの 4 つは 第二世代どうし、カントーは クリスタル版の 番号）
    ・コガネの ゲームコーナーの 景品（スクリプトの ほか メニューの 名前も）"""
+TRADE_AT = 0x7D00
 import os, sys, re
 H = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(H, 'tools'))
@@ -150,10 +151,42 @@ def apply(rom, ctx):
     # 交換
     cmod = open(cmaps.CMOD, 'rb').read()
     o = fo(0x3F, 0x4B9B); assert rom[o:o + 3] == bytes([0x21, 0x23, 0x4C])
-    t = fo(0x3F, 0x7F40); assert not any(rom[t:t + 128])
-    rom[t:t + 128] = cmod[fo(0x3F, 0x7A53):fo(0x3F, 0x7A53) + 128]
-    rom[o + 1] = 0x40; rom[o + 2] = 0x7F
-    log.append('交換：クリスタル版の 表 8（$3F:$7F40）')
+    # クリスタル版の 表は 15 こ（0〜6 ジョウト、7〜14 カントー）。16 バイトずつ ＝ 240 バイト。
+    # 前は 8 こ だけ 写して いて、8〜14 の 交換が ？？？？？ に なったり 止まったり して いた（12 からは バンクの 外）。
+    t = fo(0x3F, TRADE_AT); assert not any(rom[t - 16:t + 240 + 16])
+    src = cmod[fo(0x3F, 0x7A53):fo(0x3F, 0x7A53) + 256]
+    assert src[240:] == bytes(16) and all(src[16 * i + 1] for i in range(15))
+    rom[t:t + 240] = src[:240]
+    rom[o + 1] = TRADE_AT & 0xFF; rom[o + 2] = TRADE_AT >> 8
+    log.append('交換：クリスタル版の 表 15（$3F:$%04X）' % TRADE_AT)
+    # 交換の 話は クリスタルが 4 しゅるい（0〜3）、銀は 3 しゅるい（$3F:$4CA1、5 つの 場面 × 3）。
+    # 表の 3 番（女の子の 話：とりかえて くれない？）を 使う 交換（ジョウト 2 つ・カントー）で ほかの 文が 出て いたので、
+    # クリスタルの 3 番の 文（RAM の 名前の 場所を 銀に 読みかえ）を 写し、5 × 4 の 表に する。
+    a = fo(0x3F, 0x4C8B)
+    assert rom[a:a + 22] == bytes.fromhex('21a14c191919191919fa58ce5f19192a666fcd300fc9'), rom[a:a + 22].hex()
+    RAMX = {0xD046: 0xCF72, 0xD05B: 0xCF87, 0xD066: 0xCF92}
+    def ctext(addr):
+        o = fo(0x3F, addr); out = bytearray()
+        while True:
+            b = cmod[o]
+            if b == 0x01:
+                v = cmod[o + 1] | cmod[o + 2] << 8; v = RAMX[v]; out += bytes([1, v & 0xFF, v >> 8]); o += 3; continue
+            out.append(b); o += 1
+            if b in (0x57, 0x58): return bytes(out)
+    ct = fo(0x3F, 0x4EE2); old_t = fo(0x3F, 0x4CA1)
+    TXT_AT, TAB_AT = 0x7B10, 0x7C60
+    tx = fo(0x3F, TXT_AT); tb = fo(0x3F, TAB_AT)
+    assert not any(rom[tx - 16:tx + 200]) and not any(rom[tb - 16:tb + 40 + 16])
+    q = tx; tab = bytearray()
+    for part in range(5):
+        for d in range(3):
+            tab += rom[old_t + 6 * part + 2 * d:old_t + 6 * part + 2 * d + 2]
+        t = ctext(cmod[ct + 8 * part + 6] | cmod[ct + 8 * part + 7] << 8)
+        rom[q:q + len(t)] = t; ad = 0x4000 + (q - fo(0x3F, 0x4000)); tab += bytes([ad & 0xFF, ad >> 8]); q += len(t)
+    assert q < tx + 200
+    rom[tb:tb + 40] = tab
+    rom[a:a + 22] = bytes([0x21, TAB_AT & 0xFF, TAB_AT >> 8]) + bytes.fromhex('cb23cb23cb2319fa58ce5f19192a666fc3300f')   # e×8 ＋ 話×2
+    log.append('交換の 話：4 しゅるいに（文 $3F:$%04X、表 $3F:$%04X）' % (TXT_AT, TAB_AT))
     # 文の 名前（同じ 長さで 入れかえ。名前の 表と 図鑑は さわらない）
     k = 0
     for bk, ad, a, b in TEXTS:
