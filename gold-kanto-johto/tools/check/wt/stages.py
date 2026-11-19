@@ -1663,3 +1663,24 @@ def vr_fix(w, s):
     w.log.append('D6DE=%d D7A5=%d いま %s' % (w.rd(0xD6DE)[0], w.rd(0xD7A5)[0], w.pos()))
     s('after')
     return True
+def warp_league(w, s):
+    g = w.g
+    g.poke(0xD9C6, 16); g.poke(0xD9C7, 2); g.poke(0xD9C9, 9); g.poke(0xD9C8, 12)
+    g.poke(0xCF20, 255); g.poke(0xFFA1, 0xF1); g.poke(0xD14B, 1); g.wait(200); w.settle(); w._rc = {}
+    w.log.append('ワープ %s' % (w.pos(),)); s('高原')
+    return w.pos()[:2] == (16,2)
+def champ_rec(w, s):
+    w.run_wild = True; w.lead_for = None
+    w.g.rec('/tmp/champ')
+    for k in range(6):
+        mid = w.pos()[:2]
+        if mid != (16,7): break
+        w.travel((16,8), s, tries=1)
+        if w.pos()[:2] == (16,8): break
+        for x, y, sp in w.objs(): w.talk_to(x, y, shot=s); w.advance(s, n=400)
+    w.log.append('いま %s' % (w.pos(),))
+    for k in range(40):
+        w.g.wait(300); w.g.press('A', 4, 10)
+        if k % 3 == 0: s('hof%d' % k)
+    w.g.stop()
+    return True
