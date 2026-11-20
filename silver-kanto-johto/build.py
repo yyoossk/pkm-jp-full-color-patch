@@ -95,6 +95,16 @@ def main():
         print(k, 'に 当てた CRC32 %08X' % crc(a))
     open(os.path.join(B, NAME + '.ips'), 'wb').write(p)
     print('IPS', len(p), 'バイト / できあがり', len(rom), 'バイト CRC32 %08X' % crc(rom))
+    # MBC5 版（tools/mbc5.py：時計は ソフトで 動かす）
+    sys.path.insert(0, os.path.join(H, 'tools'))
+    import mbc5
+    r5 = mbc5.convert(rom)
+    open(os.path.join(B, '銀カントー＆ジョウト_MBC5版.gbc'), 'wb').write(r5)
+    p5 = ips([r['gin0'], r['gin1']], bytes(r5))
+    for k in ('gin0', 'gin1'):
+        assert apply(r[k], p5) == bytes(r5), k + ' に 当てた ものが ちがう（MBC5 版）'
+    open(os.path.join(B, NAME + '_MBC5版.ips'), 'wb').write(p5)
+    print('MBC5 版 IPS', len(p5), 'バイト / CRC32 %08X' % crc(r5))
 
 
 if __name__ == '__main__':
