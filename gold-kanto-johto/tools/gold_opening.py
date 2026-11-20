@@ -14,6 +14,7 @@ from asmx import L, CSD, GJ, GB, HRAM
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 RED = HERE + '/red'
+TITLE_FLAG = 0xDE36   # 第124弾の フラグ（話しかける テスト・戦闘でも 0xA5 の まま だった 使われない 1バイト）
 RGBDS = os.environ.get('RGBDS', '/home/claude/rgbds-src')
 def fo(b, a): return b * 0x4000 + a - 0x4000
 
@@ -147,6 +148,9 @@ def gold_source(src, jpinc, glue_bank, red_bank, cry, red1_bank=0):
     s, n = re.subn(r'\nSfx: [^\n]*\n(?:\t[^\n]*\n)+?\tret\n', '\nSfx:\n\tjp RedSfx\n', s); assert n == 1
     s, n = re.subn(r'\nMusic: [^\n]*\n(?:\t[^\n]*\n)+?\tret\n', '\nMusic:\n\tjp RedSfx\n', s); assert n == 1
     s, n = re.subn(r'\tcall PlayMonCry\n', '\tcall CryWrap\n', s); assert n == 1
+    # 第124弾：メニューから B で もどった ときは オープニングを 飛ばして 赤の タイトル画面から（フラグ TITLE_FLAG）
+    s, n = re.subn(r'\tcall PlayIntro\n\tcall TitleScreen\n', '\tcall MaybePlayIntro\n\tcall TitleScreen\n', s); assert n == 1
+    s += '\nMaybePlayIntro:\n\tld a, [$%04X]\n\tand a\n\tjp z, PlayIntro\n\txor a\n\tld [$%04X], a\n\tret\n' % (TITLE_FLAG, TITLE_FLAG)
     s = s.replace('INCLUDE "phase53_data.inc"', GLUE % dict(red=red_bank, red1=red1_bank, cry=cry, music=W_MUSIC, start=W_MUSIC + 1,
                                                           end=W_AUDIO_END, on=RED_ON, init=GJ['InitSound'])
                   + '\nINCLUDE "phase53_data.inc"')
@@ -374,5 +378,12 @@ def apply(g, M, E, log):
                          0xAF, 0xE0, 0xD8, 0x3E, 0x98, 0xE0, 0xD9,      # hBGMapAddress = $9800（金の タイトルの あとと 同じ）
                          0xC3, 0x08, 0x64])
     g[o:o + len(hk)] = hk
+    # 第124弾：_MainMenu の「jp StartTitleScreen」（01:5A94 → $63FD。上の フックの 中ほどで、こわれた タイトルに なった）を
+    # 使われなく なった もとの タイトルの ループ（01:63FF〜6406）へ：フラグを 立てて IntroSequence へ
+    mm = fo(0x01, 0x5A94); assert bytes(g[mm:mm + 3]) == bytes.fromhex('c3fd63')
+    lp = fo(0x01, 0x63FF); assert G0[lp:lp + 8] == bytes.fromhex('64cd2e03cda26530')
+    g[lp:lp + 8] = bytes([0x3E, 0x01, 0xEA, TITLE_FLAG & 0xFF, TITLE_FLAG >> 8, 0xC3, 0xEF, 0x63])
+    g[mm + 1:mm + 3] = bytes([0xFF, 0x63])
+    log.append('第124弾：メニューから B で 赤の タイトル画面へ（01:5A94 → 01:63FF、フラグ $%04X）' % TITLE_FLAG)
     log.append('第53・68弾：赤の オープニング %02X:%04X〜%04X、タイトルの ポケモン %02X:%04X〜%04X、赤の 音 バンク %02X'
                % (code_bank, ro, end, mon_bank, mon_addr, tot, red_bank))

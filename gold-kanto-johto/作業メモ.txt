@@ -588,3 +588,11 @@
     リセット・PC が RAM の 中 を さがす）→ 交換と 電話の ほかは なし。
   ・リリース：tools/mkrelease.py（初期版・後期版 共通の IPS）、ブログ用 HTML は tools/blog/mkhtml_gold.py
     （手本＝クリスタル版の ブログ用 HTML、画像は tools/blog/img、オリジナルの 節は 金の ROM で とった 画像）。
+
+■ 第124弾（タイトル画面に 戻る ときの 直し）
+  ・金でも メニューから B で もどると、_MainMenu の「jp StartTitleScreen」（01:5A94 → $63FD）が 赤の オープニングの フック
+    （01:63EF〜63FE）の 中ほどに 飛び、こわれた 白い 画面に なって いた。
+  ・直し（gold_opening.py）：01:5A94 の 行き先を もとの タイトルの ループ（01:63FF〜6406、使われない）に して
+    「ld a,1 / ld [$DE36],a / jp IntroSequence」、赤の オープニングの call PlayIntro を MaybePlayIntro（フラグが 立って いれば
+    消して オープニングを 飛ばす）に。$DE36 は 全マップ 話しかけテスト・戦闘でも 書かれなかった 1バイト。
+  ・確かめた：起動→オープニング→タイトル→START→B を 3回 → 赤の タイトル、そのあと さいしょから／つづきから。
