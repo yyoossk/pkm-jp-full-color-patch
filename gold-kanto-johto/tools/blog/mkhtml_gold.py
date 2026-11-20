@@ -17,8 +17,8 @@ ROM5 = open(sys.argv[5], 'rb').read()
 NAME = 'ポケットモンスター金 カントー＆ジョウト'
 CRC = '%08X' % zlib.crc32(ROM); SHA = hashlib.sha1(ROM).hexdigest()
 CRC5 = '%08X' % zlib.crc32(ROM5); SHA5 = hashlib.sha1(ROM5).hexdigest()
-IPS30 = NAME + '.ips'; IPS5 = NAME + '_MBC5.ips'
-HISTORY = [('2026/11/20', '1.1.0', ['MBC5版を追加しました（gambatte・中華エミュレーター機・フラッシュカートでも動きます。ゲームの中の時計はプレイじかんで進みます）']),
+IPS30 = NAME + '.ips'; IPS5 = NAME + '_時計機能なし.ips'
+HISTORY = [('2026/11/20', '1.1.0', ['時計機能なし版を追加しました（gambatte・中華エミュレーター機・フラッシュカートでも動きます。ゲームの中の時計はプレイじかんで進みます）']),
            ('2026/11/20', '1.0.1', ['タイトル画面のメニューから B で戻ると、画面がこわれて先に進めなかったのを直しました（オープニングを飛ばしてタイトル画面にもどります）']),
            ('2026/11/19', '1.0.0', ['初回リリース'])]
 
@@ -119,13 +119,13 @@ o.append(P('『ポケットモンスター金』を、<b>サトシ</b>になっ�
            'カントーで殿堂入りしたあとは、船でワカバタウンへ渡って、ジョウトで金の物語が始まります。ジョウトでは<b>第二世代のポケモンをすべて</b>ゲットできるようにしました。'))
 o.append(P('さらに「金 追加機能パッチ」の機能（Bボタンダッシュ・連れ歩き・<b>60fps</b> など）と、元のゲームのバグ修正も入っています。'))
 o.append(BOX('<b>ゲームボーイカラー専用です</b><br />パッチを当てたファイルは、拡張子を <b>.gbc</b> にして、<b>ゲームボーイカラーのコア（モード）</b>で起動してください。<br />'
-             'パッチを当てると ROM は <b>4MB</b>（4,194,304 バイト）になります。<b>MBC30版</b>と<b>MBC5版</b>の2つがあります。中身（遊べる内容）は同じです。'
+             'パッチを当てると ROM は <b>4MB</b>（4,194,304 バイト）になります。<b>通常版</b>と<b>時計機能なし版</b>の2つがあります。中身（遊べる内容）は同じです。'
              '<ul style="margin:6px 0 0;padding-left:1.4em;">'
-             '<li><b>MBC30版</b>：元の『金』と同じく、本物の時計（電源を切っていても進む時計）を使います。'
+             '<li><b>通常版</b>（MBC30）：元の『金』と同じく、本物の時計（電源を切っていても進む時計）を使います。'
              '動くのは SameBoy（動作を確かめています）・mGBA・BGB・VBA-M（2.1.5 以降）・Pizza Boy GBC Pro（5.4.5 以降）・RetroArch の SameBoy コア／mGBA コア など、4MB の MBC30 に対応したエミュレーターです。'
              'gambatte（RetroArch の gambatte コアや、gambatte を使う中華エミュレーター機をふくむ）や、ゲームボーイカラー本体＋エバードライブなどのフラッシュカートでは、著作権の画面のあと止まります。</li>'
-             '<li><b>MBC5版</b>：MBC30 に対応していないエミュレーター（gambatte など）・中華エミュレーター機・フラッシュカートでも動きます。'
-             'MBC5 には時計がないので、<b>ゲームの中の時計は「プレイじかん」で進みます</b>（遊んでいる間だけ進み、電源を切っている間とタイトル画面の間は止まります）。'
+             '<li><b>時計機能なし版</b>（MBC5）：MBC30 に対応していないエミュレーター（gambatte など）・中華エミュレーター機・フラッシュカートでも動きます。'
+             'カートリッジの時計を使わないので、<b>ゲームの中の時計は「プレイじかん」で進みます</b>（遊んでいる間だけ進み、電源を切っている間とタイトル画面の間は止まります）。'
              '朝・昼・夜、曜日、1日1回のイベントは、遊んだ時間に合わせて変わります。時計あわせ（オプションの とけい せってい など）はそのまま使えます。</li></ul>'))
 
 orig = []   # (見出し, html)
@@ -197,7 +197,7 @@ j = REF.index('ギガファイル便にアップロードしたリンク）</div
 bug = REF[i:j]
 RCRC = re.search(r'CRC32：([0-9A-F]{8})', REF).group(1)
 assert bug.count(RCRC) == 2 and bug.count('ポケットモンスター クリスタル カントー＆ジョウト.ips') == 1
-k = bug.index(RCRC); bug = bug[:k] + 'MBC30版 %s・MBC5版 %s' % (CRC, CRC5) + bug[k + 8:]
+k = bug.index(RCRC); bug = bug[:k] + '通常版 %s・時計機能なし版 %s' % (CRC, CRC5) + bug[k + 8:]
 bug = bug.replace(RCRC, CRC).replace('ポケットモンスター クリスタル カントー＆ジョウト.ips', IPS30)
 o.append(bug)
 
@@ -235,21 +235,21 @@ howto = howto.replace('違うときは、吸い出しをやり直してくださ
 howto = howto.replace('元の『クリスタル』とちがうので、元の『クリスタル』のセーブデータでは遊べません', '元の『金』とちがうので、元の『金』のセーブデータでは遊べません')
 mz = re.search(r'ポケットモンスター金 カントー＆ジョウト/\s*(<br />)?\s*└ ポケットモンスター金 カントー＆ジョウト\.ips', howto)
 assert mz, 'zip の 中身'
-howto = howto.replace(mz.group(0), NAME + '/<br />├ MBC30版/<br />│　└ ' + IPS30 + '<br />└ MBC5版/<br />　　└ ' + IPS5)
+howto = howto.replace(mz.group(0), NAME + '/<br />├ 通常版/<br />│　└ ' + IPS30 + '<br />└ 時計機能なし版/<br />　　└ ' + IPS5)
 mw = re.search(r'ゲームボーイカラーと 4MB の ROM（MBC30）に対応したエミュレーター（[^）]*）で遊べます。', howto); assert mw, '遊ぶ'
-howto = howto.replace(mw.group(0), 'MBC30版は、ゲームボーイカラーと 4MB の ROM（MBC30）に対応したエミュレーター（SameBoy・mGBA・BGB など）で遊べます。'
-                      'gambatte・中華エミュレーター機・フラッシュカートでは MBC5版を使ってください。どちらの版でも、IPS を当てる元のROMは同じです。')
+howto = howto.replace(mw.group(0), '通常版は、ゲームボーイカラーと 4MB の ROM（MBC30）に対応したエミュレーター（SameBoy・mGBA・BGB など）で遊べます。'
+                      'gambatte・中華エミュレーター機・フラッシュカートでは時計機能なし版を使ってください。どちらの版でも、IPS を当てる元のROMは同じです。')
 for bad in ('クリスタル', '270C4ECC', '2,097,152'): assert bad not in howto, bad
 o.append(howto)
 
 o.append(H2('確認用の値（パッチを当てたあとのROM）'))
-for nm_, c_, s_ in (('MBC30版（' + IPS30 + '）', CRC, SHA), ('MBC5版（' + IPS5 + '）', CRC5, SHA5)):
+for nm_, c_, s_ in (('通常版（' + IPS30 + '）', CRC, SHA), ('時計機能なし版（' + IPS5 + '）', CRC5, SHA5)):
     o.append(P('<b>' + nm_ + '</b>'))
     o.append(f'<div style="font-family:monospace;font-size:14px;word-break:break-all;overflow-wrap:anywhere;background:#f3fbfe;border:1px solid #8cc8e6;border-radius:4px;padding:6px 8px;margin:4px 0 10px;">CRC32：{c_}<br />SHA-1：{s_}<br />サイズ：4,194,304 バイト</div>')
 o.append(H2('注意事項'))
 o.append(UL(['バトルの計算のバグを直しているので、パッチを当てていないカートリッジ・ROMとの通信対戦では、結果がずれることがあります。',
              'エミュレーターの「ステートセーブ」は、パッチの版をまたいで使わないでください（画面がくずれたり止まったりすることがあります）。ゲームの中の「レポート」でのセーブは、そのまま使えます。',
-             'MBC30版とMBC5版のあいだでセーブデータを持っていくと、ゲームの中の時刻がずれます（オプションの とけい せってい で合わせなおせます）。',
+             '通常版と時計機能なし版のあいだでセーブデータを持っていくと、ゲームの中の時刻がずれます（オプションの とけい せってい で合わせなおせます）。',
              'パッチは自己責任で使ってください。元のROMは、必ずコピーを残しておいてください。']))
 o.append('<div style="border:2px solid #c0392b;background:#fff3f0;border-radius:8px;padding:10px 14px;margin:12px 0;line-height:1.85;"><b>不具合を見つけたら</b><br />'
          'どの端末（パソコン・Android・iPhone・中華エミュレーター機など）とエミュレーターを使って、どの場所で、何をしたときに起きたかを、コメントで教えてください。できれば画面の写真や動画もあると助かります。</div>')
