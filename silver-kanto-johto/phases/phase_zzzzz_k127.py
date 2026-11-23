@@ -4,7 +4,7 @@
      組 3（3,16：銀の マップ。$25・$23 が ない）と 組 15（15,1・15,2：銀の 港。$3B・$27・$24・$A2 が ない。
      カントーを 足した ときに 表を カントーの マップ だけで 作りなおして いた）が 足りなかった
    → その 組の 外の マップで 使う 絵だけの 表に する（組 3 は 11 ちょうど、組 15 は 8）。
-   組 17（フクシア）は 13 で 入らない（ラプラス・$6B。前から の TODO）。
+   組 17（フクシア）は 13 で 入らない → かざりの ポケモン 2つ（ラプラス $9C・$6B、話すと「！」だけ）を けす。
  2 ディグダのあな（2番道路側の 入口 26,84）の まわりの ブロック $0A → $7D（クチバ側 26,108 と 同じ）。
  3 画面が 反転する わざで テキストボックスに 黒い 箱：PP の ます（14〜18列・13段）の パレットを、わざを えらぶ 間だけ 6、
    えらび おわったら 7 に（$48:$4DFF・$48:$4E46 に 足す。戦闘の 画面を 作る 所 $48:$4C5E は 7）。
@@ -102,7 +102,7 @@ def outdoor_lists(rom, log):
         miss = [s for s in need[g] if s not in lst]
         if not miss: continue
         if g == 17:
-            log.append('第127弾 1：組 17（フクシア）は %d の 絵 → 入らない %s（そのまま）' % (len(need[g]), [hex(s) for s in miss]))
+            log.append('第127弾 1：組 17（フクシア）は %d の 絵 → 入らない %s（fuchsia() で 消す）' % (len(need[g]), [hex(s) for s in miss]))
             continue
         keep = [s for s in lst if s in need[g]]
         new = keep + [s for s, n in need[g].most_common() if s not in keep]
@@ -114,6 +114,18 @@ def outdoor_lists(rom, log):
         fixed.append(g)
         log.append('第127弾 1：組 %d の 外の 人の絵 %s → %s' % (g, bytes(lst).hex(' '), bytes(new).hex(' ')))
     assert fixed == [3, 15], fixed
+
+
+def fuchsia(rom, log):
+    """フクシア（17,5）は 人の絵が 13 で、外の マップの 表（11）に 入らない ラプラス（$9C）と $6B が 主人公の 絵に なって いた。
+    2匹とも 話すと「！」だけの かざり（道具・話の すすみ には かかわらない）なので、マップの 人の 終わりの 2つを けす。"""
+    h, ao = header(rom, 17, 5); sb = rom[ao + 6]
+    o = fo(sb, r16(rom, ao + 9)) + 2
+    o += 1 + 5 * rom[o]; o += 1 + 8 * rom[o]; o += 1 + 5 * rom[o]
+    n = rom[o]; last = [rom[o + 1 + 13 * i] for i in range(n)][-2:]
+    assert last == [0x9C, 0x6B], [hex(x) for x in last]
+    rom[o] = n - 2
+    log.append('第127弾 1：フクシアの かざりの ポケモン 2つ（$9C・$6B）を けす（人 %d → %d）' % (n, n - 2))
 
 
 def diglett(rom, log):
@@ -233,6 +245,7 @@ def pewter_guy(rom, log):
 
 def apply(rom, ctx):
     log = ctx.setdefault('log', [])
+    fuchsia(rom, log)
     outdoor_lists(rom, log)
     diglett(rom, log)
     pp_attr(rom, log)
