@@ -54,7 +54,7 @@ NPCS = [
 DIRN = {'D': 0, 'U': 1, 'L': 2, 'R': 3}
 OPP = {'D': 'U', 'U': 'D', 'L': 'R', 'R': 'L'}
 # 金の スクリプト命令（pokegold macros/scripts/events.asm の 順）
-OP = dict(scall=0x00, sjump=0x03, ifequal=0x06, iffalse=0x08, iftrue=0x09, callasm=0x0E, setval=0x15,
+OP = dict(scall=0x00, sjump=0x03, ifequal=0x06, iffalse=0x08, iftrue=0x09, callasm=0x0E, setval=0x15, readvar=0x1C,
           checkevent=0x31, clearevent=0x32, setevent=0x33, checkflag=0x34, opentext=0x47, closetext=0x49,
           writetext=0x4C, yesorno=0x4E, waitbutton=0x53, applymovement=0x68, faceplayer=0x6A, appear=0x6E,
           turnobject=0x75, endcallback=0x8F, end=0x90)
@@ -156,7 +156,9 @@ def gym_script(base, gym, gid, orig_ptr, called, hide, badge, mv, nb, sym):
         s.L('cb_hide'); s.op('setevent', (hide,)); s.op('endcallback')
     for i, ((px, py), (walk, face)) in enumerate(sorted(cells.items())):
         L = 'lv%d' % i
-        s.L(L); s.op('checkflag', (badge,)); s.op('iffalse', L + 'x'); s.op('checkevent', (called,)); s.op('iftrue', L + 'x')
+        # 第127弾：入って きた とき（上向きで この ますを 通った とき）は 呼び止めない（そらをとぶ などで 出て また 入る とき）
+        s.L(L); s.op('readvar', 0x09); s.op('ifequal', 1, L + 'x')
+        s.op('checkflag', (badge,)); s.op('iffalse', L + 'x'); s.op('checkevent', (called,)); s.op('iftrue', L + 'x')
         if hide is not None: s.op('appear', gid)
         # （showemote は 使わない：連れ歩きの 絵を こわす）
         s.op('opentext'); s.op('writetext', 'call'); s.op('waitbutton'); s.op('closetext')

@@ -31,6 +31,28 @@ def png2bpp(path):
 CAL = 0x0C
 
 
+def bike_head(bike, walk):
+    """16x16 の コマ（タイル 左上・右上・左下・右下）× 6 の 上 9段を、walk の 立ちの コマ（f % 3）の 上 9段に"""
+    def px(b, o):
+        P = [[0] * 16 for _ in range(16)]
+        for t, (dx, dy) in enumerate(((0, 0), (8, 0), (0, 8), (8, 8))):
+            d = b[o + t * 16:o + t * 16 + 16]
+            for y in range(8):
+                for x in range(8): P[dy + y][dx + x] = ((d[2 * y] >> (7 - x)) & 1) | (((d[2 * y + 1] >> (7 - x)) & 1) << 1)
+        return P
+    out = bytearray()
+    for f in range(6):
+        s_, k = px(walk, (f % 3) * 64), px(bike, f * 64)
+        P = [s_[y] if y < 9 else k[y] for y in range(16)]
+        for dx, dy in ((0, 0), (8, 0), (0, 8), (8, 8)):
+            for y in range(8):
+                lo = hi = 0
+                for x in range(8):
+                    v = P[dy + y][dx + x]; lo |= (v & 1) << (7 - x); hi |= (v >> 1) << (7 - x)
+                out += bytes([lo, hi])
+    return bytes(out)
+
+
 def lz_literal(data):
     out = bytearray(); i = 0
     while i < len(data):
@@ -56,7 +78,10 @@ def apply(g, M, E, log):
     # 自転車
     # クリスタル版（第71弾）の 自転車の 絵は 赤フルカラーの 絵の 表の 2番め＝ライバルの 歩く 絵だったので、
     # pokered の red_bike.png（16x96、6コマ。タイルは 左上・右上・左下・右下）を 2bpp に して 使う
-    a = put(png2bpp(os.path.join(POKERED, 'gfx/sprites/red_bike.png')))
+    bk = png2bpp(os.path.join(POKERED, 'gfx/sprites/red_bike.png'))
+    # 第127弾：自転車の 6コマの 上 9段を、歩く 絵（サトシ）の 立ちの 絵（下・上・横）の 上 9段に（赤の 頭の ままだった）
+    bk = bike_head(bk, G0[fo(0x30, 0x46C0):fo(0x30, 0x46C0) + 3 * 64])
+    a = put(bk)
     g[t + 6] = a & 0xFF; g[t + 7] = a >> 8; g[t + 9] = nb
     # 後ろ姿（クリスタル版：ld b, bank / ld hl, pic）
     assert M[0x3FC38] == 0x06 and M[0x3FC3A] == 0x21

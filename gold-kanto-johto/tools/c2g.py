@@ -67,9 +67,10 @@ class Xlat:
         if n is None:
             if v in s.gfree: return v     # 名前のない（MOD で使い始めた）フラグは 金でも空いている同じ番号
             if 0x800 <= v <= 0xA17: return v   # 第15弾の 土台（gold_flags.py）で 金でも 使える
-            if v < 0x800:                        # 名前なしで 使っているが 金では 使われている 番号 → 空きを わりあてる
+            if v < 0x800 or 0xA17 < v < 0xB00:   # 名前なしで 使っているが 金では 使われている 番号・第15弾の 土台の 外（第127弾 $A20）→ 空きを わりあてる
                 k = ('num', v)
-                if k not in EV_EXTRA: EV_EXTRA[k] = EV_POOL.pop(0)
+                # 第15弾の 土台の 外は 空きの うしろから（前から とると ほかの フラグの 番号が ずれて、前の 版の セーブと あわなく なる）
+                if k not in EV_EXTRA: EV_EXTRA[k] = EV_POOL.pop() if v > 0xA17 else EV_POOL.pop(0)
                 return EV_EXTRA[k]
             return s._m('event', v, ctx)
         g = G['event'].get(n)
@@ -199,7 +200,7 @@ def emit_map(E, W, at, cname, chdr, crom, grom, gmaps, cmaps_by_name):
     cb = at['scbank']; gb = E.gbank(cb)
     def alloc(n, bank):
         a = E.fill[bank]
-        if a + n > 0x8000: raise Exception('バンクがいっぱい %02X' % bank)
+        if a + n > 0x8000: raise Exception('バンクがいっぱい %02X（%s、%d バイト、のこり %d、MOD %s）' % (bank, cname, n, 0x8000 - a, [hex(k) for k, v in E.bankmap.items() if v == bank]))
         E.fill[bank] = a + n; return a
     # ブロック
     nblk = at['h'] * at['w']; bo = fo(at['blkbank'], at['blk'])
