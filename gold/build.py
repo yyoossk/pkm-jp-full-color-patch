@@ -62,8 +62,8 @@ FILES=[
 # 251ひき そろう版：野生・ショップ・ずかんの 文字の ファイルを かえて、edition251_gold.asm を 足す
 FILES251=[{'src/wild_gold.asm':'src/wild251_gold.asm','src/masterball.asm':'src/masterball251.asm',
            'src/dexinfo_gold.asm':'src/dexinfo251_gold.asm'}.get(f,f) for f in FILES]+['src/edition251_gold.asm']
-EXPECT={'kin.gbc':0xF7B01A15,'kin60.gbc':0x7ADD371D,   # Ver.1.6.0
-        'kin251.gbc':0xF16D232F,'kin251_60.gbc':0xAB2DE961}   # 251ひき そろう版
+EXPECT={'kin.gbc':0xE13AB119,'kin60.gbc':0xC1124704,   # Ver.1.6.1
+        'kin251.gbc':0xFFB8F1BE,'kin251_60.gbc':0x6F2E4A57}   # 251ひき そろう版
 def run(*a):
     r=subprocess.run(a,capture_output=True,text=True)
     if r.returncode: print(r.stdout,r.stderr); sys.exit(1)
