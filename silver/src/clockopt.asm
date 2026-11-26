@@ -25,6 +25,7 @@ INCLUDE "src/charmap_jp.inc"
 DEF OPT_BANK          EQU $39
 DEF OPT_FAR_BANK      EQU $43        ; 新しいバンク（銀：ジムリーダー再戦と同じ $43。$43:$5000〜）
 DEF OPT_FAR_ADDR      EQU $5000
+DEF OPT_PAGE_ADDR     EQU $6400      ; 2ページの 処理（同じ バンクの 空き。金は $6c00）
 DEF OPT_BANK39_FREE   EQU $7fe9      ; バンク$39 の空き（$7fe2〜$7fe8 はバグ修正）
 DEF wJumptableIndex   EQU $ce57
 DEF hJoyPressed       EQU $ffa9
@@ -43,11 +44,23 @@ DEF TILE_CURSOR       EQU $ed
 DEF TILE_HOLLOW       EQU $ec
 DEF B_BUTTON          EQU 2
 DEF JoyTextDelay      EQU $09fd
-DEF wClockSub         EQU $dee8     ; とけいの行で選んでいる所（0 = あさ・ひる・よる、1 = せってい）。使われていない WRAM（銀：$de37 は ずかんの絵の色、$de40〜$dee7 は 60fps）
+DEF wClockSub         EQU $dee8     ; とけいの行で選んでいる所（ビット0：0 = あさ・ひる・よる、1 = せってい）。
+                                    ; ビット7 = 2ページめ を 出して いる。使われていない WRAM（銀：$de37 は ずかんの絵の色、$de40〜$dee7 は 60fps）
+DEF OPT_PAGE_BIT      EQU 7
+DEF PAGE_NUM_ROW      EQU 16         ; ページの 番号（右下）
+DEF PAGE_NUM_COL      EQU 15
+DEF StringOptions     EQU $4aa6      ; バンク$39（金 $4c20 − $17a）
+DEF StringOptionsLen  EQU $38
+DEF hJoyLast          EQU $ffab
 DEF wTilemap          EQU $c3a0
 DEF SCREEN_WIDTH      EQU 20
 DEF OPT_CLOCK         EQU 7
+DEF OPT_HEAL          EQU 8        ; かいふく（ポケモンセンターの 回復の アニメ。src/pcheal.asm）
 DEF CLOCK_ROW         EQU 15
+DEF HEAL_ROW          EQU 1        ; 2ページめ の いちばん上
+DEF HEAL_VALUE_COL    EQU 11
+DEF wOptions2         EQU $d1b0    ; ビット3 ＝ はやい かいふく（ビット0 メニューせつめい・1〜2 電話の 回数）
+DEF HEAL_FAST_BIT     EQU 3
 DEF CLOCK_VALUE_COL   EQU 6        ; あさ・ひる・よる（「とけい」の右）
 DEF CLOCK_SET_COL     EQU 11       ; 「せってい」（カーソルの右）
 DEF RestartClock_Bank EQU $08
@@ -72,11 +85,11 @@ OptionsDispatch:
 	rst $08                      ; キャリー = せっていを閉じる
 	ret
 
-; ---- 上下の移動：いちばん下 = 7（とけい。おわり は なくした）
+; ---- 上下の移動：いちばん下 = 8（かいふく。おわり は なくした）
 SECTION "opt down max", ROMX[$4d57 + 1], BANK[OPT_BANK]   ; OptionsControl .DownPressed の cp OPT_CANCEL
-	db OPT_CLOCK
+	db OPT_HEAL
 SECTION "opt up wrap", ROMX[$4d74 + 1], BANK[OPT_BANK]    ; .UpPressed の ld [hl], NUM_OPTIONS
-	db OPT_CLOCK + 1
+	db OPT_HEAL + 1
 
 ; ---- カーソル：新しいバンクで消して置く。あまった所に 開いたときの入口
 SECTION "opt cursor", ROMX[Options_UpdateCursorPosition], BANK[OPT_BANK]
@@ -119,7 +132,9 @@ SECTION "opt new", ROMX[OPT_FAR_ADDR], BANK[OPT_FAR_BANK]
 Options_HighItems:
 	ld a, [wJumptableIndex]
 	cp OPT_CLOCK
-	jr z, Options_Clock
+	jp z, Options_Clock
+	cp OPT_HEAL
+	jp z, Options_Heal
 ; （おわり は なくしたので ここには来ない）
 	ldh a, [hJoyPressed]
 	and A_BUTTON
@@ -131,6 +146,7 @@ Options_HighItems:
 	ret
 
 Options_CursorNew:
+	call Options_CheckPage
 ; 元と同じに カーソルの列（10列目）を 1〜16行目まで消す
 	ld hl, wTilemap + 1 * SCREEN_WIDTH + 10
 	ld de, SCREEN_WIDTH
@@ -151,9 +167,15 @@ Options_CursorNew:
 	ld [hl], TILE_CURSOR
 	ret
 .bottom
+	cp OPT_HEAL
+	jr nz, .clockrow
+	ld hl, wTilemap + HEAL_ROW * SCREEN_WIDTH + 10
+	ld [hl], TILE_CURSOR
+	ret
+.clockrow
 	ld hl, wTilemap + CLOCK_ROW * SCREEN_WIDTH + 10
 	ld a, [wClockSub]
-	and a
+	and 1
 	jr nz, .put
 	ld hl, wTilemap + CLOCK_ROW * SCREEN_WIDTH + CLOCK_VALUE_COL - 1
 .put
@@ -167,8 +189,12 @@ Options_InitClock:
 	ld hl, UpdateFrame
 	rst $08                      ; 元の call UpdateFrame
 	ld hl, wTilemap + CLOCK_ROW * SCREEN_WIDTH + 1
-	ld de, .label
+	ld de, Options_ClockLabels.label
 	call PlaceString
+Options_ClockLabels:
+	ld hl, wTilemap + PAGE_NUM_ROW * SCREEN_WIDTH + PAGE_NUM_COL
+	ld a, $f7                     ; 1
+	call Options_PutPageNum
 	ld a, [wMapGroup]
 	and a
 	jp z, Options_ClockShow      ; ゲームを始める前は 右の文を出さない
@@ -193,7 +219,7 @@ Options_Clock:
 	bit 0, a                     ; A
 	jp z, Options_ClockShow
 	ld a, [wClockSub]
-	and a
+	and 1
 	jp nz, .setclock
 ; あさ・ひる・よる で A：左右で切りかえる（A・B で おわる）
 	ld hl, wTilemap + CLOCK_ROW * SCREEN_WIDTH + CLOCK_VALUE_COL - 1
@@ -316,3 +342,134 @@ Options_ClockShow:
 	db "よる@"
 .none
 	db "ーー@"
+
+; ---- 項目 8：かいふく（ポケモンセンターの 回復の アニメ）。左右で ふつう・はやい
+Options_Heal:
+	ldh a, [hJoyPressed]
+	and %00110000                ; みぎ・ひだり
+	jr z, Options_HealShow
+	ld hl, wOptions2
+	ld a, [hl]
+	xor 1 << HEAL_FAST_BIT
+	ld [hl], a
+	; そのまま 出す
+Options_HealShow:
+	ld a, [wOptions2]
+	bit HEAL_FAST_BIT, a
+	ld de, .normal
+	jr z, .put
+	ld de, .fast
+.put
+	ld hl, wTilemap + HEAL_ROW * SCREEN_WIDTH + HEAL_VALUE_COL
+	call PlaceString
+	and a
+	ret
+.normal
+	db "ふつう@"
+.fast
+	db "はやい@"
+
+SECTION "opt pages", ROMX[OPT_PAGE_ADDR], BANK[OPT_FAR_BANK]
+; ---- 2ページ：項目 0〜7（とけい）は 1ページめ、8（かいふく）は 2ページめ。
+; カーソルが ページを こえたら（下・上・まわりこみ）画面を かきなおす。
+Options_CheckPage:
+	ld a, [wJumptableIndex]
+	cp OPT_HEAL
+	ld a, 0
+	jr c, .want
+	ld a, 1 << OPT_PAGE_BIT
+.want
+	ld b, a
+	ld a, [wClockSub]
+	and 1 << OPT_PAGE_BIT
+	cp b
+	ret z
+	ld a, b
+	ld [wClockSub], a            ; ページを かえる（とけいの 行は「あさ・ひる・よる」の側に もどす）
+	call Options_ClearInside
+	ld a, [wClockSub]
+	and a
+	jr nz, Options_DrawPage2
+; 1ページめ：元の 開いた ときと 同じ ように かく
+	ld hl, wTilemap + 1 * SCREEN_WIDTH + 1
+	ld de, Options_StringOptions
+	call PlaceString
+	ld hl, wTilemap + 13 * SCREEN_WIDTH + 11
+	ld de, .type
+	call PlaceString
+	ld a, [wJumptableIndex]
+	push af
+	ldh a, [hJoyPressed]
+	push af
+	xor a
+	ldh [hJoyPressed], a         ; 値を かえない ように
+	ld [wJumptableIndex], a
+	ld c, 6                      ; 元と 同じ（ウインドウ の 前まで）
+.loop
+	push bc
+	xor a
+	ldh [hJoyLast], a
+	ld a, OPT_BANK
+	ld hl, GetOptionPointer
+	rst $08
+	pop bc
+	ld hl, wJumptableIndex
+	inc [hl]
+	dec c
+	jr nz, .loop
+	pop af
+	ldh [hJoyPressed], a
+	pop af
+	ld [wJumptableIndex], a
+	ld a, OPT_BANK
+	ld hl, UpdateFrame
+	rst $08
+	ld hl, wTilemap + CLOCK_ROW * SCREEN_WIDTH + 1
+	ld de, Options_ClockLabels.label
+	call PlaceString
+	jp Options_ClockLabels
+.type
+	INCBIN "base.gbc", OPT_BANK * $4000 + $4ade - $4000, 3   ; タイプ（金は $4c58）
+	db "@"
+
+Options_DrawPage2:
+	ld hl, wTilemap + PAGE_NUM_ROW * SCREEN_WIDTH + PAGE_NUM_COL
+	ld a, $f8                     ; 2
+	call Options_PutPageNum
+	ld hl, wTilemap + HEAL_ROW * SCREEN_WIDTH + 1
+	ld de, .heal
+	call PlaceString
+	jp Options_HealShow
+.heal
+	db "かいふく@"
+
+; ページの 番号「1／2」「2／2」（a = 今の ページの 数字）
+Options_PutPageNum:
+	ld [hli], a
+	ld a, $f3                     ; ／
+	ld [hli], a
+	ld a, $f8                     ; 2
+	ld [hl], a
+	ret
+
+; わくの 中（1〜16行目・1〜18列目）を 空白に
+Options_ClearInside:
+	ld hl, wTilemap + 1 * SCREEN_WIDTH + 1
+	ld c, 16
+.row
+	push hl
+	ld b, SCREEN_WIDTH - 2
+	ld a, $7f
+.col
+	ld [hli], a
+	dec b
+	jr nz, .col
+	pop hl
+	ld de, SCREEN_WIDTH
+	add hl, de
+	dec c
+	jr nz, .row
+	ret
+
+Options_StringOptions:
+	INCBIN "base.gbc", OPT_BANK * $4000 + StringOptions - $4000, StringOptionsLen
