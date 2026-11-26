@@ -196,6 +196,7 @@ import gold_p123; _l123 = []; gold_p123.apply(g, _l123, MOD); print('\n'.join(_l
 import gold_p126; _l126 = []; _fb126 = E.next_bank; E.next_bank += 1; gold_p126.apply(g, _l126, _fb126); print('\n'.join(_l126))
 import gold_p127; _l127 = []; gold_p127.apply(g, _l127); print('\n'.join(_l127))
 _l128 = []; _fb128 = E.next_bank; E.next_bank += 1; gold_p128.apply(g, _l128, _fb128); print('\n'.join(_l128))
+import gold_p130; _l130 = []; _fb130 = E.next_bank; E.next_bank += 1; gold_p130.apply(g, _l130, _fb130); print('\n'.join(_l130))
 import gold_textwrap
 _lw = []; gold_textwrap.apply(g, _lw); print('\n'.join(_lw))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF
