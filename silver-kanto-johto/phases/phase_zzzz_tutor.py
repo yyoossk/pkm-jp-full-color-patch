@@ -12,6 +12,7 @@
    ・ジム以外（わざマシンを もらった あと その人が 教える）：タマムシの おじいさん タマゴうみ・シルフ2F じばく・
      グレンの 研究所 ゆびをふる・デパート3F カウンター・ものまねむすめ ものまね・屋上の 女の子 れいとうビーム／いわなだれ／
      トライアタック（もらった 分だけ）。もとの スクリプトの はじめ 4バイトを farsjump に。
+   ・おつきみやま 1F (5,32) の ボール（第128弾。赤の わざマシン12）：拾うと みずでっぽうを 教える（KT_WaterGunBall）。
    ・わざ教えの 本体：クリスタルの MoveTutor・CheckCanLearnMoveTutorMove を 移した もの（callasm。wScriptVar ＝ わざ番号、
      教えたら 0・やめたら $FF）。predef CanLearnTMHMMove（表 $02:$4B85）を 包んで、wScriptVar と わざが 同じ ときだけ
      赤の 表で 答える（わざマシンを 使う ときは もとのまま）。本体 $FC:$4000〜。"""
@@ -26,6 +27,7 @@ CALLED = 0xBA8            # $D782 ビット0〜5（ジムごとの 呼び止め�
 CELADON_HIDE = 0xBAE      # タマムシの 案内の 人を かくす
 PREDEF_CANLEARN = 0x8B85  # predef の 表の CanLearnTMHMMove（$04:$59BF）
 GUIDE_SPRITE = 72
+TM12_BALL_FLAG = 0x805    # おつきみやま 1F (5,32) の ボール（第128弾）
 PASS = {0x00, 0x01, 0x03, 0x04, 0x10, 0x12, 0x14, 0x18, 0x1c, 0x48, 0x49, 0x4a, 0x4b, 0x4c}
 KIT = os.path.join(H, 'build', 'kit')
 # (グループ, マップ, リーダー, バッジの エンジンフラグ, わざ, わざの 名前, 写しの バンク, 足す 案内の 人)
@@ -267,9 +269,10 @@ def apply(rom, ctx):
         for k in range(len(gy['legs'])): S.append('\tdw KT_Leave_%d_%d' % (gi, k))
         if gy['addpos']: S.append('\tdw KT_CeladonCallback')
     for ni in range(len(NPCS)): S.append('\tdw KT_Npc_%d' % ni)
+    S.append('\tdw KT_WaterGunBall')                                   # 第128弾：おつきみやま 1F の ボール
     S.append('SECTION "kt", ROMX[$4100], BANK[$%02X]' % CODE_BANK)
     S.append(open(os.path.join(H, 'src', 'kantotutor.inc'), encoding='utf-8').read())
-    allmv = [g[4] for g in GYMS] + [m for _, t in NPCS for _, m, _ in t]
+    allmv = [g[4] for g in GYMS] + [m for _, t in NPCS for _, m, _ in t] + ['WATER_GUN']
     S.append('KT_RedTable:')
     for k, m in enumerate(allmv): S.append('\tdb %s\n\tdw KT_RedList_%d' % (m, k))
     S.append('\tdb 0')
@@ -349,6 +352,16 @@ def apply(rom, ctx):
             S.append('%sask:\n%s' % (N, txt('わざマシンの　わざを<L>おしえて　あげようか？')))
             S.append('%sbye:\n%s' % (N, txt('また　いつでも<L>おしえて　あげるね！')))
             for k, (fl, mv, nm) in enumerate(teach): S.append('%sq%d:\n%s' % (N, k, txt(nm + 'を<L>おぼえさせる？')))
+    # 第128弾：おつきみやま 1F (5,32) の ボール（赤の わざマシン12）。拾うと みずでっぽうを 教える。教えたら ボールは 消え、
+    # いいえ・やめたら のこる（phase_zzzzzz_k128 が ボールを この スクリプトに つなぐ）
+    S.append('KT_WaterGunBall:')
+    S.append('\topentext\n\twritetext KT_WG_find\n\tyesorno\n\tiffalse .no')
+    S.append('\tsetval WATER_GUN\n\tcallasm KT_MoveTutor\n\tifequal 0, .ok')
+    S.append('.no\n\twritetext KT_WG_keep\n\twaitbutton\n\tclosetext\n\tend')
+    S.append('.ok\n\tclosetext\n\tdb setevent_command\n\tdw $%04X\n\tdisappear LAST_TALKED\n\tend' % TM12_BALL_FLAG)
+    S.append('KT_WG_find:\n%s' % txt('<P>は　わざマシンを　みつけた！<PARA>なかには　みずでっぽうが<L>はいっている！<PARA>'
+                                       'みずでっぽうを<L>おぼえさせますか？'))
+    S.append('KT_WG_keep:\n%s' % txt('<P>は　わざマシンを<L>そのまま　のこしておいた'))
     asmpatch.overlay(rom, '\n'.join(S) + '\n', inc=[os.path.join(KIT, 'pokegold'), KIT], cwd=KIT)
 
     # ---- 表を 読む
@@ -393,6 +406,8 @@ def apply(rom, ctx):
         na = nxt(); q, n = npc_heads[ni]
         rom[q:q + 4] = bytes([0x04, CODE_BANK, na & 0xFF, na >> 8])
         log.append('$%02X:$%04X %s → $%02X:$%04X' % (ob, oa, '・'.join(x[2] for x in teach), CODE_BANK, na))
+    ctx['kt_watergun'] = nxt()
+    log.append('おつきみやま 1F の みずでっぽうの ボール → $%02X:$%04X' % (CODE_BANK, ctx['kt_watergun']))
     log.append('CanLearnTMHMMove の predef → $%02X:$%04X（赤の 表 %s）' % (CODE_BANK, wrap,
                {m: len(learners[m]) for m in allmv}))
     return rom
