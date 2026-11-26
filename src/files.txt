@@ -11,3 +11,5 @@ src/relearn_fix.asm
 src/tm_mart.asm
 src/changebox_fix.asm
 src/pc_item_desc.asm
+src/pokecenter_heal.asm
+src/options_heal.asm

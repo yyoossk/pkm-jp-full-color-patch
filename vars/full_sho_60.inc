@@ -28,3 +28,7 @@ DEF ChangeBoxRedrawBank EQU $03  ; ChangeBox の最後に jp していた所
 DEF ChangeBoxRedraw EQU $7FB3
 DEF HAS_PC_ITEM_DESC EQU 1      ; パソコンの「どうぐを ひきだす」で道具の説明を出す
 DEF HandleMenuInputW EQU $3A64  ; HandleMenuInput（入口）
+DEF HAS_HEAL_OPT EQU 1         ; 回復のあと下を向く・せっていで回復のアニメーションをとばす
+DEF Delay3 EQU $3D63
+DEF PlaceMenuCursor EQU $3B22
+DEF OptCursorX EQU $3B85       ; せってい：左右でカーソルの X をかえたあと
