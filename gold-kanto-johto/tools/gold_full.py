@@ -4,7 +4,7 @@ sys.path.insert(0, '/home/claude/work/scripts')
 from c2g import *
 from changed import changed_maps
 VAN = open('/home/claude/roms/Pocket Monsters - Crystal Version (Japan).gbc', 'rb').read()
-MOD = open(__import__('os').environ.get('MODROM', '/home/claude/work/ref/crystal_kj5.gbc'), 'rb').read()
+MOD = open(__import__('os').environ.get('MODROM', '/home/claude/work/ref/crystal_kj6.gbc'), 'rb').read()
 VAN = VAN + bytes(len(MOD) - len(VAN))
 import gold_scenes as _gs; print('シーンの 変数（readmem など）：直した %d' % len(_gs.ram_fix(VAN)))
 import os as _os
@@ -134,6 +134,7 @@ allblobs = {}
 for nm, (W, at) in walks.items(): allblobs.update(W.blobs)
 for k, b in allblobs.items(): E.place(k, b)
 _la = []; gold_asm.apply(E, MOD, g, _la, cm); gold_safari.apply(g, MOD, E, _la); gold_specials.apply(g, MOD, E.next_bank, _la); E.next_bank += 1; print('\n'.join(_la))
+import gold_p128; gold_p128.setup(E)    # 第128弾：グレンジムの 像
 import gold_tutor; _ltut = []; gold_tutor.install(E, g, _ltut)    # 第66弾：ジムの 案内の 人の 教え技
 for nm, (W, at) in walks.items(): emit_map(E, W, at, nm, cm[nm]['hdr'], MOD, g, gm, cm)
 gold_tutor.native(E, g, MOD, cm, _ltut); print('\n'.join(_ltut))
@@ -194,6 +195,7 @@ _lf = []; gold_fixes.apply(g, E, MOD, _lf); print('\n'.join(_lf))
 import gold_p123; _l123 = []; gold_p123.apply(g, _l123, MOD); print('\n'.join(_l123))
 import gold_p126; _l126 = []; _fb126 = E.next_bank; E.next_bank += 1; gold_p126.apply(g, _l126, _fb126); print('\n'.join(_l126))
 import gold_p127; _l127 = []; gold_p127.apply(g, _l127); print('\n'.join(_l127))
+_l128 = []; _fb128 = E.next_bank; E.next_bank += 1; gold_p128.apply(g, _l128, _fb128); print('\n'.join(_l128))
 import gold_textwrap
 _lw = []; gold_textwrap.apply(g, _lw); print('\n'.join(_lw))
 s = (sum(g) - g[0x14E] - g[0x14F]) & 0xFFFF; g[0x14E] = s >> 8; g[0x14F] = s & 0xFF

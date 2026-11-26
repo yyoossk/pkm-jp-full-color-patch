@@ -24,6 +24,8 @@ DEF PlaySFX            EQU $3d45
 DEF FarPrintText       EQU $3366
 DEF Predef             EQU $2e05
 DEF SFX_WRONG          EQU $19
+DEF GetSGBLayout       EQU $34e5
+DEF SCGB_PACKPALS      EQU $14
 DEF PREDEF_LEARNMOVE   EQU $00
 ; 0B:592A ChooseMonToLearnTMHM・0B:5A2E TMHMNotCompatibleText・03:7F70 KnowsMove・01:7CEC ChangeHappiness
 
@@ -34,6 +36,8 @@ Tutor:
 	call ClearBGPalettes
 	call ClearScreen
 	call DelayFrame
+	ld b, SCGB_PACKPALS              ; 第128弾：手持ちの 画面の 色と 属性（ないと 町や どうくつの タイルの 属性が 残り、空白に マップの 絵が 出た）
+	call GetSGBLayout
 	ld a, [wScriptVar]
 	ld [wNamedObjectIndex], a
 	ld [wPutativeTMHMMove], a

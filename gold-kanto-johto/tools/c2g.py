@@ -34,6 +34,7 @@ MAPALIAS = {}
 # クリスタル版で 2マスの 入口の 片方だけに warp が ある 所（赤・黄では 2マスとも 入口）。
 # マップ名 → [(足す マスの y, x, まねる warp の 番号（0から）)]。当たりは gold_fixes.fix_twin_doors
 EXTRA_TUTOR = {}       # 第66弾：マップ名 → f(E, gb, alloc, grom, coords, objs)（gold_tutor.py）
+EXTRA_BGS = {}         # 第128弾：マップ名 → f(E, gb, alloc, grom) → 足す 看板（5バイト ずつ）の リスト（gold_p128.py：グレンジムの 像）
 EXTRA_WARPS = {'Route2': [(35, 17, 3)]}          # ひでんマシン05の ゲートの 北の 入口（16,35 と 17,35）
 # ホームの住所（クリスタル → 金）
 HOMEMAP = {0x26B2: 0x27BF}   # ObjectEvent（jumptextfaceplayer ObjectEventText）
@@ -44,6 +45,9 @@ RAMMAP = {0xD071: 0xCF9D, 0xC2DD: 0xD165}    # wStringBuffer3・wScriptVar（ram
 EV_POOL = sorted((set(range(0x800)) - set(v for n, v in G['event'].items() if n.startswith('EVENT_')))
                  & set(v for n, v in C['event'].items() if n.startswith('EVENT_')))
 EV_EXTRA = {}
+# 第15弾の 土台の 外の フラグ（MOD の 弾ごと）：空きの うしろから 番号の 順に きめて おく（マップを 移す 順で 番号が かわらない ように、前の 版の セーブと あわせる）
+EV_HI = {}
+for _v in (0xA20, 0xA2C, 0xA2D): EV_HI[_v] = EV_POOL.pop()
 
 # 金に ない もの の かわり
 ENGINE_ALIAS = {'ENGINE_PLAYER_IS_FEMALE': 'ENGINE_UNUSED_STATUSFLAGS2_3', 'ENGINE_MOBILE_SYSTEM': 'ENGINE_UNUSED_STATUSFLAGS2_3'}   # 金に 女の子は いない（いつも 立たない フラグ）
@@ -70,7 +74,7 @@ class Xlat:
             if v < 0x800 or 0xA17 < v < 0xB00:   # 名前なしで 使っているが 金では 使われている 番号・第15弾の 土台の 外（第127弾 $A20）→ 空きを わりあてる
                 k = ('num', v)
                 # 第15弾の 土台の 外は 空きの うしろから（前から とると ほかの フラグの 番号が ずれて、前の 版の セーブと あわなく なる）
-                if k not in EV_EXTRA: EV_EXTRA[k] = EV_POOL.pop() if v > 0xA17 else EV_POOL.pop(0)
+                if k not in EV_EXTRA: EV_EXTRA[k] = EV_HI[v] if v > 0xA17 else EV_POOL.pop(0)
                 return EV_EXTRA[k]
             return s._m('event', v, ctx)
         g = G['event'].get(n)
@@ -232,8 +236,10 @@ def emit_map(E, W, at, cname, chdr, crom, grom, gmaps, cmaps_by_name):
         g, n = X.mapid((wv[3], wv[4]), cname + ' warp'); ev += wv[:3] + bytes([g, n])
     ev.append(len(coords))
     for c in coords: ev += c
-    ev.append(len(at['bgs']))
+    xbgs = EXTRA_BGS[cname](E, gb, alloc, grom) if cname in EXTRA_BGS else []
+    ev.append(len(at['bgs']) + len(xbgs))
     for g_ in at['bgs']: ev += g_[:3] + E.ptr(cb, w(g_, 3), cname + ' bg')[1].to_bytes(2, 'little')
+    for g_ in xbgs: ev += g_
     ev.append(len(objs))
     for ob in objs: ev += ob
     ea = alloc(len(ev), gb); grom[gb * 0x4000 + ea - 0x4000:gb * 0x4000 + ea - 0x4000 + len(ev)] = ev

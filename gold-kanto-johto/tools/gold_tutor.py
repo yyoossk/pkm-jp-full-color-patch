@@ -57,7 +57,9 @@ OPP = {'D': 'U', 'U': 'D', 'L': 'R', 'R': 'L'}
 OP = dict(scall=0x00, sjump=0x03, ifequal=0x06, iffalse=0x08, iftrue=0x09, callasm=0x0E, setval=0x15, readvar=0x1C,
           checkevent=0x31, clearevent=0x32, setevent=0x33, checkflag=0x34, opentext=0x47, closetext=0x49,
           writetext=0x4C, yesorno=0x4E, waitbutton=0x53, applymovement=0x68, faceplayer=0x6A, appear=0x6E,
-          turnobject=0x75, endcallback=0x8F, end=0x90)
+          turnobject=0x75, endcallback=0x8F, end=0x90, disappear=0x6D)
+# 第128弾：おつきみ山 1F の (5,32) の ボール（赤の わざマシン12 みずでっぽう）。ひろうと みずでっぽうを 教える
+MTMOON_BALL = ('G26_037', (5, 32), 'WATER_GUN', 0x805)
 
 
 def consts(path):
@@ -91,7 +93,7 @@ def red_learners(move):
 def all_moves():
     L = [g[3] for g in GYMS]
     for _, _, teach, _ in NPCS: L += [t[1] for t in teach]
-    return L
+    return L + [MTMOON_BALL[2]]                # 第128弾（さいごに 足す：ほかの わざの 表の 順は かわらない）
 
 
 def asm_bytes(addr, moves, tables):
@@ -269,6 +271,30 @@ def install(E, g, log):
             log.append('教え技 %s %s：%s フラグ %s、スクリプト %02X:%04X（%d バイト）' % (
                 cname, pos, '/'.join(t[1] for t in tc), ' '.join('%03X' % t[0] for t in tc), gb, a, len(data)))
         c2g.EXTRA_TUTOR[cname] = f
+    # 第128弾：おつきみ山 1F の ボール → ひろうと みずでっぽうを 教える（教えたら きえる、いいえ なら のこる）
+    cname, pos, mvn, mflag = MTMOON_BALL
+    def fb(E_, gb, alloc, grom, coords, objs, cbs, cname=cname, pos=pos, mvn=mvn, mflag=mflag):
+        gi = [i for i, ob in enumerate(objs) if (ob[2] - 4, ob[1] - 4) == pos]
+        assert len(gi) == 1, (cname, pos, gi); ob = objs[gi[0]]
+        fl = X.event(mflag, cname)
+        assert ob[0] == 0x54 and ob[7] & 0x0F == 1 and (ob[11] | ob[12] << 8) == fl, ob.hex(' ')
+        def build(base):
+            s_ = S(base)
+            s_.L('wg'); s_.op('opentext'); s_.op('writetext', 'find'); s_.op('yesorno'); s_.op('iffalse', 'no')
+            s_.tutor(MV[mvn], nb, sym, 'ok')
+            s_.L('no'); s_.op('writetext', 'keep'); s_.op('waitbutton'); s_.op('closetext'); s_.op('end')
+            s_.L('ok'); s_.op('closetext'); s_.op('setevent', (fl,)); s_.op('disappear', 0xFE); s_.op('end')
+            s_.L('find'); s_.raw(T('<PLAYER>は　わざマシンを　みつけた！<PARA>なかには　みずでっぽうが<LINE>はいっている！<PARA>'
+                                   'みずでっぽうを<LINE>おぼえさせますか？'))
+            s_.L('keep'); s_.raw(T('<PLAYER>は　わざマシンを<LINE>そのまま　のこしておいた'))
+            return s_
+        n = len(build(0x4000).done()); a = alloc(n, gb); sc = build(a); data = sc.done()
+        grom[fo(gb, a):fo(gb, a) + len(data)] = data
+        ob[7] = ob[7] & 0xF0; ob[9:11] = sc.lab['wg'].to_bytes(2, 'little')
+        log.append('第128弾 おつきみ山 1F %s の ボール：みずでっぽうを 教える（フラグ %03X）、スクリプト %02X:%04X（%d バイト）'
+                   % (pos, fl, gb, a, len(data)))
+    assert cname not in c2g.EXTRA_TUTOR
+    c2g.EXTRA_TUTOR[cname] = fb
     return nb
 
 

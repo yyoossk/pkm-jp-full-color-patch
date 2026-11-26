@@ -16,6 +16,8 @@ g.poke(0xD56D, 0x27); g.poke(0xD56E, 0x0F)                                      
 g.cmd('render 0')
 base = '/tmp/tc_base_%d.st' % os.getpid(); g.save_state(base)
 keys = sorted(w.maps)
+if os.environ.get('BANKS'):   # 環境変数 BANKS=A3,A0 … その スクリプトの バンクの マップだけ（直した マップと 同じ バンクだけ 見る とき）
+    _B = {int(x, 16) for x in os.environ['BANKS'].split(',')}; keys = [k for k in keys if w.maps[k]['attr']['scbank'] in _B]
 if SH: a_, n_ = map(int, SH.split('/')); keys = [k for j, k in enumerate(keys) if j % n_ == a_]
 done = set()
 if os.path.exists(OUT):
