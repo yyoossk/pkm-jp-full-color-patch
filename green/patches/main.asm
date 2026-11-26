@@ -567,6 +567,9 @@ INCLUDE "pc_item_swap.asm"
 ; １１．パソコンの「どうぐを ひきだす」で 道具の 説明を 出す
 INCLUDE "pc_item_desc.asm"
 
+; ポケモンセンターの 回復（回復の あと 下を 向く・せっていで 回復の アニメーションを とばす）
+INCLUDE "pokecenter_heal.asm"
+
 ; ７．わざの 思い出し（クチバの ファンクラブ）で 「きりさく」などを えらぶと、こわれて 止まる 直し
 ;   思い出しは DisplayListMenuID（リストの ID 1 ＝ わざの リスト）を 使う。リストを かく ときは わざの 名前
 ;   （GetMoveName：バンク4）で かくが、えらんだ ときの GetName は いつも どうぐの 名前の バンク（1）を 使う。

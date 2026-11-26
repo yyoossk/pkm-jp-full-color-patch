@@ -1,4 +1,4 @@
-# ポケットモンスター緑フルカラー ソース（Ver.1.8.0 から。今は Ver.1.12.0）
+# ポケットモンスター緑フルカラー ソース（Ver.1.8.0 から。今は Ver.1.13.0）
 
 Ver.1.8.0 の ROM を 土台にして、これからの 直しや 追加を ソースで 書いて 当てる ための 一式です（金の 改良と 同じ やり方）。
 元の ROM（緑 1.0・1.1）は 入って いません。
@@ -8,12 +8,13 @@ Ver.1.8.0 の ROM を 土台にして、これからの 直しや 追加を ソ�
 | フォルダ・ファイル | 中身 |
 |---|---|
 | `base_ips/` | 土台：Ver.1.8.0 の パッチ 12種類（1.0・1.1 の どちらの 元の ROM に 当てても 同じ ROM） |
-| `patches/main.asm` | **これからの 直しや 追加を 書く 所**（Ver.1.9.0・Ver.1.10.0・Ver.1.10.1・Ver.1.10.2・Ver.1.11.0・Ver.1.11.1・Ver.1.11.2・Ver.1.12.0 の 直し・追加が 入って いる） |
+| `patches/main.asm` | **これからの 直しや 追加を 書く 所**（Ver.1.9.0・Ver.1.10.0・Ver.1.10.1・Ver.1.10.2・Ver.1.11.0・Ver.1.11.1・Ver.1.11.2・Ver.1.12.0・Ver.1.13.0 の 直し・追加が 入って いる） |
 | `patches/dex_types.asm`・`patches/charmap.asm` | ずかんの キット（タイプ・進化・種族値）と、字の 番号 |
 | `patches/tm_mart.asm` | 殿堂入りの あと、タマムシデパートの わざマシンの 店で 一回切りの わざマシンも 買える |
 | `patches/changebox_fix.asm` | STARTボタンの「パソコン」で ボックスを かえた あと、話しかけると 止まるのを 直す |
 | `patches/pc_item_swap.asm` | パソコンの どうぐの リストで、SELECT の 入れかえが できないのを 直す |
 | `patches/pc_item_desc.asm` | パソコンの「どうぐを ひきだす」「どうぐを すてる」で、カーソルの 道具の 説明を 下の わくに 出す（ショップの 説明と 同じ。$D688 を 使う） |
+| `patches/pokecenter_heal.asm` | ポケモンセンターで 回復した あと 主人公が 下を 向く・「せってい」に「かいふくの アニメーション」（みる／とばす。wOptions の ビット4）を 足す |
 | `patches/follow.asm`・`patches/follow/` | 連れ歩き（金銀グラフィックの 完全版・60fps版・151匹そろう版・151匹そろう版の60fps版だけ）。絵と 色は `tools/follow_gen.py` で 連れ歩きキットから 作る |
 | `patches/editions/<版>.inc` | 版ごとに ちがう 番地を 書く 所（今は 空） |
 | `tools/build.py` | 12種類の ROM を 組む（土台 ＋ patches）。CRC32 を 出す |
@@ -28,8 +29,8 @@ Ver.1.8.0 の ROM を 土台にして、これからの 直しや 追加を ソ�
 python3 tools/build.py 元の緑.gb
 ```
 
-`out/` に 12種類の .gbc が できます。今の `patches/` で 組むと Ver.1.12.0 と 同じ CRC32 に なります
-（8A34C561・E1B6143E・A43386BF・6DC756AD・F4C9FA71・AB1B65FF・C1B6A79E・29FC5B38・167984AA・18B25513・6CE035EF・C23F09F0）。
+`out/` に 12種類の .gbc が できます。今の `patches/` で 組むと Ver.1.13.0 と 同じ CRC32 に なります
+（A058DA6B・BFD08C47・A43386BF・6DC756AD・F747851D・DD65961B・C1B6A79E・29FC5B38・A5370CB8・1B3C2A7F・3286AD96・06C60A43）。
 
 `patches/main.asm` が 空なら（土台だけ）Ver.1.8.0 と 同じ CRC32 に なります
 （0EE87A90・7814120C・A43386BF・6DC756AD・9959DBBE・926B3C64・C1B6A79E・29FC5B38・8CC78F88・6319700C・2EB1FD3A・49C8A03C）。
