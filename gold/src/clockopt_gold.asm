@@ -47,7 +47,12 @@ DEF wClockSub         EQU $de37     ; とけいの行で選んでいる所（0 =
 DEF wTilemap          EQU $c3a0
 DEF SCREEN_WIDTH      EQU 20
 DEF OPT_CLOCK         EQU 7
+DEF OPT_HEAL          EQU 8        ; かいふく（ポケモンセンターの 回復の アニメ。src/pcheal.asm）
 DEF CLOCK_ROW         EQU 15
+DEF HEAL_ROW          EQU 16
+DEF HEAL_VALUE_COL    EQU 11
+DEF wOptions2         EQU $d1b0    ; ビット3 ＝ はやい かいふく（ビット0 メニューせつめい・1〜2 電話の 回数）
+DEF HEAL_FAST_BIT     EQU 3
 DEF CLOCK_VALUE_COL   EQU 6        ; あさ・ひる・よる（「とけい」の右）
 DEF CLOCK_SET_COL     EQU 11       ; 「せってい」（カーソルの右）
 DEF RestartClock_Bank EQU $08
@@ -72,11 +77,11 @@ OptionsDispatch:
 	rst $08                      ; キャリー = せっていを閉じる
 	ret
 
-; ---- 上下の移動：いちばん下 = 7（とけい。おわり は なくした）
+; ---- 上下の移動：いちばん下 = 8（かいふく。おわり は なくした）
 SECTION "opt down max", ROMX[$4ed1 + 1], BANK[OPT_BANK]   ; OptionsControl .DownPressed の cp OPT_CANCEL
-	db OPT_CLOCK
+	db OPT_HEAL
 SECTION "opt up wrap", ROMX[$4eee + 1], BANK[OPT_BANK]    ; .UpPressed の ld [hl], NUM_OPTIONS
-	db OPT_CLOCK + 1
+	db OPT_HEAL + 1
 
 ; ---- カーソル：新しいバンクで消して置く。あまった所に 開いたときの入口
 SECTION "opt cursor", ROMX[Options_UpdateCursorPosition], BANK[OPT_BANK]
@@ -119,7 +124,9 @@ SECTION "opt new", ROMX[OPT_FAR_ADDR], BANK[OPT_FAR_BANK]
 Options_HighItems:
 	ld a, [wJumptableIndex]
 	cp OPT_CLOCK
-	jr z, Options_Clock
+	jp z, Options_Clock
+	cp OPT_HEAL
+	jp z, Options_Heal
 ; （おわり は なくしたので ここには来ない）
 	ldh a, [hJoyPressed]
 	and A_BUTTON
@@ -151,6 +158,12 @@ Options_CursorNew:
 	ld [hl], TILE_CURSOR
 	ret
 .bottom
+	cp OPT_HEAL
+	jr nz, .clockrow
+	ld hl, wTilemap + HEAL_ROW * SCREEN_WIDTH + 10
+	ld [hl], TILE_CURSOR
+	ret
+.clockrow
 	ld hl, wTilemap + CLOCK_ROW * SCREEN_WIDTH + 10
 	ld a, [wClockSub]
 	and a
@@ -169,6 +182,10 @@ Options_InitClock:
 	ld hl, wTilemap + CLOCK_ROW * SCREEN_WIDTH + 1
 	ld de, .label
 	call PlaceString
+	ld hl, wTilemap + HEAL_ROW * SCREEN_WIDTH + 1
+	ld de, .heal
+	call PlaceString
+	call Options_HealShow
 	ld a, [wMapGroup]
 	and a
 	jp z, Options_ClockShow      ; ゲームを始める前は 右の文を出さない
@@ -178,6 +195,8 @@ Options_InitClock:
 	jp Options_ClockShow
 .label
 	db "とけい@"
+.heal
+	db "かいふく@"
 .set
 	db "せってい@"
 
@@ -316,3 +335,29 @@ Options_ClockShow:
 	db "よる@"
 .none
 	db "ーー@"
+
+; ---- 項目 8：かいふく（ポケモンセンターの 回復の アニメ）。左右で ふつう・はやい
+Options_Heal:
+	ldh a, [hJoyPressed]
+	and %00110000                ; みぎ・ひだり
+	jr z, Options_HealShow
+	ld hl, wOptions2
+	ld a, [hl]
+	xor 1 << HEAL_FAST_BIT
+	ld [hl], a
+	; そのまま 出す
+Options_HealShow:
+	ld a, [wOptions2]
+	bit HEAL_FAST_BIT, a
+	ld de, .normal
+	jr z, .put
+	ld de, .fast
+.put
+	ld hl, wTilemap + HEAL_ROW * SCREEN_WIDTH + HEAL_VALUE_COL
+	call PlaceString
+	and a
+	ret
+.normal
+	db "ふつう@"
+.fast
+	db "はやい@"
